@@ -216,10 +216,11 @@ const allowedOrigins = parseAllowedOrigins(
 const server = createServer((request, response) => {
   const url = requestURL(request);
 
-  if (url.pathname === "/health") {
+  if (url.pathname === "/" || url.pathname === "/health") {
     const health = jsonResponse(200, {
       ok: true,
       service: "nega-yunana-realtime-relay",
+      websocketPath: "/realtime",
     });
 
     response.writeHead(health.status, health.headers);
