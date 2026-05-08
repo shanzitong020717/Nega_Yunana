@@ -29,6 +29,37 @@ export type RealtimeSessionCredential = {
 const DEFAULT_REALTIME_MODEL = "gpt-realtime-mini";
 const CLIENT_SECRET_TTL_SECONDS = 600;
 
+function getErrorField(
+  error: unknown,
+  field: "status" | "code" | "type" | "param" | "request_id",
+) {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const value = (error as Record<string, unknown>)[field];
+
+  return typeof value === "string" || typeof value === "number"
+    ? value
+    : undefined;
+}
+
+function logRealtimeProviderError(error: unknown) {
+  if (process.env.NODE_ENV === "test") {
+    return;
+  }
+
+  console.warn("[realtime] Provider session creation failed.", {
+    name: error instanceof Error ? error.name : undefined,
+    message: error instanceof Error ? error.message : String(error),
+    status: getErrorField(error, "status"),
+    code: getErrorField(error, "code"),
+    type: getErrorField(error, "type"),
+    param: getErrorField(error, "param"),
+    requestId: getErrorField(error, "request_id"),
+  });
+}
+
 function shouldUseMockMode(input: Pick<CreateRealtimeSessionInput, "mockMode">) {
   return (
     input.mockMode === true ||
@@ -148,9 +179,12 @@ export async function createRealtimeSession(
     },
   } satisfies ClientSecretCreateParams;
 
-  const clientSecret = await getOpenAIClient().realtime.clientSecrets.create(
-    params,
-  );
+  const clientSecret = await getOpenAIClient().realtime.clientSecrets
+    .create(params)
+    .catch((error: unknown) => {
+      logRealtimeProviderError(error);
+      throw error;
+    });
 
   return {
     clientSecret: clientSecret.value,
