@@ -57,6 +57,7 @@ describe("RealtimeRoom mock UI", () => {
       "已静音",
       "连接中",
       "需要麦克风权限",
+      "连接失败",
       "会话已结束",
     ].forEach((state) => {
       expect(screen.getAllByText(state).length).toBeGreaterThan(0);

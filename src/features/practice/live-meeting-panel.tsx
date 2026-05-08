@@ -10,6 +10,7 @@ export type RealtimeRoomState =
   | "Muted"
   | "Reconnecting"
   | "Mic Permission Required"
+  | "Connection Error"
   | "Session Ended";
 
 export type TranscriptTurn = {
@@ -36,6 +37,7 @@ const allStates: RealtimeRoomState[] = [
   "Muted",
   "Reconnecting",
   "Mic Permission Required",
+  "Connection Error",
   "Session Ended",
 ];
 
@@ -47,6 +49,7 @@ const stateLabels: Record<RealtimeRoomState, string> = {
   Muted: "已静音",
   Reconnecting: "连接中",
   "Mic Permission Required": "需要麦克风权限",
+  "Connection Error": "连接失败",
   "Session Ended": "会话已结束",
 };
 

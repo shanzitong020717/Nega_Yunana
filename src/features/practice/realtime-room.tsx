@@ -13,10 +13,16 @@ import {
   SmartSupportPanel,
   type SmartCue,
 } from "@/features/practice/smart-support-panel";
+import {
+  decodePCM16Base64ToFloat32,
+  encodeFloat32AudioToPCM16Base64,
+} from "@/lib/audio/pcm";
 
 type RealtimeRoomProps = {
   sessionId: string;
 };
+
+type BrowserAudioContextConstructor = typeof AudioContext;
 
 type RealtimeWebRTCSessionResponse = {
   transport?: "webrtc";
@@ -69,6 +75,8 @@ const cueResponses: Record<SmartCue, string> = {
   "Challenge Me":
     "Challenge: Why should we choose Rokid instead of a phone translation app?",
 };
+const REALTIME_AUDIO_SAMPLE_RATE = 24_000;
+const INPUT_AUDIO_BUFFER_SIZE = 4096;
 
 function nextTurnId() {
   return `turn_${crypto.randomUUID()}`;
@@ -82,6 +90,14 @@ function isRelayRealtimeCredential(
   realtimeSession: RealtimeSessionResponse,
 ): realtimeSession is RealtimeRelaySessionResponse {
   return realtimeSession.transport === "websocket_relay";
+}
+
+function getBrowserAudioContext() {
+  const browserGlobal = globalThis as typeof globalThis & {
+    webkitAudioContext?: BrowserAudioContextConstructor;
+  };
+
+  return browserGlobal.AudioContext ?? browserGlobal.webkitAudioContext;
 }
 
 function eventText(event: Record<string, unknown>) {
@@ -107,7 +123,15 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const relayInputAudioContextRef = useRef<AudioContext | null>(null);
+  const relayInputAudioSourceRef = useRef<MediaStreamAudioSourceNode | null>(
+    null,
+  );
+  const relayInputProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const relayOutputAudioContextRef = useRef<AudioContext | null>(null);
+  const relayOutputTimeRef = useRef(0);
   const relaySocketRef = useRef<WebSocket | null>(null);
+  const isMutedRef = useRef(false);
   const transcriptTurnsRef = useRef(initialTranscript);
 
   useEffect(() => {
@@ -149,6 +173,15 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     dataChannelRef.current = null;
     relaySocketRef.current?.close();
     relaySocketRef.current = null;
+    relayInputProcessorRef.current?.disconnect();
+    relayInputProcessorRef.current = null;
+    relayInputAudioSourceRef.current?.disconnect();
+    relayInputAudioSourceRef.current = null;
+    void relayInputAudioContextRef.current?.close();
+    relayInputAudioContextRef.current = null;
+    relayOutputTimeRef.current = 0;
+    void relayOutputAudioContextRef.current?.close();
+    relayOutputAudioContextRef.current = null;
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
     mediaStreamRef.current?.getTracks().forEach((track) => {
@@ -189,6 +222,11 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
 
     const type = event.type;
     const text = eventText(event);
+    const audioDelta = event.delta;
+
+    if (type === "response.audio.delta" && typeof audioDelta === "string") {
+      playPCM16AudioDelta(audioDelta);
+    }
 
     if (!text) {
       return;
@@ -213,6 +251,42 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
   }
 
+  function parseRealtimeEvent(message: MessageEvent<string>) {
+    try {
+      return JSON.parse(message.data) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+
+  function playPCM16AudioDelta(base64Audio: string) {
+    const AudioContextConstructor = getBrowserAudioContext();
+
+    if (!AudioContextConstructor) {
+      return;
+    }
+
+    const audioContext =
+      relayOutputAudioContextRef.current ?? new AudioContextConstructor();
+    relayOutputAudioContextRef.current = audioContext;
+
+    const samples = decodePCM16Base64ToFloat32(base64Audio);
+    const audioBuffer = audioContext.createBuffer(
+      1,
+      samples.length,
+      REALTIME_AUDIO_SAMPLE_RATE,
+    );
+    audioBuffer.copyToChannel(samples, 0);
+
+    const source = audioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(audioContext.destination);
+
+    const startAt = Math.max(audioContext.currentTime, relayOutputTimeRef.current);
+    source.start(startAt);
+    relayOutputTimeRef.current = startAt + audioBuffer.duration;
+  }
+
   function sendRealtimeEvent(event: Record<string, unknown>) {
     const serializedEvent = JSON.stringify(event);
     const dataChannel = dataChannelRef.current;
@@ -229,7 +303,60 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
   }
 
+  async function startRelayMicrophoneStreaming(stream: MediaStream) {
+    const AudioContextConstructor = getBrowserAudioContext();
+
+    if (!AudioContextConstructor) {
+      throw new Error("当前浏览器无法初始化实时音频。");
+    }
+
+    const audioContext = new AudioContextConstructor();
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(
+      INPUT_AUDIO_BUFFER_SIZE,
+      1,
+      1,
+    );
+
+    processor.onaudioprocess = (event) => {
+      const output = event.outputBuffer.getChannelData(0);
+      output.fill(0);
+
+      const relaySocket = relaySocketRef.current;
+
+      if (
+        !relaySocket ||
+        relaySocket.readyState !== WebSocket.OPEN ||
+        isMutedRef.current
+      ) {
+        return;
+      }
+
+      const audio = encodeFloat32AudioToPCM16Base64(
+        event.inputBuffer.getChannelData(0),
+        {
+          inputSampleRate: audioContext.sampleRate,
+          outputSampleRate: REALTIME_AUDIO_SAMPLE_RATE,
+        },
+      );
+
+      relaySocket.send(
+        JSON.stringify({
+          type: "input_audio_buffer.append",
+          audio,
+        }),
+      );
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+    relayInputAudioContextRef.current = audioContext;
+    relayInputAudioSourceRef.current = source;
+    relayInputProcessorRef.current = processor;
+  }
+
   async function connectRealtimeWebSocketRelay(
+    stream: MediaStream,
     realtimeSession: RealtimeRelaySessionResponse,
   ) {
     const relayUrl = new URL(realtimeSession.relayUrl);
@@ -239,34 +366,78 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     relaySocketRef.current = relaySocket;
 
     await new Promise<void>((resolve, reject) => {
+      let settled = false;
       const timeout = window.setTimeout(() => {
-        reject(new Error("实时 Relay 连接超时。"));
+        settle(() => {
+          reject(new Error("实时 Relay 连接超时。"));
+        });
       }, 10_000);
 
+      function settle(callback: () => void) {
+        if (settled) {
+          return;
+        }
+
+        settled = true;
+        window.clearTimeout(timeout);
+        callback();
+      }
+      const startRelaySession = () => {
+        setState("Listening");
+        addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
+        void startRelayMicrophoneStreaming(stream).catch(() => {
+          addSystemTurn("实时音频初始化失败，请检查浏览器音频权限。");
+        });
+        sendRealtimeEvent({
+          type: "response.create",
+          response: {
+            modalities: ["audio", "text"],
+            instructions:
+              "Start the roleplay by asking one concise customer discovery question about smart glasses in an overseas business meeting.",
+          },
+        });
+      };
+
       relaySocket.addEventListener("message", handleRealtimeEvent);
+      relaySocket.addEventListener("message", (message) => {
+        const event = parseRealtimeEvent(message);
+
+        if (event?.type === "relay.ready") {
+          settle(() => {
+            startRelaySession();
+            resolve();
+          });
+          return;
+        }
+
+        if (event?.type === "relay.error") {
+          settle(() => {
+            reject(new Error("实时 Relay 无法连接到模型服务。"));
+          });
+        }
+      });
       relaySocket.addEventListener(
         "open",
         () => {
-          window.clearTimeout(timeout);
-          setState("Listening");
-          addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
-          sendRealtimeEvent({
-            type: "response.create",
-            response: {
-              modalities: ["text"],
-              instructions:
-                "Start the roleplay by asking one concise customer discovery question about smart glasses in an overseas business meeting.",
-            },
-          });
-          resolve();
+          addSystemTurn("实时 Relay 已连接，正在等待模型服务就绪。");
         },
         { once: true },
       );
       relaySocket.addEventListener(
         "error",
         () => {
-          window.clearTimeout(timeout);
-          reject(new Error("实时 Relay 连接失败。"));
+          settle(() => {
+            reject(new Error("实时 Relay 连接失败。"));
+          });
+        },
+        { once: true },
+      );
+      relaySocket.addEventListener(
+        "close",
+        () => {
+          settle(() => {
+            reject(new Error("实时 Relay 连接已关闭。"));
+          });
         },
         { once: true },
       );
@@ -278,7 +449,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     realtimeSession: RealtimeSessionResponse,
   ) {
     if (isRelayRealtimeCredential(realtimeSession)) {
-      await connectRealtimeWebSocketRelay(realtimeSession);
+      await connectRealtimeWebSocketRelay(stream, realtimeSession);
       return;
     }
 
@@ -363,14 +534,27 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      let stream: MediaStream;
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        setState("Mic Permission Required");
+        addSystemTurn("开始语音练习需要麦克风权限。");
+        return;
+      }
+
       mediaStreamRef.current = stream;
       const realtimeSession = await requestRealtimeSession();
       await connectRealtimeWebRTC(stream, realtimeSession);
-    } catch {
+    } catch (error) {
       closeRealtimeConnection();
-      setState("Mic Permission Required");
-      addSystemTurn("开始语音练习需要麦克风权限。");
+      setState("Connection Error");
+      addSystemTurn(
+        error instanceof Error
+          ? error.message
+          : "实时连接失败，请稍后重试。",
+      );
     }
   }
 
@@ -423,6 +607,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         track.enabled = !nextMuted;
       });
       setState(nextMuted ? "Muted" : "Listening");
+      isMutedRef.current = nextMuted;
       return nextMuted;
     });
   }
@@ -444,6 +629,9 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     });
     sendRealtimeEvent({
       type: "response.create",
+      response: {
+        modalities: ["audio", "text"],
+      },
     });
     addSystemTurn(cueResponses[cue]);
   }
