@@ -77,6 +77,7 @@ const cueResponses: Record<SmartCue, string> = {
 };
 const REALTIME_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
+const RELAY_READY_TIMEOUT_MS = 45_000;
 
 function nextTurnId() {
   return `turn_${crypto.randomUUID()}`;
@@ -371,7 +372,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         settle(() => {
           reject(new Error("实时 Relay 连接超时。"));
         });
-      }, 10_000);
+      }, RELAY_READY_TIMEOUT_MS);
 
       function settle(callback: () => void) {
         if (settled) {
@@ -427,7 +428,11 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         "error",
         () => {
           settle(() => {
-            reject(new Error("实时 Relay 连接失败。"));
+            reject(
+              new Error(
+                "实时 Relay 连接失败，请确认当前网址已加入 Relay 白名单。",
+              ),
+            );
           });
         },
         { once: true },

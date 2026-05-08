@@ -2,6 +2,10 @@ import { createServer, type IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
+import {
+  isRealtimeRelayOriginAllowed,
+  parseRealtimeRelayAllowedOrigins,
+} from "../src/lib/ai/realtime-relay-origin";
 import { buildProviderRealtimeWebSocketURL } from "../src/lib/ai/realtime-relay-url";
 import { verifyRealtimeRelayToken } from "../src/lib/ai/realtime-relay-token";
 
@@ -42,27 +46,17 @@ function requiredEnv(name: string) {
   return value;
 }
 
-function parseAllowedOrigins(value: string | undefined) {
-  return new Set(
-    (value ?? "")
-      .split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  );
-}
-
 function requestURL(request: IncomingMessage) {
   return new URL(request.url ?? "/", `http://${request.headers.host}`);
 }
 
 function isOriginAllowed(request: IncomingMessage, allowedOrigins: Set<string>) {
-  if (allowedOrigins.size === 0) {
-    return true;
-  }
-
   const origin = request.headers.origin;
 
-  return typeof origin === "string" && allowedOrigins.has(origin);
+  return isRealtimeRelayOriginAllowed(
+    typeof origin === "string" ? origin : undefined,
+    allowedOrigins,
+  );
 }
 
 function jsonResponse(status: number, payload: Record<string, unknown>) {
@@ -209,7 +203,7 @@ const port = Number.parseInt(optionalEnv("PORT") ?? `${DEFAULT_PORT}`, 10);
 const sharedSecret = requiredEnv("REALTIME_RELAY_SHARED_SECRET");
 const providerApiKey = requiredEnv("OPENAI_API_KEY");
 const defaultModel = optionalEnv("OPENAI_REALTIME_MODEL") ?? DEFAULT_REALTIME_MODEL;
-const allowedOrigins = parseAllowedOrigins(
+const allowedOrigins = parseRealtimeRelayAllowedOrigins(
   optionalEnv("REALTIME_RELAY_ALLOWED_ORIGINS"),
 );
 
