@@ -18,13 +18,28 @@ type RealtimeRoomProps = {
   sessionId: string;
 };
 
-type RealtimeSessionResponse = {
+type RealtimeWebRTCSessionResponse = {
+  transport?: "webrtc";
   clientSecret: string;
   sessionId: string;
   expiresAt: string;
   model: string;
   instructionsPreview: string;
 };
+
+type RealtimeRelaySessionResponse = {
+  transport: "websocket_relay";
+  relayUrl: string;
+  relayToken: string;
+  sessionId: string;
+  expiresAt: string;
+  model: string;
+  instructionsPreview: string;
+};
+
+type RealtimeSessionResponse =
+  | RealtimeWebRTCSessionResponse
+  | RealtimeRelaySessionResponse;
 
 const initialTranscript: TranscriptTurn[] = [
   {
@@ -63,6 +78,12 @@ function isMockRealtimeCredential(clientSecret: string) {
   return clientSecret.startsWith("mock_realtime_client_secret_");
 }
 
+function isRelayRealtimeCredential(
+  realtimeSession: RealtimeSessionResponse,
+): realtimeSession is RealtimeRelaySessionResponse {
+  return realtimeSession.transport === "websocket_relay";
+}
+
 function eventText(event: Record<string, unknown>) {
   const transcript = event.transcript;
   const text = event.text;
@@ -86,6 +107,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const relaySocketRef = useRef<WebSocket | null>(null);
   const transcriptTurnsRef = useRef(initialTranscript);
 
   useEffect(() => {
@@ -125,6 +147,8 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   function closeRealtimeConnection() {
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
+    relaySocketRef.current?.close();
+    relaySocketRef.current = null;
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
     mediaStreamRef.current?.getTracks().forEach((track) => {
@@ -189,20 +213,75 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
   }
 
-  function sendDataChannelEvent(event: Record<string, unknown>) {
+  function sendRealtimeEvent(event: Record<string, unknown>) {
+    const serializedEvent = JSON.stringify(event);
     const dataChannel = dataChannelRef.current;
 
-    if (!dataChannel || dataChannel.readyState !== "open") {
+    if (dataChannel?.readyState === "open") {
+      dataChannel.send(serializedEvent);
       return;
     }
 
-    dataChannel.send(JSON.stringify(event));
+    const relaySocket = relaySocketRef.current;
+
+    if (relaySocket?.readyState === WebSocket.OPEN) {
+      relaySocket.send(serializedEvent);
+    }
+  }
+
+  async function connectRealtimeWebSocketRelay(
+    realtimeSession: RealtimeRelaySessionResponse,
+  ) {
+    const relayUrl = new URL(realtimeSession.relayUrl);
+    relayUrl.searchParams.set("token", realtimeSession.relayToken);
+
+    const relaySocket = new WebSocket(relayUrl);
+    relaySocketRef.current = relaySocket;
+
+    await new Promise<void>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(new Error("实时 Relay 连接超时。"));
+      }, 10_000);
+
+      relaySocket.addEventListener("message", handleRealtimeEvent);
+      relaySocket.addEventListener(
+        "open",
+        () => {
+          window.clearTimeout(timeout);
+          setState("Listening");
+          addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
+          sendRealtimeEvent({
+            type: "response.create",
+            response: {
+              modalities: ["text"],
+              instructions:
+                "Start the roleplay by asking one concise customer discovery question about smart glasses in an overseas business meeting.",
+            },
+          });
+          resolve();
+        },
+        { once: true },
+      );
+      relaySocket.addEventListener(
+        "error",
+        () => {
+          window.clearTimeout(timeout);
+          reject(new Error("实时 Relay 连接失败。"));
+        },
+        { once: true },
+      );
+    });
   }
 
   async function connectRealtimeWebRTC(
     stream: MediaStream,
     realtimeSession: RealtimeSessionResponse,
   ) {
+    if (isRelayRealtimeCredential(realtimeSession)) {
+      await connectRealtimeWebSocketRelay(realtimeSession);
+      return;
+    }
+
     const PeerConnection = globalThis.RTCPeerConnection;
 
     if (
@@ -234,7 +313,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     dataChannelRef.current = dataChannel;
     dataChannel.addEventListener("message", handleRealtimeEvent);
     dataChannel.addEventListener("open", () => {
-      sendDataChannelEvent({
+      sendRealtimeEvent({
         type: "response.create",
         response: {
           instructions:
@@ -350,7 +429,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
 
   function handleCue(cue: SmartCue) {
     setState(cue === "Challenge Me" ? "Speaking" : "Thinking");
-    sendDataChannelEvent({
+    sendRealtimeEvent({
       type: "conversation.item.create",
       item: {
         type: "message",
@@ -363,7 +442,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         ],
       },
     });
-    sendDataChannelEvent({
+    sendRealtimeEvent({
       type: "response.create",
     });
     addSystemTurn(cueResponses[cue]);

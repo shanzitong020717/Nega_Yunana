@@ -55,6 +55,14 @@ For the current Plato AI style third-party setup, use:
 - `OPENAI_TEXT_MODEL=gpt-4o-realtime-preview`
 - `OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview`
 
+For Realtime, Plato AI currently supports direct WebSocket access but not the OpenAI ephemeral WebRTC client secret endpoint. Deploy the Render relay in `render.yaml`, then set these Vercel variables:
+
+- `OPENAI_REALTIME_TRANSPORT=websocket_relay`
+- `REALTIME_RELAY_URL=wss://<your-render-service>.onrender.com/realtime`
+- `REALTIME_RELAY_SHARED_SECRET=<same value as Render>`
+
+See `docs/render-realtime-relay.md`.
+
 ## CLI Commands
 
 Use these commands if you prefer the terminal. Do not paste secrets into committed files.

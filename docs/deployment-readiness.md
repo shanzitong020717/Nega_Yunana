@@ -6,6 +6,9 @@ Configure these variables in the deployment provider before enabling real AI cal
 
 - `OPENAI_API_KEY`: server-side OpenAI API key.
 - `OPENAI_BASE_URL`: optional OpenAI-compatible API endpoint for third-party providers. Leave unset for official OpenAI.
+- `OPENAI_REALTIME_TRANSPORT`: use `webrtc` for official OpenAI ephemeral client secrets, or `websocket_relay` for the Render relay.
+- `REALTIME_RELAY_URL`: Render relay WebSocket URL when `OPENAI_REALTIME_TRANSPORT=websocket_relay`.
+- `REALTIME_RELAY_SHARED_SECRET`: shared HMAC secret used by Vercel and Render to sign and verify relay tokens.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `APP_BASE_URL`: public app URL, such as `https://your-domain.com`.
 - `UPLOAD_DIR`: local upload directory for the current filesystem storage adapter.
@@ -14,6 +17,7 @@ Configure these variables in the deployment provider before enabling real AI cal
 `.env.example` contains the required shape. Do not commit real `.env` or `.env.local` files.
 
 See `docs/production-environment-setup.md` for the current Vercel project, configured non-secret values, and remaining required secrets.
+See `docs/render-realtime-relay.md` for the Render WebSocket relay setup.
 
 ## Privacy And Storage
 
@@ -26,6 +30,7 @@ See `docs/production-environment-setup.md` for the current Vercel project, confi
 
 - `OPENAI_API_KEY` is read in server-side AI modules only.
 - `OPENAI_BASE_URL` is server-side configuration and must not include secrets.
+- `REALTIME_RELAY_SHARED_SECRET` is server-side only and must match between Vercel and Render.
 - Client components never read `OPENAI_API_KEY` or any `NEXT_PUBLIC_OPENAI_*` variable.
 - The Realtime route returns an ephemeral Realtime client secret, not the standard OpenAI API key.
 - `tests/api/realtime-session.test.ts` verifies that the serialized Realtime response does not contain the standard API key or the `OPENAI_API_KEY` variable name.

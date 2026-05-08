@@ -2,6 +2,7 @@ import type { CustomerPersona } from "@/data/personas";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
 import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import type { PrepCardPayload } from "@/lib/ai/prep-card";
+import { createRealtimeRelayToken } from "@/lib/ai/realtime-relay-token";
 import type { CreatePracticeSessionInput } from "@/lib/validation/practice";
 import type { ClientSecretCreateParams } from "openai/resources/realtime/client-secrets";
 
@@ -18,13 +19,28 @@ export type CreateRealtimeSessionInput = BuildRealtimeInstructionsInput & {
   mockMode?: boolean;
 };
 
-export type RealtimeSessionCredential = {
+export type RealtimeWebRTCSessionCredential = {
+  transport: "webrtc";
   clientSecret: string;
   sessionId: string;
   expiresAt: string;
   model: string;
   instructionsPreview: string;
 };
+
+export type RealtimeRelaySessionCredential = {
+  transport: "websocket_relay";
+  relayUrl: string;
+  relayToken: string;
+  sessionId: string;
+  expiresAt: string;
+  model: string;
+  instructionsPreview: string;
+};
+
+export type RealtimeSessionCredential =
+  | RealtimeWebRTCSessionCredential
+  | RealtimeRelaySessionCredential;
 
 const DEFAULT_REALTIME_MODEL = "gpt-realtime-mini";
 const CLIENT_SECRET_TTL_SECONDS = 600;
@@ -67,6 +83,39 @@ function shouldUseMockMode(input: Pick<CreateRealtimeSessionInput, "mockMode">) 
     process.env.NODE_ENV === "test" ||
     !hasOpenAIApiKey()
   );
+}
+
+function normalizeOptionalEnv(value: string | undefined) {
+  const trimmedValue = value?.trim() ?? "";
+  const unquotedValue =
+    (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
+    (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
+      ? trimmedValue.slice(1, -1).trim()
+      : trimmedValue;
+
+  return unquotedValue.length > 0 ? unquotedValue : undefined;
+}
+
+function getRealtimeRelayConfig() {
+  if (process.env.OPENAI_REALTIME_TRANSPORT !== "websocket_relay") {
+    return null;
+  }
+
+  const relayUrl = normalizeOptionalEnv(process.env.REALTIME_RELAY_URL);
+  const sharedSecret = normalizeOptionalEnv(
+    process.env.REALTIME_RELAY_SHARED_SECRET,
+  );
+
+  if (!relayUrl || !sharedSecret) {
+    throw new Error(
+      "REALTIME_RELAY_URL and REALTIME_RELAY_SHARED_SECRET are required when OPENAI_REALTIME_TRANSPORT is websocket_relay.",
+    );
+  }
+
+  return {
+    relayUrl,
+    sharedSecret,
+  };
 }
 
 function formatList(title: string, items?: string[] | null) {
@@ -135,14 +184,41 @@ export async function createRealtimeSession(
   const model = process.env.OPENAI_REALTIME_MODEL ?? DEFAULT_REALTIME_MODEL;
   const instructions = buildRealtimeInstructions(input);
   const instructionsPreview = instructions.slice(0, 1200);
+  const sessionId = `rt_session_${crypto.randomUUID()}`;
+  const expiresAt = new Date(
+    Date.now() + CLIENT_SECRET_TTL_SECONDS * 1000,
+  ).toISOString();
+  const relayConfig = getRealtimeRelayConfig();
+
+  if (relayConfig && input.mockMode !== true) {
+    return {
+      transport: "websocket_relay",
+      relayUrl: relayConfig.relayUrl,
+      relayToken: createRealtimeRelayToken(
+        {
+          practiceSessionId: input.practiceSessionId,
+          realtimeSessionId: sessionId,
+          model,
+          instructions,
+        },
+        {
+          secret: relayConfig.sharedSecret,
+          ttlSeconds: CLIENT_SECRET_TTL_SECONDS,
+        },
+      ),
+      sessionId,
+      expiresAt,
+      model,
+      instructionsPreview,
+    };
+  }
 
   if (shouldUseMockMode(input)) {
     return {
+      transport: "webrtc",
       clientSecret: `mock_realtime_client_secret_${crypto.randomUUID()}`,
-      sessionId: `rt_session_${crypto.randomUUID()}`,
-      expiresAt: new Date(
-        Date.now() + CLIENT_SECRET_TTL_SECONDS * 1000,
-      ).toISOString(),
+      sessionId,
+      expiresAt,
       model,
       instructionsPreview,
     };
@@ -187,8 +263,9 @@ export async function createRealtimeSession(
     });
 
   return {
+    transport: "webrtc",
     clientSecret: clientSecret.value,
-    sessionId: `rt_session_${crypto.randomUUID()}`,
+    sessionId,
     expiresAt: new Date(clientSecret.expires_at * 1000).toISOString(),
     model,
     instructionsPreview,
