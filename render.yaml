@@ -17,4 +17,4 @@ services:
       - key: REALTIME_RELAY_SHARED_SECRET
         sync: false
       - key: REALTIME_RELAY_ALLOWED_ORIGINS
-        value: https://nega-yunana.vercel.app
+        value: https://nega-yunana.vercel.app,http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001
