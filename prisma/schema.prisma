@@ -1,0 +1,259 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MaterialStatus {
+  UPLOADED
+  PROCESSING
+  READY
+  FAILED
+  PROCESSING_NOT_SUPPORTED
+}
+
+enum FileType {
+  PDF
+  PPTX
+  DOCX
+  TXT
+  MARKDOWN
+}
+
+enum PracticeMode {
+  PRESENTATION_REHEARSAL
+  CUSTOMER_QA
+  OBJECTION_CHALLENGE
+  SOLUTION_MEETING
+}
+
+enum Difficulty {
+  EASY
+  NORMAL
+  HARD
+  EXECUTIVE
+}
+
+enum PracticeSessionStatus {
+  CREATED
+  ACTIVE
+  COMPLETED
+  REVIEWED
+  CANCELLED
+  FAILED
+}
+
+enum TranscriptSpeaker {
+  USER
+  AI_CUSTOMER
+  SYSTEM
+}
+
+enum PhraseSource {
+  BUILT_IN
+  MATERIAL
+  REVIEW
+  USER_ADDED
+}
+
+enum MasteryStatus {
+  NEW
+  NEEDS_PRACTICE
+  PRACTICING
+  MASTERED
+}
+
+enum WeaknessType {
+  LONG_ANSWERS
+  FEATURE_ONLY_TALK
+  WEAK_DISCOVERY
+  UNCLEAR_POSITIONING
+  WEAK_OBJECTION_HANDLING
+  REPETITIVE_VOCABULARY
+  MISSING_NEXT_STEP
+  GRAMMAR_ACCURACY
+  PRONUNCIATION_CLARITY
+  FLUENCY
+}
+
+model UserProfile {
+  id                  String            @id @default(cuid())
+  name                String
+  role                String
+  englishLevel        String            @default("B2")
+  trainingPreferences Json              @default("{}")
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  materials           Material[]
+  prepCards           PrepCard[]
+  practiceSessions    PracticeSession[]
+  phrases             Phrase[]
+  weaknesses          WeaknessMetric[]
+}
+
+model Material {
+  id               String            @id @default(cuid())
+  ownerId          String
+  name             String
+  fileType         FileType
+  storagePath      String
+  originalFileName String
+  customerType     String?
+  industry         String?
+  meetingGoal      String?
+  confidentialMode Boolean           @default(true)
+  processingStatus MaterialStatus    @default(UPLOADED)
+  notes            String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  owner            UserProfile       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  brief            MaterialBrief?
+  prepCards        PrepCard[]
+  sessions         PracticeSession[]
+
+  @@index([ownerId])
+  @@index([processingStatus])
+}
+
+model MaterialBrief {
+  id               String   @id @default(cuid())
+  materialId       String   @unique
+  keyMessage       String
+  productPoints    Json     @default("[]")
+  customerValue    Json     @default("[]")
+  likelyQuestions  Json     @default("[]")
+  likelyObjections Json     @default("[]")
+  riskyClaims      Json     @default("[]")
+  usefulPhrases    Json     @default("[]")
+  glossary         Json     @default("[]")
+  outline          Json     @default("[]")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  material         Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+}
+
+model PrepCard {
+  id                 String            @id @default(cuid())
+  userId             String
+  materialId         String?
+  customerType       String
+  industry           String?
+  countryOrRegion    String?
+  meetingGoal        String
+  knownConcerns      Json              @default("[]")
+  trainingFocus      Json              @default("[]")
+  customerContext    String
+  keyTalkingPoints   Json              @default("[]")
+  discoveryQuestions Json              @default("[]")
+  likelyObjections   Json              @default("[]")
+  openingScript      String
+  mustUsePhrases     Json              @default("[]")
+  doNotOverpromise   Json              @default("[]")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user               UserProfile       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material           Material?         @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  sessions           PracticeSession[]
+
+  @@index([userId])
+  @@index([materialId])
+}
+
+model PracticeSession {
+  id                String                @id @default(cuid())
+  userId            String
+  mode              PracticeMode
+  personaId         String
+  materialId        String?
+  prepCardId        String?
+  difficulty        Difficulty            @default(NORMAL)
+  trainingFocus     Json                  @default("[]")
+  sourceObjectionId String?
+  status            PracticeSessionStatus @default(CREATED)
+  startedAt         DateTime?
+  endedAt           DateTime?
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+  user              UserProfile           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material          Material?             @relation(fields: [materialId], references: [id], onDelete: SetNull)
+  prepCard          PrepCard?             @relation(fields: [prepCardId], references: [id], onDelete: SetNull)
+  transcriptTurns   TranscriptTurn[]
+  review            Review?
+
+  @@index([userId])
+  @@index([materialId])
+  @@index([status])
+}
+
+model TranscriptTurn {
+  id        String            @id @default(cuid())
+  sessionId String
+  speaker   TranscriptSpeaker
+  text      String
+  timestamp Int
+  metadata  Json              @default("{}")
+  createdAt DateTime          @default(now())
+  session   PracticeSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+}
+
+model Review {
+  id                        String          @id @default(cuid())
+  sessionId                 String          @unique
+  meetingOutcome            Json            @default("{}")
+  scores                    Json            @default("{}")
+  topImprovements           Json            @default("[]")
+  bestMoments               Json            @default("[]")
+  sentenceUpgrades          Json            @default("[]")
+  materialCoverage          Json            @default("{}")
+  phrasebookSuggestions     Json            @default("[]")
+  weaknessUpdates           Json            @default("[]")
+  nextSessionRecommendation Json            @default("{}")
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+  session                   PracticeSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+model Phrase {
+  id                  String        @id @default(cuid())
+  userId              String
+  category            String
+  english             String
+  chinese             String
+  useCase             String
+  simpleVersion       String?
+  professionalVersion String?
+  relatedProductPoint String?
+  relatedObjection    String?
+  tags                Json          @default("[]")
+  source              PhraseSource  @default(USER_ADDED)
+  practiceCount       Int           @default(0)
+  masteryStatus       MasteryStatus @default(NEW)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  user                UserProfile   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, english])
+  @@index([userId])
+  @@index([category])
+  @@index([source])
+}
+
+model WeaknessMetric {
+  id               String       @id @default(cuid())
+  userId           String
+  type             WeaknessType
+  severity         Int
+  evidence         String
+  recommendedDrill String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  user             UserProfile  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+}

@@ -1,0 +1,53 @@
+# Deployment Readiness Notes
+
+## Production Environment
+
+Configure these variables in the deployment provider before enabling real AI calls:
+
+- `OPENAI_API_KEY`: server-side OpenAI API key.
+- `DATABASE_URL`: PostgreSQL connection string.
+- `APP_BASE_URL`: public app URL, such as `https://your-domain.com`.
+- `UPLOAD_DIR`: local upload directory for the current filesystem storage adapter.
+- `CONFIDENTIAL_MODE_DEFAULT`: keep as `true` for customer materials.
+
+`.env.example` contains the required shape. Do not commit real `.env` or `.env.local` files.
+
+## Privacy And Storage
+
+- Uploaded files are written under `UPLOAD_DIR`.
+- `.gitignore` excludes `uploads/`, `storage/`, `.env`, `.env.local`, and `.env.*.local`.
+- Material deletion removes the local stored file, material record, generated brief, related prep cards, related practice sessions, transcripts, and reviews.
+- The current local filesystem upload adapter is suitable for local development. For production hosting on Vercel or another serverless platform, replace or wrap it with persistent object storage before relying on uploaded files across deployments.
+
+## OpenAI Key Safety
+
+- `OPENAI_API_KEY` is read in server-side AI modules only.
+- Client components never read `OPENAI_API_KEY` or any `NEXT_PUBLIC_OPENAI_*` variable.
+- The Realtime route returns an ephemeral Realtime client secret, not the standard OpenAI API key.
+- `tests/api/realtime-session.test.ts` verifies that the serialized Realtime response does not contain the standard API key or the `OPENAI_API_KEY` variable name.
+
+## Confidential Material UX
+
+- The upload form shows an English and Chinese privacy warning before file selection.
+- `Confidential mode` is checked by default.
+- The material list displays a visible `Confidential` status pill for protected materials.
+
+## Validation Commands
+
+Run before deployment:
+
+```bash
+npm run typecheck
+npm run test
+npm run build
+npm run e2e
+```
+
+GitHub Actions currently runs:
+
+```bash
+npm ci
+npm run typecheck
+npm run test
+npm run build
+```
