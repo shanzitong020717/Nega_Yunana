@@ -5,6 +5,7 @@
 Configure these variables in the deployment provider before enabling real AI calls:
 
 - `OPENAI_API_KEY`: server-side OpenAI API key.
+- `OPENAI_BASE_URL`: optional OpenAI-compatible API endpoint for third-party providers. Leave unset for official OpenAI.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `APP_BASE_URL`: public app URL, such as `https://your-domain.com`.
 - `UPLOAD_DIR`: local upload directory for the current filesystem storage adapter.
@@ -24,6 +25,7 @@ See `docs/production-environment-setup.md` for the current Vercel project, confi
 ## OpenAI Key Safety
 
 - `OPENAI_API_KEY` is read in server-side AI modules only.
+- `OPENAI_BASE_URL` is server-side configuration and must not include secrets.
 - Client components never read `OPENAI_API_KEY` or any `NEXT_PUBLIC_OPENAI_*` variable.
 - The Realtime route returns an ephemeral Realtime client secret, not the standard OpenAI API key.
 - `tests/api/realtime-session.test.ts` verifies that the serialized Realtime response does not contain the standard API key or the `OPENAI_API_KEY` variable name.

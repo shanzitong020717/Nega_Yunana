@@ -36,6 +36,9 @@ Add these in Vercel Project Settings > Environment Variables:
 - `OPENAI_API_KEY`
   - Environments: Production, Preview, Development
   - Mark as sensitive.
+- `OPENAI_BASE_URL`
+  - Environments: Production, Preview, Development
+  - Use only for OpenAI-compatible third-party providers. Leave unset for official OpenAI.
 - `DATABASE_URL`
   - Environments: Production, Preview, Development
   - Use a managed PostgreSQL database, not the local development URL.
@@ -46,6 +49,12 @@ Recommended optional variables:
 - `OPENAI_REALTIME_MODEL=gpt-realtime-mini`
 - `AI_MOCK_MODE=false`
 
+For the current Plato AI style third-party setup, use:
+
+- `OPENAI_BASE_URL=https://api.bltcy.ai/v1`
+- `OPENAI_TEXT_MODEL=gpt-4o-realtime-preview`
+- `OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview`
+
 ## CLI Commands
 
 Use these commands if you prefer the terminal. Do not paste secrets into committed files.
@@ -54,6 +63,7 @@ Use these commands if you prefer the terminal. Do not paste secrets into committ
 npx vercel link --yes --project nega-yunana
 npx vercel env ls
 npx vercel env add OPENAI_API_KEY production --sensitive
+npx vercel env add OPENAI_BASE_URL production
 npx vercel env add DATABASE_URL production --sensitive
 npx vercel env pull .env.local --yes
 ```
@@ -62,6 +72,7 @@ After connecting the GitHub repository to Vercel, also add Preview values:
 
 ```bash
 npx vercel env add OPENAI_API_KEY preview --sensitive
+npx vercel env add OPENAI_BASE_URL preview
 npx vercel env add DATABASE_URL preview --sensitive
 npx vercel env add APP_BASE_URL preview
 npx vercel env add UPLOAD_DIR preview
