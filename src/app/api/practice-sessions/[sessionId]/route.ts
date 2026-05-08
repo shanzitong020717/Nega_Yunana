@@ -18,7 +18,7 @@ export async function DELETE(
     const deleted = deletePracticeSessionRecord(sessionId);
 
     if (!deleted) {
-      return apiErrorResponse("NOT_FOUND", "Practice session not found", 404);
+      return apiErrorResponse("NOT_FOUND", "未找到练习会话", 404);
     }
 
     return NextResponse.json({

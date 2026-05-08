@@ -14,12 +14,12 @@ const fileTypeByExtension: Record<string, (typeof supportedFileTypes)[number]> =
 };
 
 export const createMaterialInputSchema = z.object({
-  name: nonEmptyString("Material name is required"),
+  name: nonEmptyString("请填写材料名称"),
   fileType: z.enum(supportedFileTypes, {
-    error: "Unsupported file type",
+    error: "不支持该文件类型",
   }),
-  originalFileName: nonEmptyString("Original file name is required"),
-  storagePath: nonEmptyString("Storage path is required"),
+  originalFileName: nonEmptyString("原始文件名不能为空"),
+  storagePath: nonEmptyString("存储路径不能为空"),
   customerType: optionalString,
   industry: optionalString,
   meetingGoal: optionalString,

@@ -60,7 +60,7 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
       };
 
       if (!response.ok || !result.prepCard) {
-        throw new Error(result.error?.message ?? "Prep card generation failed");
+        throw new Error(result.error?.message ?? "准备卡生成失败");
       }
 
       onCreated(result.prepCard);
@@ -69,7 +69,7 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Prep card generation failed",
+          : "准备卡生成失败",
       );
     } finally {
       setIsSubmitting(false);
@@ -81,14 +81,14 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <ClipboardList className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Generate prep card</h2>
+          <h2 className="text-lg font-semibold">生成会议准备卡</h2>
         </div>
-        <StatusPill tone="primary">AI mock-ready</StatusPill>
+        <StatusPill tone="primary">AI 可生成</StatusPill>
       </div>
 
       <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
         <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-material-id">
-          Material ID
+          材料 ID
           <input
             id="prep-material-id"
             name="materialId"
@@ -99,43 +99,43 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-customer-type">
-            Customer type
+            客户类型
             <input
               id="prep-customer-type"
               name="customerType"
               required
-              placeholder="Enterprise buyer, distributor, technical lead"
+              placeholder="企业买家、渠道商、技术负责人"
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-industry">
-            Industry
+            行业
             <input
               id="prep-industry"
               name="industry"
-              placeholder="Healthcare, education, manufacturing"
+              placeholder="医疗、教育、制造业"
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-country-region">
-            Country or region
+            国家或地区
             <input
               id="prep-country-region"
               name="countryOrRegion"
-              placeholder="Singapore, Germany, Middle East"
+              placeholder="新加坡、德国、中东"
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-meeting-goal">
-            Meeting goal
+            会议目标
             <input
               id="prep-meeting-goal"
               name="meetingGoal"
               required
-              placeholder="Qualify a pilot, book a demo, handle IT review"
+              placeholder="确认试点、预约演示、处理 IT 审查"
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             />
           </label>
@@ -143,23 +143,23 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-known-concerns">
-            Known concerns
+            已知顾虑
             <textarea
               id="prep-known-concerns"
               name="knownConcerns"
               rows={4}
-              placeholder="privacy&#10;translation accuracy&#10;pilot value"
+              placeholder="隐私&#10;翻译准确率&#10;试点价值"
               className="rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-[var(--primary)]"
             />
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="prep-training-focus">
-            Training focus
+            训练重点
             <textarea
               id="prep-training-focus"
               name="trainingFocus"
               rows={4}
-              placeholder="business value&#10;discovery questions&#10;shorter answers"
+              placeholder="商业价值&#10;探索式问题&#10;更短回答"
               className="rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-[var(--primary)]"
             />
           </label>
@@ -181,7 +181,7 @@ export function PrepCardForm({ onCreated }: PrepCardFormProps) {
             className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <WandSparkles className="h-4 w-4" aria-hidden="true" />
-            {isSubmitting ? "Generating..." : "Generate prep card"}
+            {isSubmitting ? "生成中..." : "生成准备卡"}
           </button>
         </div>
       </form>

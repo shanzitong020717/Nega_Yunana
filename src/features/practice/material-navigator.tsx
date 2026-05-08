@@ -20,14 +20,14 @@ export function MaterialNavigator() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5 text-[var(--accent)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Material Navigator</h2>
+          <h2 className="text-lg font-semibold">材料导航</h2>
         </div>
-        <StatusPill tone="neutral">Mock brief</StatusPill>
+        <StatusPill tone="neutral">示例简报</StatusPill>
       </div>
 
       <section className="mt-5">
         <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-          Use material points
+          使用材料要点
         </h3>
         <ul className="mt-3 space-y-3 text-sm leading-6 text-[var(--muted)]">
           {materialPoints.map((point) => (
@@ -40,7 +40,7 @@ export function MaterialNavigator() {
 
       <section className="mt-5">
         <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-          Must-use phrases
+          必用表达
         </h3>
         <ul className="mt-3 space-y-3 text-sm leading-6 text-[var(--muted)]">
           {mustUsePhrases.map((phrase) => (

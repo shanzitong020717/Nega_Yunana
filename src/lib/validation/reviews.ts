@@ -4,21 +4,21 @@ import { createPhraseInputSchema } from "@/lib/validation/phrasebook";
 import { nonEmptyString, stringArraySchema } from "./shared";
 
 export const sentenceUpgradeSchema = z.object({
-  original: nonEmptyString("Original sentence is required"),
-  naturalEnglish: nonEmptyString("Natural English sentence is required"),
-  chineseExplanation: nonEmptyString("Chinese explanation is required"),
-  practicePrompt: nonEmptyString("Practice prompt is required"),
+  original: nonEmptyString("原句不能为空"),
+  naturalEnglish: nonEmptyString("自然英文句子不能为空"),
+  chineseExplanation: nonEmptyString("中文解释不能为空"),
+  practicePrompt: nonEmptyString("练习提示不能为空"),
 });
 
 export const meetingOutcomeSchema = z.object({
-  summary: nonEmptyString("Meeting outcome summary is required"),
-  customerReaction: nonEmptyString("Customer reaction is required"),
-  nextStep: nonEmptyString("Next step is required"),
+  summary: nonEmptyString("会议结果总结不能为空"),
+  customerReaction: nonEmptyString("客户反应不能为空"),
+  nextStep: nonEmptyString("下一步不能为空"),
 });
 
 export const scoreItemSchema = z.object({
   score: z.number().int().min(1).max(5),
-  rationale: nonEmptyString("Score rationale is required"),
+  rationale: nonEmptyString("评分理由不能为空"),
 });
 
 export const businessScorecardSchema = z.object({
@@ -48,7 +48,7 @@ export const objectionFrameworkReviewSchema = z.object({
   requiredSteps: z.array(objectionFrameworkStepSchema).min(1),
   usedSteps: z.array(objectionFrameworkStepSchema).default([]),
   missingSteps: z.array(objectionFrameworkStepSchema).default([]),
-  coachingNote: nonEmptyString("Objection framework coaching note is required"),
+  coachingNote: nonEmptyString("异议框架建议不能为空"),
 });
 
 export const weaknessUpdateInputSchema = z.object({
@@ -66,25 +66,25 @@ export const weaknessUpdateInputSchema = z.object({
       "fluency",
     ],
     {
-      error: "Invalid weakness type",
+      error: "弱项类型无效",
     },
   ),
   severity: z.number().int().min(1).max(5),
-  evidence: nonEmptyString("Weakness evidence is required"),
-  recommendedDrill: nonEmptyString("Recommended drill is required"),
+  evidence: nonEmptyString("弱项证据不能为空"),
+  recommendedDrill: nonEmptyString("推荐练习不能为空"),
 });
 
 export const nextSessionRecommendationSchema = z.object({
-  focus: nonEmptyString("Next session focus is required"),
-  drill: nonEmptyString("Next session drill is required"),
-  prompt: nonEmptyString("Next session prompt is required"),
+  focus: nonEmptyString("下一次练习重点不能为空"),
+  drill: nonEmptyString("下一次练习项目不能为空"),
+  prompt: nonEmptyString("下一次练习提示不能为空"),
 });
 
 export const createReviewInputSchema = z.object({
   meetingOutcome: meetingOutcomeSchema,
   scores: businessScorecardSchema,
   topImprovements: z
-    .array(nonEmptyString("Improvement is required"))
+    .array(nonEmptyString("改进点不能为空"))
     .min(1)
     .max(3),
   bestMoments: stringArraySchema,

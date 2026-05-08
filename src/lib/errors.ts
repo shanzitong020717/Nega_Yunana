@@ -29,7 +29,7 @@ export async function readJsonBody(request: Request) {
   try {
     return (await request.json()) as unknown;
   } catch {
-    throw new SyntaxError("Request body must be valid JSON");
+    throw new SyntaxError("请求体必须是有效 JSON");
   }
 }
 
@@ -46,5 +46,5 @@ export function handleApiError(error: unknown) {
     return apiErrorResponse("INVALID_JSON", error.message, 400);
   }
 
-  return apiErrorResponse("INTERNAL_ERROR", "Unexpected server error", 500);
+  return apiErrorResponse("INTERNAL_ERROR", "服务器出现异常", 500);
 }

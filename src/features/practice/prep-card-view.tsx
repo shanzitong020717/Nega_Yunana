@@ -8,14 +8,14 @@ type PrepCardViewProps = {
 };
 
 const emptySections = [
-  "Customer Context",
-  "Meeting Goal",
-  "Key Talking Points",
-  "Discovery Questions",
-  "Likely Objections",
-  "Opening Script",
-  "Must-Use Phrases",
-  "Do Not Overpromise",
+  "客户背景",
+  "会议目标",
+  "关键话术点",
+  "探索式问题",
+  "可能异议",
+  "开场脚本",
+  "必用表达",
+  "避免过度承诺",
 ] as const;
 
 function ListSection({ title, items }: { title: string; items: string[] }) {
@@ -37,10 +37,10 @@ export function PrepCardView({ prepCard }: PrepCardViewProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <BookOpenCheck className="h-5 w-5 text-[var(--success)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Meeting prep card</h2>
+          <h2 className="text-lg font-semibold">会议准备卡</h2>
         </div>
         <StatusPill tone={prepCard ? "success" : "neutral"}>
-          {prepCard ? "ready" : "waiting"}
+          {prepCard ? "已就绪" : "等待中"}
         </StatusPill>
       </div>
 
@@ -48,31 +48,31 @@ export function PrepCardView({ prepCard }: PrepCardViewProps) {
         <div className="mt-5 space-y-4">
           <section className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
             <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Customer Context
+              客户背景
             </h3>
             <p className="mt-2 text-sm leading-6">{prepCard.customerContext}</p>
           </section>
           <section className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
             <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Meeting Goal
+              会议目标
             </h3>
             <p className="mt-2 text-sm leading-6">{prepCard.meetingGoal}</p>
           </section>
           <div className="grid gap-3 lg:grid-cols-2">
-            <ListSection title="Key Talking Points" items={prepCard.keyTalkingPoints} />
-            <ListSection title="Discovery Questions" items={prepCard.discoveryQuestions} />
-            <ListSection title="Likely Objections" items={prepCard.likelyObjections} />
-            <ListSection title="Must-Use Phrases" items={prepCard.mustUsePhrases} />
+            <ListSection title="关键话术点" items={prepCard.keyTalkingPoints} />
+            <ListSection title="探索式问题" items={prepCard.discoveryQuestions} />
+            <ListSection title="可能异议" items={prepCard.likelyObjections} />
+            <ListSection title="必用表达" items={prepCard.mustUsePhrases} />
           </div>
           <section className="rounded-md border border-[var(--border)] p-4">
             <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Opening Script
+              开场脚本
             </h3>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
               {prepCard.openingScript}
             </p>
           </section>
-          <ListSection title="Do Not Overpromise" items={prepCard.doNotOverpromise} />
+          <ListSection title="避免过度承诺" items={prepCard.doNotOverpromise} />
         </div>
       ) : (
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

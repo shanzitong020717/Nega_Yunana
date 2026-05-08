@@ -63,7 +63,7 @@ describe("realtime session API", () => {
     await expect(readJson(response)).resolves.toEqual({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Invalid customer persona",
+        message: "客户角色无效",
       },
     });
   });

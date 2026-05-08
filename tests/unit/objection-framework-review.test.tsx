@@ -91,8 +91,8 @@ describe("objection handling framework review", () => {
   it("shows missing objection framework steps in the review page", () => {
     render(<ReviewView reviewId="review_123" sessionId="session_123" review={baseReview} />);
 
-    expect(screen.getByText("Objection Framework")).toBeInTheDocument();
-    expect(screen.getByText("Missing: Clarify, Next Step")).toBeInTheDocument();
+    expect(screen.getByText("异议处理框架")).toBeInTheDocument();
+    expect(screen.getByText("缺少：澄清背景, 推进下一步")).toBeInTheDocument();
     expect(screen.getByText(baseReview.objectionFramework!.coachingNote)).toBeInTheDocument();
   });
 });

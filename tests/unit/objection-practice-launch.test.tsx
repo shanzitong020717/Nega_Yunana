@@ -37,7 +37,7 @@ describe("ObjectionBankView practice launch", () => {
 
     render(<ObjectionBankView />);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Practice" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "开始练习" })[0]);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

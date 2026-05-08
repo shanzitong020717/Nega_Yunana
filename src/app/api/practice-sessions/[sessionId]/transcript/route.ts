@@ -38,7 +38,7 @@ export async function DELETE(_request: Request, context: TranscriptRouteContext)
     const { sessionId } = await context.params;
 
     if (!getPracticeSessionRecord(sessionId)) {
-      return apiErrorResponse("NOT_FOUND", "Practice session not found", 404);
+      return apiErrorResponse("NOT_FOUND", "未找到练习会话", 404);
     }
 
     const deleted = deleteTranscriptTurns(sessionId);

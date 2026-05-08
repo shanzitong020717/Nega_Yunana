@@ -40,7 +40,7 @@ export function MaterialsView() {
       };
 
       if (!response.ok || !payload.brief) {
-        throw new Error(payload.error?.message ?? "Brief generation failed");
+        throw new Error(payload.error?.message ?? "简报生成失败");
       }
 
       setBrief(payload.brief);
@@ -71,7 +71,7 @@ export function MaterialsView() {
       });
 
       if (!response.ok) {
-        throw new Error("Material deletion failed");
+        throw new Error("材料删除失败");
       }
 
       setMaterials((currentMaterials) =>
@@ -84,7 +84,7 @@ export function MaterialsView() {
         setBriefStatus("waiting");
       }
     } catch {
-      setDeleteError("Could not delete this material. Please try again.");
+      setDeleteError("无法删除该材料，请稍后重试。");
     } finally {
       setDeletingMaterialId(null);
     }
@@ -93,8 +93,8 @@ export function MaterialsView() {
   return (
     <>
       <PageHeader
-        eyebrow="Materials"
-        title="Customer material library"
+        eyebrow="材料"
+        title="客户材料库"
         description="Upload decks, PDFs, proposals, and customer notes, then generate meeting briefs for practice sessions."
       />
 

@@ -21,7 +21,7 @@ export async function DELETE(_request: Request, context: MaterialRouteContext) {
     const material = getMaterialRecord(materialId);
 
     if (!material) {
-      return apiErrorResponse("NOT_FOUND", "Material not found", 404);
+      return apiErrorResponse("NOT_FOUND", "未找到材料", 404);
     }
 
     await deleteStoredFile(material.storagePath);

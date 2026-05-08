@@ -32,8 +32,8 @@ export default async function ReviewPage({ params }: ReviewPageProps) {
   return (
     <>
       <PageHeader
-        eyebrow="Review"
-        title="Practice review"
+        eyebrow="复盘"
+        title="练习复盘"
         description="Review meeting outcome, sentence upgrades, material coverage, and recommended next-session drills."
       />
       <ReviewView

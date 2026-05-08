@@ -11,16 +11,14 @@ describe("MaterialUpload", () => {
   it("renders the required upload fields and privacy warning", () => {
     render(<MaterialUpload onUploaded={vi.fn()} />);
 
-    expect(screen.getByLabelText("Material file")).toBeInTheDocument();
-    expect(screen.getByLabelText("Material name")).toBeInTheDocument();
-    expect(screen.getByLabelText("Customer type")).toBeInTheDocument();
-    expect(screen.getByLabelText("Customer industry")).toBeInTheDocument();
-    expect(screen.getByLabelText("Meeting goal")).toBeInTheDocument();
-    expect(screen.getByLabelText("Confidential mode")).toBeChecked();
-    expect(screen.getByLabelText("Notes")).toBeInTheDocument();
-    expect(
-      screen.getByText("Privacy warning before upload"),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("材料文件")).toBeInTheDocument();
+    expect(screen.getByLabelText("材料名称")).toBeInTheDocument();
+    expect(screen.getByLabelText("客户类型")).toBeInTheDocument();
+    expect(screen.getByLabelText("客户行业")).toBeInTheDocument();
+    expect(screen.getByLabelText("会议目标")).toBeInTheDocument();
+    expect(screen.getByLabelText("保密模式")).toBeChecked();
+    expect(screen.getByLabelText("备注")).toBeInTheDocument();
+    expect(screen.getByText("上传前隐私提醒")).toBeInTheDocument();
     expect(
       screen.getByText("Confidential by default"),
     ).toBeInTheDocument();
@@ -51,16 +49,16 @@ describe("MaterialUpload", () => {
       />,
     );
 
-    expect(screen.getByText("Confidential")).toBeInTheDocument();
-    expect(screen.getByText("ready")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Delete material Customer deck" }));
+    expect(screen.getByText("保密")).toBeInTheDocument();
+    expect(screen.getByText("已就绪")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "删除材料 Customer deck" }));
     expect(onDeleteMaterial).toHaveBeenCalledWith("material_123");
   });
 
   it("shows a client-side error for unsupported file types", () => {
     render(<MaterialUpload onUploaded={vi.fn()} />);
 
-    fireEvent.change(screen.getByLabelText("Material file"), {
+    fireEvent.change(screen.getByLabelText("材料文件"), {
       target: {
         files: [
           new File(["video"], "demo.mp4", {
@@ -71,7 +69,7 @@ describe("MaterialUpload", () => {
     });
 
     expect(
-      screen.getByText("Unsupported file type. Upload PDF, PPTX, DOCX, TXT, or Markdown."),
+      screen.getByText("不支持该文件类型。请上传 PDF、PPTX、DOCX、TXT 或 Markdown。"),
     ).toBeInTheDocument();
   });
 
@@ -84,7 +82,7 @@ describe("MaterialUpload", () => {
       }),
     ).toEqual({
       ok: false,
-      message: "File is too large. Keep uploads under 25 MB.",
+      message: "文件过大。请将上传文件控制在 25 MB 以内。",
     });
   });
 });

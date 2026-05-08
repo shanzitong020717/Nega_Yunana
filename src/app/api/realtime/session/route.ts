@@ -17,7 +17,7 @@ import {
 } from "@/lib/validation/shared";
 
 const createRealtimeSessionInputSchema = z.object({
-  practiceSessionId: nonEmptyString("Practice session is required"),
+  practiceSessionId: nonEmptyString("练习会话不能为空"),
   personaId: personaIdSchema,
   materialId: optionalString,
   prepCardId: optionalString,
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         {
           error: {
             code: "VALIDATION_ERROR",
-            message: "Invalid customer persona",
+            message: "客户角色无效",
           },
         },
         { status: 400 },

@@ -17,14 +17,14 @@ import type { ProgressSummary } from "@/lib/progress/weakness-store";
 
 const recommendedDrills = [
   {
-    title: "Privacy objection challenge",
+    title: "隐私异议挑战",
     detail:
       "Handle a skeptical enterprise buyer asking how meeting data is captured, processed, and governed.",
     duration: "12 min",
     href: "/objection-bank",
   },
   {
-    title: "Feature-to-value conversion",
+    title: "功能转价值练习",
     detail:
       "Turn captions, transcription, translation, and hands-free access into business outcomes.",
     duration: "10 min",
@@ -34,15 +34,15 @@ const recommendedDrills = [
 
 const meetingPrepSteps = [
   {
-    title: "Upload the customer material",
+    title: "上传客户材料",
     detail: "Deck, proposal, product brief, meeting notes, or customer requirement document.",
   },
   {
-    title: "Create a customer-facing brief",
+    title: "生成客户简报",
     detail: "AI extracts likely questions, technical concerns, and discovery prompts.",
   },
   {
-    title: "Practice the meeting flow",
+    title: "练习会议流程",
     detail: "Rehearse opening, discovery, demo narration, objections, and next steps.",
   },
 ] as const;
@@ -50,13 +50,13 @@ const meetingPrepSteps = [
 const recentMaterials = [
   {
     title: "Enterprise multilingual meeting deck",
-    type: "Customer deck",
-    status: "Ready for simulation",
+    type: "客户材料",
+    status: "可开始模拟",
   },
   {
     title: "Rokid AR productivity overview",
-    type: "Product brief",
-    status: "Needs customer questions",
+    type: "产品简报",
+    status: "需要客户问题",
   },
 ] as const;
 
@@ -67,9 +67,9 @@ const weeklyFocus = [
 ] as const;
 
 const reviewSignals = [
-  { label: "Clarity", value: "B+", tone: "primary" as const },
-  { label: "Business value", value: "Needs work", tone: "warning" as const },
-  { label: "Next step", value: "Strong", tone: "success" as const },
+  { label: "清晰度", value: "B+", tone: "primary" as const },
+  { label: "商业价值", value: "待加强", tone: "warning" as const },
+  { label: "下一步", value: "强", tone: "success" as const },
 ] as const;
 
 type DashboardViewProps = {
@@ -85,8 +85,8 @@ export function DashboardView({ progress }: DashboardViewProps) {
   return (
     <>
       <PageHeader
-        eyebrow="Rokid overseas sales"
-        title="Meeting training workspace"
+        eyebrow="Rokid 海外销售"
+        title="会议训练工作台"
         description="Prepare customer conversations, rehearse with realistic overseas buyers, and turn every practice session into a focused learning loop."
         actions={
           <>
@@ -95,14 +95,14 @@ export function DashboardView({ progress }: DashboardViewProps) {
               className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium transition hover:border-[var(--primary)]"
             >
               <FileUp className="h-4 w-4" aria-hidden="true" />
-              Upload material
+              上传材料
             </Link>
             <Link
               href="/practice"
               className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
             >
               <Mic2 className="h-4 w-4" aria-hidden="true" />
-              Start practice
+              开始练习
             </Link>
           </>
         }
@@ -114,13 +114,13 @@ export function DashboardView({ progress }: DashboardViewProps) {
             <div>
               <div className="flex items-center gap-2">
                 <Target className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-                <h2 className="text-lg font-semibold">Today’s recommended drill</h2>
+                <h2 className="text-lg font-semibold">今日推荐练习</h2>
               </div>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                 Two short drills are enough for daily momentum: one hard question and one value-based answer.
               </p>
             </div>
-            <StatusPill tone="primary">Mock content</StatusPill>
+            <StatusPill tone="primary">示例内容</StatusPill>
           </div>
 
           <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -153,7 +153,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-[var(--success)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">This Week&apos;s Focus</h2>
+            <h2 className="text-lg font-semibold">本周重点</h2>
           </div>
           <div className="mt-4 flex flex-col gap-3">
             {weeklyFocusItems.map((item) => (
@@ -174,7 +174,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
           <div>
             <div className="flex items-center gap-2">
               <FileText className="h-5 w-5 text-[var(--accent)]" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">Prepare for a customer meeting</h2>
+              <h2 className="text-lg font-semibold">客户会议准备</h2>
             </div>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
               The material workflow should turn a deck into customer questions, bilingual notes, and a realistic role-play.
@@ -184,7 +184,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
             href="/materials"
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
-            Manage materials
+            管理材料
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
@@ -192,7 +192,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
           {meetingPrepSteps.map((step, index) => (
             <div key={step.title} className="rounded-md border border-[var(--border)] p-4">
               <p className="text-xs font-semibold uppercase text-[var(--primary)]">
-                Step {index + 1}
+                步骤 {index + 1}
               </p>
               <h3 className="mt-2 text-sm font-semibold">{step.title}</h3>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
@@ -207,7 +207,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-[var(--accent)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Recent materials</h2>
+            <h2 className="text-lg font-semibold">最近材料</h2>
           </div>
           <div className="mt-4 divide-y divide-[var(--border)]">
             {recentMaterials.map((material) => (
@@ -228,9 +228,9 @@ export function DashboardView({ progress }: DashboardViewProps) {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
-              <h2 className="text-lg font-semibold">Recent review</h2>
+              <h2 className="text-lg font-semibold">最近复盘</h2>
             </div>
-            <StatusPill tone="warning">Main weakness: feature-only talk</StatusPill>
+            <StatusPill tone="warning">主要弱项：只讲功能</StatusPill>
           </div>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
             Your answer was clear, but it stayed too close to product features. Next practice should translate every feature into a customer outcome.
@@ -248,7 +248,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
             className="mt-4 inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             <BookOpenText className="h-4 w-4" aria-hidden="true" />
-            Review upgraded phrases
+            复习升级表达
           </Link>
         </div>
       </section>

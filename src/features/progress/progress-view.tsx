@@ -39,15 +39,15 @@ export function ProgressView({
   return (
     <>
       <PageHeader
-        eyebrow="Progress"
-        title="Personal weakness tracker"
+        eyebrow="进步"
+        title="个人弱项追踪"
         description="Track repeated meeting-performance issues and convert them into the next focused English-speaking drill."
         actions={
           <Link
             href="/practice"
             className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
           >
-            Start next drill
+            开始下一组练习
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         }
@@ -57,10 +57,10 @@ export function ProgressView({
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-[var(--accent)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Recent 7-day training count</h2>
+            <h2 className="text-lg font-semibold">近 7 天训练次数</h2>
           </div>
           <p className="mt-5 text-4xl font-semibold">
-            {progress.recentTrainingCount} sessions
+            {progress.recentTrainingCount} 次会话
           </p>
           <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
             This count updates as completed practice sessions produce reviews.
@@ -70,7 +70,7 @@ export function ProgressView({
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Recommended Drills</h2>
+            <h2 className="text-lg font-semibold">推荐练习</h2>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {recommendedDrills.map((drill) => (
@@ -93,7 +93,7 @@ export function ProgressView({
         <div className="lg:col-span-2 rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <Target className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Top Weaknesses</h2>
+            <h2 className="text-lg font-semibold">主要弱项</h2>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {topWeaknesses.map((metric) => (
@@ -104,7 +104,7 @@ export function ProgressView({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <h3 className="text-base font-semibold">{metric.label}</h3>
                   <StatusPill tone={severityTone(metric.severity)}>
-                    {`Severity ${metric.severity}`}
+                    {`严重度 ${metric.severity}`}
                   </StatusPill>
                 </div>
                 <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
@@ -121,7 +121,7 @@ export function ProgressView({
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-[var(--success)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Improved Weaknesses</h2>
+            <h2 className="text-lg font-semibold">已有改善的弱项</h2>
           </div>
           <div className="mt-4 space-y-3">
             {progress.improvedWeaknesses.length > 0 ? (
@@ -148,7 +148,7 @@ export function ProgressView({
       <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
         <div className="flex items-center gap-2">
           <History className="h-5 w-5 text-[var(--accent)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">History</h2>
+          <h2 className="text-lg font-semibold">历史记录</h2>
         </div>
         <div className="mt-4 divide-y divide-[var(--border)]">
           {progress.history.length > 0 ? (

@@ -35,7 +35,7 @@ export async function GET(
     const material = getMaterialRecord(materialId);
 
     if (!material) {
-      return apiErrorResponse("NOT_FOUND", "Material not found", 404);
+      return apiErrorResponse("NOT_FOUND", "未找到材料", 404);
     }
 
     const existingBrief = getMaterialBriefRecord(materialId);
@@ -47,7 +47,7 @@ export async function GET(
     if (!material.extractedText) {
       return apiErrorResponse(
         "PROCESSING_NOT_SUPPORTED",
-        "Material text is not available for brief generation",
+        "当前材料文本暂不可用于生成简报",
         409,
       );
     }

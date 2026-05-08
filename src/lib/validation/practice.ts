@@ -11,27 +11,27 @@ const personaIds = personas.map((persona) => persona.id) as [
 export const practiceModeSchema = z.enum(
   ["presentation_rehearsal", "customer_qa", "objection_challenge", "solution_meeting"],
   {
-    error: "Invalid practice mode",
+    error: "练习模式无效",
   },
 );
 
 export const difficultySchema = z.enum(
   ["easy", "normal", "hard", "executive"],
   {
-    error: "Invalid difficulty",
+    error: "难度无效",
   },
 );
 
 export const personaIdSchema = z.enum(personaIds, {
-  error: "Invalid customer persona",
+  error: "客户角色无效",
 });
 
 export const createPrepCardInputSchema = z.object({
   materialId: optionalString,
-  customerType: nonEmptyString("Customer type is required"),
+  customerType: nonEmptyString("请填写客户类型"),
   industry: optionalString,
   countryOrRegion: optionalString,
-  meetingGoal: nonEmptyString("Meeting goal is required"),
+  meetingGoal: nonEmptyString("请填写会议目标"),
   knownConcerns: stringArraySchema,
   trainingFocus: stringArraySchema,
 });
@@ -48,15 +48,15 @@ export const createPracticeSessionInputSchema = z.object({
 
 export const transcriptTurnInputSchema = z.object({
   speaker: z.enum(["user", "ai_customer", "system"], {
-    error: "Invalid transcript speaker",
+    error: "转写说话人无效",
   }),
-  text: nonEmptyString("Transcript text is required"),
+  text: nonEmptyString("转写文本不能为空"),
   timestamp: z.number().int().nonnegative(),
   metadata: z.record(z.string(), z.unknown()).default({}),
 });
 
 export const saveTranscriptInputSchema = z.object({
-  turns: z.array(transcriptTurnInputSchema).min(1, "At least one turn is required"),
+  turns: z.array(transcriptTurnInputSchema).min(1, "至少需要一条对话记录"),
 });
 
 export type CreatePrepCardInput = z.infer<typeof createPrepCardInputSchema>;

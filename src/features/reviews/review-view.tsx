@@ -24,12 +24,20 @@ type ReviewViewProps = {
 };
 
 const scoreLabels: Record<keyof PracticeReviewPayload["scores"], string> = {
-  clarity: "Clarity",
-  businessConfidence: "Business Confidence",
-  discoverySkill: "Discovery Skill",
-  productPositioning: "Product Positioning",
-  objectionHandling: "Objection Handling",
-  englishNaturalness: "English Naturalness",
+  clarity: "清晰度",
+  businessConfidence: "商务自信",
+  discoverySkill: "探索提问能力",
+  productPositioning: "产品定位",
+  objectionHandling: "异议处理",
+  englishNaturalness: "英语自然度",
+};
+
+const frameworkLabels: Record<string, string> = {
+  Acknowledge: "承认顾虑",
+  Clarify: "澄清背景",
+  Position: "定位价值",
+  Support: "补充支撑",
+  "Next Step": "推进下一步",
 };
 
 function Section({
@@ -84,12 +92,12 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Delete request failed");
+        throw new Error("删除请求失败");
       }
 
       setPrivacyMessage(successMessage);
     } catch {
-      setPrivacyMessage("Deletion failed. Please try again.");
+      setPrivacyMessage("删除失败，请稍后重试。");
     } finally {
       setPendingPrivacyAction(null);
     }
@@ -102,14 +110,14 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
           <StatusPill tone="primary">{reviewId}</StatusPill>
           <StatusPill tone="neutral">{sessionId}</StatusPill>
         </div>
-        <h2 className="mt-4 text-xl font-semibold">Meeting Outcome</h2>
+        <h2 className="mt-4 text-xl font-semibold">会议结果</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted)]">
           {review.meetingOutcome.summary}
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <div className="rounded-md border border-[var(--border)] p-3">
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Customer Reaction
+              客户反应
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
               {review.meetingOutcome.customerReaction}
@@ -117,7 +125,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
           </div>
           <div className="rounded-md border border-[var(--border)] p-3">
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Next Step
+              下一步
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
               {review.meetingOutcome.nextStep}
@@ -129,7 +137,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
       <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold">Privacy Controls</h2>
+            <h2 className="text-lg font-semibold">隐私控制</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
               Remove sensitive practice artifacts for this session when they
               should no longer be retained.
@@ -143,15 +151,15 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                 void deletePracticeData(
                   "review",
                   `/api/practice-sessions/${sessionId}/review`,
-                  "Review deleted.",
+                  "复盘已删除。",
                 )
               }
               className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "review"
-                ? "Deleting..."
-                : "Delete this review"}
+                ? "删除中..."
+                : "删除本次复盘"}
             </button>
             <button
               type="button"
@@ -160,15 +168,15 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                 void deletePracticeData(
                   "transcript",
                   `/api/practice-sessions/${sessionId}/transcript`,
-                  "Transcript deleted.",
+                  "转写已删除。",
                 )
               }
               className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "transcript"
-                ? "Deleting..."
-                : "Delete transcript"}
+                ? "删除中..."
+                : "删除转写"}
             </button>
             <button
               type="button"
@@ -177,15 +185,15 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                 void deletePracticeData(
                   "session",
                   `/api/practice-sessions/${sessionId}`,
-                  "Practice session deleted.",
+                  "练习会话已删除。",
                 )
               }
               className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "session"
-                ? "Deleting..."
-                : "Delete practice session"}
+                ? "删除中..."
+                : "删除练习会话"}
             </button>
           </div>
         </div>
@@ -196,7 +204,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
         ) : null}
       </section>
 
-      <Section title="Business Scorecard" icon={BarChart3}>
+      <Section title="商务评分卡" icon={BarChart3}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {Object.entries(review.scores).map(([key, score]) => (
             <article
@@ -220,11 +228,11 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
       </Section>
 
       {review.objectionFramework ? (
-        <Section title="Objection Framework" icon={ListChecks}>
+        <Section title="异议处理框架" icon={ListChecks}>
           <div className="grid gap-3 md:grid-cols-[1fr_1fr]">
             <div className="rounded-md border border-[var(--border)] bg-white p-4">
               <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-                Required Steps
+                必要步骤
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {review.objectionFramework.requiredSteps.map((step) => {
@@ -239,7 +247,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                           : "rounded-md border border-[#f3c5a5] bg-[#fff5ed] px-2.5 py-1 text-xs font-medium text-[var(--warning)]"
                       }
                     >
-                      {step}
+                      {frameworkLabels[step] ?? step}
                     </span>
                   );
                 })}
@@ -247,13 +255,15 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
             </div>
             <div className="rounded-md border border-[var(--border)] bg-white p-4">
               <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-                Framework Gap
+                框架缺口
               </p>
               <p className="mt-3 text-sm font-medium text-[var(--foreground)]">
-                {`Missing: ${
+                {`缺少：${
                   review.objectionFramework.missingSteps.length > 0
-                    ? review.objectionFramework.missingSteps.join(", ")
-                    : "None"
+                    ? review.objectionFramework.missingSteps
+                        .map((step) => frameworkLabels[step] ?? step)
+                        .join(", ")
+                    : "无"
                 }`}
               </p>
               <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
@@ -265,37 +275,37 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
       ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Top 3 Improvements" icon={ListChecks}>
+        <Section title="前三个改进点" icon={ListChecks}>
           <BulletList items={review.topImprovements} />
         </Section>
 
-        <Section title="Best Moments" icon={Award}>
+        <Section title="表现最好的部分" icon={Award}>
           <BulletList items={review.bestMoments} />
         </Section>
       </div>
 
-      <Section title="Sentence Upgrade" icon={Lightbulb}>
+      <Section title="句子升级" icon={Lightbulb}>
         <SentenceUpgradeTable upgrades={review.sentenceUpgrades} />
       </Section>
 
-      <Section title="Material Coverage" icon={FileText}>
+      <Section title="材料覆盖情况" icon={FileText}>
         <div className="grid gap-3 md:grid-cols-3">
           <div>
             <h3 className="text-sm font-semibold text-[var(--primary-strong)]">
-              Covered
+              已覆盖
             </h3>
             <div className="mt-3">
               <BulletList items={review.materialCoverage.covered} />
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--warning)]">Missed</h3>
+            <h3 className="text-sm font-semibold text-[var(--warning)]">遗漏</h3>
             <div className="mt-3">
               <BulletList items={review.materialCoverage.missed} />
             </div>
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-[var(--muted)]">Unclear</h3>
+            <h3 className="text-sm font-semibold text-[var(--muted)]">不清晰</h3>
             <div className="mt-3">
               <BulletList items={review.materialCoverage.unclear} />
             </div>
@@ -303,11 +313,11 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
         </div>
       </Section>
 
-      <Section title="Replay Practice" icon={CheckCircle2}>
+      <Section title="跟读练习" icon={CheckCircle2}>
         <ReplayPractice upgrades={review.sentenceUpgrades} />
       </Section>
 
-      <Section title="Phrasebook Suggestions" icon={Lightbulb}>
+      <Section title="表达库建议" icon={Lightbulb}>
         <div className="grid gap-3 lg:grid-cols-2">
           {review.phrasebookSuggestions.map((phrase) => (
             <article
@@ -329,11 +339,11 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
         </div>
       </Section>
 
-      <Section title="Next Session Recommendation" icon={Target}>
+      <Section title="下一次练习建议" icon={Target}>
         <div className="grid gap-3 md:grid-cols-3">
           <div className="rounded-md border border-[var(--border)] p-3">
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Focus
+              重点
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
               {review.nextSessionRecommendation.focus}
@@ -341,7 +351,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
           </div>
           <div className="rounded-md border border-[var(--border)] p-3">
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Drill
+              练习
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
               {review.nextSessionRecommendation.drill}
@@ -349,7 +359,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
           </div>
           <div className="rounded-md border border-[var(--border)] p-3">
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              Prompt
+              提示
             </p>
             <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
               {review.nextSessionRecommendation.prompt}

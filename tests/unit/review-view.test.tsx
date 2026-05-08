@@ -80,27 +80,27 @@ describe("ReviewView", () => {
     render(<ReviewView reviewId="review_123" sessionId="session_123" review={review} />);
 
     [
-      "Meeting Outcome",
-      "Business Scorecard",
-      "Top 3 Improvements",
-      "Best Moments",
-      "Sentence Upgrade",
-      "Material Coverage",
-      "Replay Practice",
-      "Phrasebook Suggestions",
-      "Next Session Recommendation",
+      "会议结果",
+      "商务评分卡",
+      "前三个改进点",
+      "表现最好的部分",
+      "句子升级",
+      "材料覆盖情况",
+      "跟读练习",
+      "表达库建议",
+      "下一次练习建议",
     ].forEach((section) => {
       expect(screen.getByText(section)).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Original")).toBeInTheDocument();
-    expect(screen.getByText("Natural Business English")).toBeInTheDocument();
+    expect(screen.getByText("原句")).toBeInTheDocument();
+    expect(screen.getByText("自然商务英语")).toBeInTheDocument();
     expect(screen.getByText("中文解释")).toBeInTheDocument();
-    expect(screen.getByText("Practice Prompt")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Save to Phrasebook/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Listen/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Shadow/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Repeat/i })).toBeInTheDocument();
+    expect(screen.getByText("练习提示")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /保存到表达库/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /听一遍/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /影子跟读/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /重复练习/ })).toBeInTheDocument();
   });
 
   it("saves an upgraded sentence to the phrasebook and shows saved state", async () => {
@@ -121,7 +121,7 @@ describe("ReviewView", () => {
 
     render(<ReviewView reviewId="review_123" sessionId="session_123" review={review} />);
 
-    fireEvent.click(screen.getByRole("button", { name: /Save to Phrasebook/i }));
+    fireEvent.click(screen.getByRole("button", { name: /保存到表达库/ }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -131,6 +131,6 @@ describe("ReviewView", () => {
         }),
       );
     });
-    expect(await screen.findByRole("button", { name: /Saved/i })).toBeDisabled();
+    expect(await screen.findByRole("button", { name: /已保存/ })).toBeDisabled();
   });
 });

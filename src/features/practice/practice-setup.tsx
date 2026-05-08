@@ -13,18 +13,27 @@ type PracticeSetupProps = {
 };
 
 const practiceModes = [
-  { value: "presentation_rehearsal", label: "Presentation Rehearsal" },
-  { value: "customer_qa", label: "Customer Q&A" },
-  { value: "objection_challenge", label: "Objection Challenge" },
-  { value: "solution_meeting", label: "Solution Meeting" },
+  { value: "presentation_rehearsal", label: "演示汇报练习" },
+  { value: "customer_qa", label: "客户问答" },
+  { value: "objection_challenge", label: "异议挑战" },
+  { value: "solution_meeting", label: "方案会议" },
 ] as const;
 
 const difficulties = [
-  { value: "easy", label: "Easy" },
-  { value: "normal", label: "Normal" },
-  { value: "hard", label: "Hard" },
-  { value: "executive", label: "Executive" },
+  { value: "easy", label: "简单" },
+  { value: "normal", label: "普通" },
+  { value: "hard", label: "困难" },
+  { value: "executive", label: "高管级" },
 ] as const;
+
+const personaLabels: Record<string, string> = {
+  distributor: "渠道商",
+  enterprise_buyer: "企业买家",
+  technical_lead: "技术负责人",
+  procurement_manager: "采购经理",
+  skeptical_executive: "谨慎型高管",
+  end_user_manager: "终端用户经理",
+};
 
 function splitList(value: FormDataEntryValue | null) {
   if (typeof value !== "string") {
@@ -89,7 +98,7 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
       };
 
       if (!response.ok || !result.practiceSession) {
-        throw new Error(result.error?.message ?? "Practice session creation failed");
+        throw new Error(result.error?.message ?? "练习会话创建失败");
       }
 
       router.push(`/practice/${result.practiceSession.id}`);
@@ -97,7 +106,7 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
       setError(
         caughtError instanceof Error
           ? caughtError.message
-          : "Practice session creation failed",
+          : "练习会话创建失败",
       );
     } finally {
       setIsSubmitting(false);
@@ -109,15 +118,15 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <Mic2 className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Practice setup</h2>
+          <h2 className="text-lg font-semibold">练习设置</h2>
         </div>
-        <StatusPill tone="primary">Creates session</StatusPill>
+        <StatusPill tone="primary">创建会话</StatusPill>
       </div>
 
       <form className="mt-5 grid gap-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-mode">
-            Mode
+            练习模式
             <select
               id="practice-mode"
               name="mode"
@@ -133,7 +142,7 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-persona">
-            Persona
+            客户角色
             <select
               id="practice-persona"
               name="personaId"
@@ -142,14 +151,14 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
             >
               {personas.map((persona) => (
                 <option key={persona.id} value={persona.id}>
-                  {persona.name}
+                  {personaLabels[persona.id] ?? persona.name}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-material-id">
-            Material ID
+            材料 ID
             <input
               id="practice-material-id"
               name="materialId"
@@ -159,14 +168,14 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-prep-card">
-            Prep Card
+            准备卡
             <select
               id="practice-prep-card"
               name="prepCardId"
               defaultValue={defaultPrepCardId}
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             >
-              <option value="">No prep card</option>
+              <option value="">不使用准备卡</option>
               {prepCards.map((prepCard) => (
                 <option key={prepCard.id} value={prepCard.id}>
                   {prepCard.customerType} · {prepCard.meetingGoal}
@@ -176,7 +185,7 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-difficulty">
-            Difficulty
+            难度
             <select
               id="practice-difficulty"
               name="difficulty"
@@ -193,12 +202,12 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
         </div>
 
         <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="practice-training-focus">
-          Training focus
+          训练重点
           <textarea
             id="practice-training-focus"
             name="trainingFocus"
             rows={4}
-            placeholder="business value&#10;privacy objection&#10;shorter answers"
+            placeholder="商业价值&#10;隐私异议&#10;更短回答"
             className="rounded-md border border-[var(--border)] bg-white px-3 py-2 text-sm leading-6 outline-none transition focus:border-[var(--primary)]"
           />
         </label>
@@ -219,7 +228,7 @@ export function PracticeSetup({ prepCards = [] }: PracticeSetupProps) {
             className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             <PlayCircle className="h-4 w-4" aria-hidden="true" />
-            {isSubmitting ? "Creating..." : "Start practice"}
+            {isSubmitting ? "创建中..." : "开始练习"}
           </button>
         </div>
       </form>

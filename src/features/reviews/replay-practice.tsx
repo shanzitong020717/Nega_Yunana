@@ -7,9 +7,9 @@ type ReplayPracticeProps = {
 };
 
 const actions = [
-  { label: "Listen", icon: Volume2 },
-  { label: "Shadow", icon: Mic2 },
-  { label: "Repeat", icon: Repeat2 },
+  { label: "听一遍", icon: Volume2 },
+  { label: "影子跟读", icon: Mic2 },
+  { label: "重复练习", icon: Repeat2 },
 ] as const;
 
 export function ReplayPractice({ upgrades }: ReplayPracticeProps) {

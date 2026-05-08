@@ -53,7 +53,7 @@ describe("MaterialsView", () => {
 
     render(<MaterialsView />);
 
-    fireEvent.change(screen.getByLabelText("Material file"), {
+    fireEvent.change(screen.getByLabelText("材料文件"), {
       target: {
         files: [
           new File(["Customer notes"], "customer-notes.txt", {
@@ -62,10 +62,10 @@ describe("MaterialsView", () => {
         ],
       },
     });
-    fireEvent.change(screen.getByLabelText("Material name"), {
+    fireEvent.change(screen.getByLabelText("材料名称"), {
       target: { value: "Customer notes" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /Upload material/i }));
+    fireEvent.click(screen.getByRole("button", { name: /上传材料/ }));
 
     expect(await screen.findByText("Generated key message")).toBeInTheDocument();
     await waitFor(() => {

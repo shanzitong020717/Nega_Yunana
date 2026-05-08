@@ -49,10 +49,10 @@ describe("privacy deletion controls", () => {
 
     render(<PrivacySettings />);
 
-    fireEvent.change(screen.getByLabelText("Material ID"), {
+    fireEvent.change(screen.getByLabelText("材料 ID"), {
       target: { value: "material_123" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Delete material" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除材料" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -60,7 +60,7 @@ describe("privacy deletion controls", () => {
         expect.objectContaining({ method: "DELETE" }),
       );
     });
-    expect(await screen.findByText("Material deleted.")).toBeInTheDocument();
+    expect(await screen.findByText("材料已删除。")).toBeInTheDocument();
   });
 
   it("deletes the current review from the review page controls", async () => {
@@ -73,7 +73,7 @@ describe("privacy deletion controls", () => {
 
     render(<ReviewView reviewId="review_123" sessionId="session_123" review={review} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Delete this review" }));
+    fireEvent.click(screen.getByRole("button", { name: "删除本次复盘" }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -81,6 +81,6 @@ describe("privacy deletion controls", () => {
         expect.objectContaining({ method: "DELETE" }),
       );
     });
-    expect(await screen.findByText("Review deleted.")).toBeInTheDocument();
+    expect(await screen.findByText("复盘已删除。")).toBeInTheDocument();
   });
 });

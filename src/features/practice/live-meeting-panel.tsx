@@ -39,16 +39,27 @@ const allStates: RealtimeRoomState[] = [
   "Session Ended",
 ];
 
+const stateLabels: Record<RealtimeRoomState, string> = {
+  Ready: "准备就绪",
+  Listening: "聆听中",
+  Thinking: "思考中",
+  Speaking: "回复中",
+  Muted: "已静音",
+  Reconnecting: "连接中",
+  "Mic Permission Required": "需要麦克风权限",
+  "Session Ended": "会话已结束",
+};
+
 function speakerLabel(speaker: TranscriptTurn["speaker"]) {
   if (speaker === "ai_customer") {
-    return "AI Customer";
+    return "AI 客户";
   }
 
   if (speaker === "user") {
-    return "You";
+    return "你";
   }
 
-  return "System";
+  return "系统";
 }
 
 export function LiveMeetingPanel({
@@ -65,14 +76,14 @@ export function LiveMeetingPanel({
         <div>
           <div className="flex items-center gap-2">
             <Mic2 className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">Live meeting panel</h2>
+            <h2 className="text-lg font-semibold">实时会议面板</h2>
           </div>
           <p className="mt-2 text-sm font-medium text-[var(--primary-strong)]">
-            Current state: {state}
+            当前状态：{stateLabels[state]}
           </p>
         </div>
         <StatusPill tone={state === "Session Ended" ? "neutral" : "primary"}>
-          {state}
+          {stateLabels[state]}
         </StatusPill>
       </div>
 
@@ -87,7 +98,7 @@ export function LiveMeetingPanel({
                 : "border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]",
             ].join(" ")}
           >
-            {item}
+            {stateLabels[item]}
           </span>
         ))}
       </div>
@@ -99,7 +110,7 @@ export function LiveMeetingPanel({
           className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
         >
           <Mic2 className="h-4 w-4" aria-hidden="true" />
-          Start
+          开始
         </button>
         <button
           type="button"
@@ -107,7 +118,7 @@ export function LiveMeetingPanel({
           className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-4 text-sm font-medium transition hover:border-[var(--primary)]"
         >
           <MicOff className="h-4 w-4" aria-hidden="true" />
-          {isMuted ? "Unmute" : "Mute"}
+          {isMuted ? "取消静音" : "静音"}
         </button>
         <button
           type="button"
@@ -115,13 +126,13 @@ export function LiveMeetingPanel({
           className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] bg-[#fff0ee] px-4 text-sm font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
         >
           <PhoneOff className="h-4 w-4" aria-hidden="true" />
-          End
+          结束
         </button>
       </div>
 
       <div className="mt-5 max-h-[30rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
         <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-          Transcript
+          实时转写
         </h3>
         <div className="mt-3 space-y-3">
           {transcriptTurns.map((turn) => (

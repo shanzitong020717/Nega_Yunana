@@ -5,14 +5,14 @@ import { AppSidebar } from "@/components/app-sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rokid Overseas Meeting Coach",
+  title: "Rokid 海外会议口语教练",
   description:
     "A tailored English meeting coach for Rokid overseas sales and solution conversations.",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="zh-CN">
       <body>
         <div className="app-grid">
           <AppSidebar />

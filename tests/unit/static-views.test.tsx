@@ -16,17 +16,17 @@ describe("static product views", () => {
   it("renders the dashboard learning loop sections", () => {
     render(<DashboardView />);
 
-    expect(screen.getByText("Today’s recommended drill")).toBeInTheDocument();
-    expect(screen.getByText("Prepare for a customer meeting")).toBeInTheDocument();
-    expect(screen.getByText("Recent materials")).toBeInTheDocument();
-    expect(screen.getByText("This Week's Focus")).toBeInTheDocument();
-    expect(screen.getByText("Recent review")).toBeInTheDocument();
+    expect(screen.getByText("今日推荐练习")).toBeInTheDocument();
+    expect(screen.getByText("客户会议准备")).toBeInTheDocument();
+    expect(screen.getByText("最近材料")).toBeInTheDocument();
+    expect(screen.getByText("本周重点")).toBeInTheDocument();
+    expect(screen.getByText("最近复盘")).toBeInTheDocument();
   });
 
   it("filters objection cards by category", () => {
     render(<ObjectionBankView />);
 
-    fireEvent.change(screen.getByLabelText("Category"), {
+    fireEvent.change(screen.getByLabelText("类别"), {
       target: { value: "Privacy & Security" },
     });
 
@@ -37,9 +37,9 @@ describe("static product views", () => {
   it("filters phrasebook cards by tag and shows a personal empty state", () => {
     render(<PhrasebookView />);
 
-    expect(screen.getByText("No saved personal phrases yet")).toBeInTheDocument();
+    expect(screen.getByText("还没有收藏个人表达")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("Tag"), {
+    fireEvent.change(screen.getByLabelText("标签"), {
       target: { value: "pilot" },
     });
 
@@ -50,7 +50,7 @@ describe("static product views", () => {
   it("renders progress focus areas from mock weakness data", () => {
     render(<ProgressView />);
 
-    expect(screen.getByText("Feature-only talk")).toBeInTheDocument();
-    expect(screen.getAllByText("Feature-to-value conversion drill").length).toBeGreaterThan(0);
+    expect(screen.getByText("只讲功能")).toBeInTheDocument();
+    expect(screen.getAllByText("功能转价值练习").length).toBeGreaterThan(0);
   });
 });

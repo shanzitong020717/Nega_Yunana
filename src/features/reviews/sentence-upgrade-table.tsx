@@ -42,7 +42,7 @@ export function SentenceUpgradeTable({ upgrades }: SentenceUpgradeTableProps) {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to save phrase.");
+        throw new Error("保存表达失败。");
       }
 
       setSaveStates((currentStates) => ({
@@ -62,16 +62,16 @@ export function SentenceUpgradeTable({ upgrades }: SentenceUpgradeTableProps) {
       <table className="min-w-[52rem] w-full border-collapse text-left text-sm">
         <thead className="bg-[var(--surface-subtle)] text-xs font-semibold uppercase text-[var(--muted)]">
           <tr>
-            <th className="border-b border-[var(--border)] px-3 py-3">Original</th>
+            <th className="border-b border-[var(--border)] px-3 py-3">原句</th>
             <th className="border-b border-[var(--border)] px-3 py-3">
-              Natural Business English
+              自然商务英语
             </th>
             <th className="border-b border-[var(--border)] px-3 py-3">中文解释</th>
             <th className="border-b border-[var(--border)] px-3 py-3">
-              Practice Prompt
+              练习提示
             </th>
             <th className="border-b border-[var(--border)] px-3 py-3">
-              Save to Phrasebook
+              保存到表达库
             </th>
           </tr>
         </thead>
@@ -105,12 +105,12 @@ export function SentenceUpgradeTable({ upgrades }: SentenceUpgradeTableProps) {
                   >
                     <BookmarkPlus className="h-4 w-4" aria-hidden="true" />
                     {saveState === "saving"
-                      ? "Saving..."
+                      ? "保存中..."
                       : saveState === "saved"
-                        ? "Saved"
+                        ? "已保存"
                         : saveState === "error"
-                          ? "Retry Save"
-                          : "Save to Phrasebook"}
+                          ? "重试保存"
+                          : "保存到表达库"}
                   </button>
                 </td>
               </tr>

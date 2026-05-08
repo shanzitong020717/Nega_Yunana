@@ -88,7 +88,7 @@ describe("material brief API", () => {
     await expect(readJson(response)).resolves.toEqual({
       error: {
         code: "NOT_FOUND",
-        message: "Material not found",
+        message: "未找到材料",
       },
     });
   });

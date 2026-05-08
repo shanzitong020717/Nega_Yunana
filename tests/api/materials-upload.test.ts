@@ -50,7 +50,7 @@ describe("materials upload API", () => {
     await expect(readJson(response)).resolves.toEqual({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Unsupported file type",
+        message: "不支持该文件类型",
       },
     });
   });

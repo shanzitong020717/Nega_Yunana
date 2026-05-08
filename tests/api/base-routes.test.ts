@@ -54,7 +54,7 @@ describe("base API route handlers", () => {
     await expect(readJson(response)).resolves.toEqual({
       error: {
         code: "VALIDATION_ERROR",
-        message: "Invalid customer persona",
+        message: "客户角色无效",
       },
     });
   });
@@ -103,7 +103,7 @@ describe("base API route handlers", () => {
     await expect(readJson(response)).resolves.toEqual({
       error: {
         code: "VALIDATION_ERROR",
-        message: "English sentence is required",
+        message: "英文句子不能为空",
       },
     });
   });

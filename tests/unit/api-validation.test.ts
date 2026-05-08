@@ -32,7 +32,7 @@ describe("api validation schemas", () => {
         originalFileName: "demo.mp4",
         storagePath: "materials/demo.mp4",
       }),
-    ).toThrow("Unsupported file type");
+    ).toThrow("不支持该文件类型");
   });
 
   it("rejects invalid persona ids", () => {
@@ -43,7 +43,7 @@ describe("api validation schemas", () => {
         difficulty: "normal",
         trainingFocus: ["business_value"],
       }),
-    ).toThrow("Invalid customer persona");
+    ).toThrow("客户角色无效");
   });
 
   it("rejects empty phrase English sentences", () => {
@@ -55,6 +55,6 @@ describe("api validation schemas", () => {
         useCase: "Explaining business value.",
         tags: ["business-value"],
       }),
-    ).toThrow("English sentence is required");
+    ).toThrow("英文句子不能为空");
   });
 });

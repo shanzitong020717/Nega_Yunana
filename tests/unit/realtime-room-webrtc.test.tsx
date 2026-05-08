@@ -28,12 +28,12 @@ describe("RealtimeRoom browser voice connection", () => {
 
     expect(getUserMedia).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
 
     await waitFor(() => {
       expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
       expect(
-        screen.getByText("Current state: Mic Permission Required"),
+        screen.getByText("当前状态：需要麦克风权限"),
       ).toBeInTheDocument();
     });
   });
@@ -74,10 +74,10 @@ describe("RealtimeRoom browser voice connection", () => {
 
     render(<RealtimeRoom sessionId="session_123" />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Start" }));
-    await screen.findByText("Current state: Listening");
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+    await screen.findByText("当前状态：聆听中");
 
-    fireEvent.click(screen.getByRole("button", { name: "End" }));
+    fireEvent.click(screen.getByRole("button", { name: "结束" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenLastCalledWith(
@@ -88,6 +88,6 @@ describe("RealtimeRoom browser voice connection", () => {
       );
     });
     expect(stop).toHaveBeenCalled();
-    expect(screen.getByText("Current state: Session Ended")).toBeInTheDocument();
+    expect(screen.getByText("当前状态：会话已结束")).toBeInTheDocument();
   });
 });

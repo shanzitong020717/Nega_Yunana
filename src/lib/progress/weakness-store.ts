@@ -23,16 +23,16 @@ export type ProgressSummary = {
 };
 
 export const weaknessLabels: Record<WeaknessUpdateInput["type"], string> = {
-  long_answers: "Long Answers",
-  feature_only_talk: "Feature-Only Talk",
-  weak_discovery: "Weak Discovery",
-  unclear_positioning: "Unclear Positioning",
-  weak_objection_handling: "Weak Objection Handling",
-  repetitive_vocabulary: "Repetitive Vocabulary",
-  missing_next_step: "Missing Next Step",
-  grammar_accuracy: "Grammar Accuracy",
-  pronunciation_clarity: "Pronunciation Clarity",
-  fluency: "Fluency",
+  long_answers: "回答过长",
+  feature_only_talk: "只讲功能",
+  weak_discovery: "探索提问不足",
+  unclear_positioning: "定位不清晰",
+  weak_objection_handling: "异议处理偏弱",
+  repetitive_vocabulary: "词汇重复",
+  missing_next_step: "缺少下一步",
+  grammar_accuracy: "语法准确性",
+  pronunciation_clarity: "发音清晰度",
+  fluency: "流利度",
 };
 
 const weaknessMetrics = new Map<WeaknessUpdateInput["type"], WeaknessMetric>();
@@ -101,17 +101,17 @@ export function getDefaultProgressSummary(): ProgressSummary {
       {
         id: "weakness_feature_value",
         type: "feature_only_talk",
-        label: "Feature-only talk",
+      label: "只讲功能",
         severity: 3,
         evidence:
-          "Mock baseline: practice sessions should track whether product features are connected to customer value.",
-        recommendedDrill: "Feature-to-value conversion drill",
+        "Mock baseline: practice sessions should track whether product features are connected to customer value.",
+        recommendedDrill: "功能转价值练习",
         occurrences: 1,
         lastSeenAt: new Date(0).toISOString(),
       },
     ],
     improvedWeaknesses: [],
-    recommendedDrills: ["Feature-to-value conversion drill"],
+    recommendedDrills: ["功能转价值练习"],
     history: [],
   };
 }

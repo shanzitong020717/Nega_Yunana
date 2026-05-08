@@ -51,13 +51,13 @@ export async function POST(request: Request) {
     const file = formData.get("file");
 
     if (!isUploadedFile(file) || file.size === 0) {
-      return apiErrorResponse("VALIDATION_ERROR", "Material file is required", 400);
+      return apiErrorResponse("VALIDATION_ERROR", "请上传材料文件", 400);
     }
 
     const fileType = getSupportedFileTypeFromName(file.name);
 
     if (!fileType) {
-      return apiErrorResponse("VALIDATION_ERROR", "Unsupported file type", 400);
+      return apiErrorResponse("VALIDATION_ERROR", "不支持该文件类型", 400);
     }
 
     const storedUpload = await storeUploadedFile(file);

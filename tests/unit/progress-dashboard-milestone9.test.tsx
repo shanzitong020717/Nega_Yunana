@@ -50,19 +50,19 @@ describe("milestone 9 progress surfaces", () => {
   it("renders the full progress summary from weakness data", () => {
     render(<ProgressView progress={progressSummary} />);
 
-    expect(screen.getByText("Recent 7-day training count")).toBeInTheDocument();
-    expect(screen.getByText("3 sessions")).toBeInTheDocument();
-    expect(screen.getByText("Top Weaknesses")).toBeInTheDocument();
-    expect(screen.getByText("Improved Weaknesses")).toBeInTheDocument();
-    expect(screen.getByText("Recommended Drills")).toBeInTheDocument();
-    expect(screen.getByText("History")).toBeInTheDocument();
+    expect(screen.getByText("近 7 天训练次数")).toBeInTheDocument();
+    expect(screen.getByText("3 次会话")).toBeInTheDocument();
+    expect(screen.getByText("主要弱项")).toBeInTheDocument();
+    expect(screen.getByText("已有改善的弱项")).toBeInTheDocument();
+    expect(screen.getByText("推荐练习")).toBeInTheDocument();
+    expect(screen.getByText("历史记录")).toBeInTheDocument();
     expect(screen.getAllByText("Weak Discovery").length).toBeGreaterThan(0);
   });
 
   it("shows this week's focus from weakness recommendations on the dashboard", () => {
     render(<DashboardView progress={progressSummary} />);
 
-    expect(screen.getByText("This Week's Focus")).toBeInTheDocument();
+    expect(screen.getByText("本周重点")).toBeInTheDocument();
     expect(screen.getAllByText("Use-case discovery ladder").length).toBeGreaterThan(0);
   });
 });

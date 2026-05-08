@@ -33,44 +33,44 @@ type NavItem = {
 const navItems: NavItem[] = [
   {
     href: "/dashboard",
-    label: "Dashboard",
-    description: "Today’s focus",
+    label: "首页",
+    description: "今日重点",
     icon: LayoutDashboard,
   },
   {
     href: "/materials",
-    label: "Materials",
-    description: "Decks and briefs",
+    label: "材料",
+    description: "资料与简报",
     icon: FileText,
   },
   {
     href: "/practice",
-    label: "Practice",
-    description: "Meeting simulator",
+    label: "练习",
+    description: "会议模拟",
     icon: Mic2,
   },
   {
     href: "/objection-bank",
-    label: "Objection Bank",
-    description: "Hard questions",
+    label: "异议库",
+    description: "高压问题",
     icon: MessageSquareWarning,
   },
   {
     href: "/phrasebook",
-    label: "Phrasebook",
-    description: "Rokid expressions",
+    label: "表达库",
+    description: "Rokid 话术",
     icon: BookOpenText,
   },
   {
     href: "/progress",
-    label: "Progress",
-    description: "Weakness tracker",
+    label: "进步",
+    description: "弱项追踪",
     icon: BarChart3,
   },
   {
     href: "/settings",
-    label: "Settings",
-    description: "Privacy and model",
+    label: "设置",
+    description: "隐私与模型",
     icon: Settings,
   },
 ];
@@ -93,12 +93,12 @@ export function AppSidebar() {
               <p className="text-sm font-semibold text-[var(--foreground)]">
                 Rokid Coach
               </p>
-              <p className="text-xs text-[var(--muted)]">Overseas meetings</p>
+              <p className="text-xs text-[var(--muted)]">海外会议口语</p>
             </div>
           </div>
         </Link>
 
-        <nav aria-label="Primary navigation" className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
+        <nav aria-label="主导航" className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =

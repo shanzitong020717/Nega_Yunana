@@ -148,7 +148,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     });
 
     if (!response.ok) {
-      throw new Error("Failed to create realtime session.");
+      throw new Error("实时会话创建失败。");
     }
 
     return (await response.json()) as RealtimeSessionResponse;
@@ -210,7 +210,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       typeof PeerConnection === "undefined"
     ) {
       setState("Listening");
-      addSystemTurn(`Mock Realtime session ${realtimeSession.sessionId} started.`);
+      addSystemTurn(`模拟实时会话 ${realtimeSession.sessionId} 已开始。`);
       return;
     }
 
@@ -259,7 +259,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     );
 
     if (!sdpResponse.ok) {
-      throw new Error("Failed to connect realtime audio.");
+      throw new Error("实时语音连接失败。");
     }
 
     await peerConnection.setRemoteDescription({
@@ -267,7 +267,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       sdp: await sdpResponse.text(),
     });
     setState("Listening");
-    addSystemTurn(`Realtime voice session ${realtimeSession.sessionId} connected.`);
+    addSystemTurn(`实时语音会话 ${realtimeSession.sessionId} 已连接。`);
   }
 
   async function handleStart() {
@@ -280,7 +280,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         setState("Mic Permission Required");
-        addSystemTurn("Microphone access is not available in this browser.");
+        addSystemTurn("当前浏览器无法使用麦克风。");
         return;
       }
 
@@ -291,7 +291,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     } catch {
       closeRealtimeConnection();
       setState("Mic Permission Required");
-      addSystemTurn("Microphone permission is required to start voice practice.");
+      addSystemTurn("开始语音练习需要麦克风权限。");
     }
   }
 
@@ -317,7 +317,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     );
 
     if (!response.ok) {
-      throw new Error("Failed to save transcript.");
+      throw new Error("保存转写失败。");
     }
   }
 
@@ -325,13 +325,13 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     closeRealtimeConnection();
     setIsMuted(false);
     setState("Session Ended");
-    const turnsToSave = addSystemTurn("Session ended. Saving transcript for review.");
+    const turnsToSave = addSystemTurn("会话已结束，正在保存转写用于复盘。");
 
     try {
       await saveTranscript(turnsToSave);
-      addSystemTurn("Transcript saved for review.");
+      addSystemTurn("转写已保存，可用于复盘。");
     } catch {
-      addSystemTurn("Transcript could not be saved. Please try again later.");
+      addSystemTurn("转写暂时无法保存，请稍后重试。");
     }
   }
 
@@ -373,8 +373,8 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     <>
       <audio ref={audioRef} autoPlay className="hidden" />
       <PageHeader
-        eyebrow="Realtime room"
-        title="Live meeting practice"
+        eyebrow="实时练习室"
+        title="实时会议练习"
         description="Practice a customer conversation with material guidance, live transcript, and smart support controls."
       />
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.35fr_0.85fr]">

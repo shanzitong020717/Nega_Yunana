@@ -22,8 +22,8 @@ export function PracticeView() {
   return (
     <>
       <PageHeader
-        eyebrow="Practice"
-        title="Meeting simulator setup"
+        eyebrow="练习"
+        title="会议模拟设置"
         description="Generate a customer-specific prep card, choose the practice mode and persona, then enter the meeting room."
       />
 

@@ -12,9 +12,27 @@ import {
   type ObjectionCategory,
 } from "@/data/objections";
 
-type CategoryFilter = "All categories" | ObjectionCategory;
+type CategoryFilter = "all" | ObjectionCategory;
 
-const allCategoryLabel = "All categories";
+const allCategoryLabel = "all";
+
+const categoryLabels: Record<CategoryFilter, string> = {
+  all: "全部类别",
+  "Product Value": "产品价值",
+  "Accuracy & Reliability": "准确性与可靠性",
+  "Privacy & Security": "隐私与安全",
+  Deployment: "部署落地",
+  Competition: "竞品对比",
+  "Pricing & Pilot": "价格与试点",
+};
+
+const frameworkLabels: Record<string, string> = {
+  Acknowledge: "承认顾虑",
+  Clarify: "澄清背景",
+  Position: "定位价值",
+  Support: "补充支撑",
+  "Next Step": "推进下一步",
+};
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
@@ -70,7 +88,7 @@ export function ObjectionBankView() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to create practice session");
+        throw new Error("练习会话创建失败");
       }
 
       const payload = (await response.json()) as {
@@ -79,12 +97,12 @@ export function ObjectionBankView() {
       const sessionId = payload.practiceSession?.id;
 
       if (!sessionId) {
-        throw new Error("Practice session response was missing an id");
+        throw new Error("练习会话缺少 ID");
       }
 
       router.push(`/practice/${sessionId}`);
     } catch {
-      setLaunchError("Could not start this practice session. Please try again.");
+      setLaunchError("无法开始这次练习，请稍后重试。");
     } finally {
       setLaunchingObjectionId(null);
     }
@@ -93,32 +111,32 @@ export function ObjectionBankView() {
   return (
     <>
       <PageHeader
-        eyebrow="Objection Bank"
-        title="Rokid sales objection practice"
+        eyebrow="异议库"
+        title="Rokid 销售异议练习"
         description="Train common overseas customer concerns with structured answer frameworks, short answers, professional answers, and focused practice entry points."
       />
 
       <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
         <div className="grid gap-3 lg:grid-cols-[0.75fr_1fr_auto] lg:items-end">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="objection-category">
-            Category
+            类别
             <select
               id="objection-category"
               value={category}
               onChange={(event) => setCategory(event.target.value as CategoryFilter)}
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             >
-              <option value={allCategoryLabel}>{allCategoryLabel}</option>
+              <option value={allCategoryLabel}>{categoryLabels[allCategoryLabel]}</option>
               {objectionCategories.map((item) => (
                 <option key={item} value={item}>
-                  {item}
+                  {categoryLabels[item]}
                 </option>
               ))}
             </select>
           </label>
 
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="objection-search">
-            Search
+            搜索
             <span className="relative">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted)]"
@@ -128,14 +146,14 @@ export function ObjectionBankView() {
                 id="objection-search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Search concern, answer, or follow-up"
+                placeholder="搜索顾虑、回答或追问"
                 className="min-h-11 w-full rounded-md border border-[var(--border)] bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-[var(--primary)]"
               />
             </span>
           </label>
 
           <div className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2">
-            <p className="text-xs text-[var(--muted)]">Visible cards</p>
+            <p className="text-xs text-[var(--muted)]">可见卡片</p>
             <p className="mt-1 text-lg font-semibold">{filteredObjections.length}</p>
           </div>
         </div>
@@ -159,7 +177,7 @@ export function ObjectionBankView() {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <StatusPill tone="neutral">{objection.category}</StatusPill>
+                  <StatusPill tone="neutral">{categoryLabels[objection.category]}</StatusPill>
                   <h2 className="mt-3 text-lg font-semibold leading-7">
                     {objection.question}
                   </h2>
@@ -173,14 +191,14 @@ export function ObjectionBankView() {
               <div className="mt-5 space-y-4">
                 <section>
                   <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                    Customer Concern
+                    客户顾虑
                   </h3>
                   <p className="mt-2 text-sm leading-6">{objection.customerConcern}</p>
                 </section>
 
                 <section>
                   <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                    Answer Framework
+                    回答框架
                   </h3>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {objection.answerFramework.map((step) => (
@@ -188,7 +206,7 @@ export function ObjectionBankView() {
                         key={step}
                         className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]"
                       >
-                        {step}
+                        {frameworkLabels[step] ?? step}
                       </span>
                     ))}
                   </div>
@@ -196,7 +214,7 @@ export function ObjectionBankView() {
 
                 <section>
                   <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                    Short Answer
+                    简短回答
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
                     {objection.shortAnswer}
@@ -205,7 +223,7 @@ export function ObjectionBankView() {
 
                 <section>
                   <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                    Professional Answer
+                    专业回答
                   </h3>
                   <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
                     {objection.professionalAnswer}
@@ -215,7 +233,7 @@ export function ObjectionBankView() {
 
               <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
                 <p className="max-w-xl text-sm leading-6 text-[var(--muted)]">
-                  Follow-up: {objection.followUpQuestion}
+                  追问：{objection.followUpQuestion}
                 </p>
                 <button
                   type="button"
@@ -224,7 +242,7 @@ export function ObjectionBankView() {
                   className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[var(--primary)] px-3 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:bg-[#8cb9b5]"
                 >
                   <PlayCircle className="h-4 w-4" aria-hidden="true" />
-                  {launchingObjectionId === objection.id ? "Starting..." : "Practice"}
+                  {launchingObjectionId === objection.id ? "启动中..." : "开始练习"}
                 </button>
               </div>
             </article>
@@ -232,7 +250,7 @@ export function ObjectionBankView() {
         </section>
       ) : (
         <section className="rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-          <h2 className="text-lg font-semibold">No objections match these filters</h2>
+          <h2 className="text-lg font-semibold">没有匹配的异议卡片</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Clear the search or switch category to keep practicing.
           </p>

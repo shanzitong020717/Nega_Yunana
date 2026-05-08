@@ -19,42 +19,42 @@ type DeleteConfig = {
 const deleteConfigs: DeleteConfig[] = [
   {
     target: "material",
-    title: "Material",
-    label: "Material ID",
+    title: "材料",
+    label: "材料 ID",
     fieldName: "materialId",
     placeholder: "material_...",
-    buttonLabel: "Delete material",
-    successMessage: "Material deleted.",
+    buttonLabel: "删除材料",
+    successMessage: "材料已删除。",
     endpoint: (id) => `/api/materials/${id}`,
   },
   {
     target: "practiceSession",
-    title: "Practice session",
-    label: "Practice Session ID",
+    title: "练习会话",
+    label: "练习会话 ID",
     fieldName: "practiceSessionId",
     placeholder: "session_...",
-    buttonLabel: "Delete practice session",
-    successMessage: "Practice session deleted.",
+    buttonLabel: "删除练习会话",
+    successMessage: "练习会话已删除。",
     endpoint: (id) => `/api/practice-sessions/${id}`,
   },
   {
     target: "transcript",
-    title: "Transcript only",
-    label: "Transcript Session ID",
+    title: "仅删除转写",
+    label: "转写会话 ID",
     fieldName: "transcriptSessionId",
     placeholder: "session_...",
-    buttonLabel: "Delete transcript",
-    successMessage: "Transcript deleted.",
+    buttonLabel: "删除转写",
+    successMessage: "转写已删除。",
     endpoint: (id) => `/api/practice-sessions/${id}/transcript`,
   },
   {
     target: "review",
-    title: "Review only",
-    label: "Review Session ID",
+    title: "仅删除复盘",
+    label: "复盘会话 ID",
     fieldName: "reviewSessionId",
     placeholder: "session_...",
-    buttonLabel: "Delete review",
-    successMessage: "Review deleted.",
+    buttonLabel: "删除复盘",
+    successMessage: "复盘已删除。",
     endpoint: (id) => `/api/practice-sessions/${id}/review`,
   },
 ];
@@ -77,7 +77,7 @@ export function PrivacySettings() {
     const id = String(formData.get(config.fieldName) ?? "").trim();
 
     if (!id) {
-      setError(`${config.label} is required.`);
+      setError(`请填写${config.label}。`);
       return;
     }
 
@@ -89,13 +89,13 @@ export function PrivacySettings() {
       });
 
       if (!response.ok) {
-        throw new Error("Delete request failed");
+        throw new Error("删除请求失败");
       }
 
       form.reset();
       setMessage(config.successMessage);
     } catch {
-      setError("Deletion failed. Please check the ID and try again.");
+      setError("删除失败，请检查 ID 后重试。");
     } finally {
       setPendingTarget(null);
     }
@@ -106,7 +106,7 @@ export function PrivacySettings() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">Privacy deletion controls</h2>
+          <h2 className="text-lg font-semibold">隐私删除控制</h2>
         </div>
       </div>
 
@@ -141,7 +141,7 @@ export function PrivacySettings() {
               className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
-              {pendingTarget === config.target ? "Deleting..." : config.buttonLabel}
+              {pendingTarget === config.target ? "删除中..." : config.buttonLabel}
             </button>
           </form>
         ))}

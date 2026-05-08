@@ -33,7 +33,7 @@ async function readOptionalJsonBody(request: Request) {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new SyntaxError("Request body must be valid JSON");
+    throw new SyntaxError("请求体必须是有效 JSON");
   }
 }
 
@@ -85,7 +85,7 @@ export async function DELETE(_request: Request, context: ReviewRouteContext) {
     const { sessionId } = await context.params;
 
     if (!getPracticeSessionRecord(sessionId)) {
-      return apiErrorResponse("NOT_FOUND", "Practice session not found", 404);
+      return apiErrorResponse("NOT_FOUND", "未找到练习会话", 404);
     }
 
     const deletedReview = deleteReviewBySessionId(sessionId);
