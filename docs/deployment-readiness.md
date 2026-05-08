@@ -12,6 +12,8 @@ Configure these variables in the deployment provider before enabling real AI cal
 
 `.env.example` contains the required shape. Do not commit real `.env` or `.env.local` files.
 
+See `docs/production-environment-setup.md` for the current Vercel project, configured non-secret values, and remaining required secrets.
+
 ## Privacy And Storage
 
 - Uploaded files are written under `UPLOAD_DIR`.

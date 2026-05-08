@@ -36,3 +36,4 @@ playwright-report/
 .idea/
 
 /src/generated/prisma
+.vercel
