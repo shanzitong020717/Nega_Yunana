@@ -1,7 +1,19 @@
 import { z } from "zod";
+import { zodTextFormat } from "openai/helpers/zod";
 
-import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
+
+const prepCardStructuredOutputSchema = z.object({
+  customerContext: z.string(),
+  meetingGoal: z.string(),
+  keyTalkingPoints: z.array(z.string()),
+  discoveryQuestions: z.array(z.string()),
+  likelyObjections: z.array(z.string()),
+  openingScript: z.string(),
+  mustUsePhrases: z.array(z.string()),
+  doNotOverpromise: z.array(z.string()),
+});
 
 export const prepCardSchema = z.object({
   customerContext: z.string().min(1),
@@ -33,7 +45,7 @@ function shouldUseMockMode(input: GeneratePrepCardInput) {
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test" ||
-    !process.env.OPENAI_API_KEY
+    !hasOpenAIApiKey()
   );
 }
 
@@ -103,6 +115,39 @@ function buildPrepCardPrompt(input: GeneratePrepCardInput) {
   ].join("\n\n");
 }
 
+function logPrepCardFallback(error: unknown) {
+  if (process.env.NODE_ENV === "test") {
+    return;
+  }
+
+  const errorSummary =
+    error instanceof Error
+      ? { name: error.name, message: error.message }
+      : { message: String(error) };
+
+  console.warn(
+    "[prep-card] AI generation failed; using deterministic fallback.",
+    errorSummary,
+  );
+}
+
+async function generateOpenAIPrepCard(input: GeneratePrepCardInput) {
+  const response = await getOpenAIClient().responses.parse({
+    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5.4-mini",
+    input: buildPrepCardPrompt(input),
+    text: {
+      format: zodTextFormat(prepCardStructuredOutputSchema, "prep_card"),
+    },
+  });
+  const parsedPrepCard = response.output_parsed;
+
+  if (!parsedPrepCard) {
+    throw new Error("OpenAI returned no parsed prep card.");
+  }
+
+  return prepCardSchema.parse(parsedPrepCard);
+}
+
 export async function generatePrepCard(
   input: GeneratePrepCardInput,
 ): Promise<PrepCardPayload> {
@@ -110,10 +155,10 @@ export async function generatePrepCard(
     return generateMockPrepCard(input);
   }
 
-  const response = await getOpenAIClient().responses.create({
-    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5.4-mini",
-    input: buildPrepCardPrompt(input),
-  });
-
-  return prepCardSchema.parse(JSON.parse(response.output_text));
+  try {
+    return await generateOpenAIPrepCard(input);
+  } catch (error) {
+    logPrepCardFallback(error);
+    return generateMockPrepCard(input);
+  }
 }

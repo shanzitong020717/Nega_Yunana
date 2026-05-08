@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { objections } from "@/data/objections";
 import type { CustomerPersona } from "@/data/personas";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
-import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import type { PrepCardPayload } from "@/lib/ai/prep-card";
 import type { PracticeSessionRecord } from "@/lib/practice/practice-session-store";
 import type { TranscriptTurnInput } from "@/lib/validation/practice";
@@ -35,7 +35,7 @@ function shouldUseMockMode(input: Pick<GeneratePracticeReviewInput, "mockMode">)
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test" ||
-    !process.env.OPENAI_API_KEY
+    !hasOpenAIApiKey()
   );
 }
 

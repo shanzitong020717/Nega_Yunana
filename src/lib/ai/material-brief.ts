@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getOpenAIClient } from "@/lib/ai/openai-client";
+import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 
 const glossaryItemSchema = z.object({
   term: z.string().min(1),
@@ -37,7 +37,7 @@ function shouldUseMockMode(input: GenerateMaterialBriefInput) {
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test" ||
-    !process.env.OPENAI_API_KEY
+    !hasOpenAIApiKey()
   );
 }
 
