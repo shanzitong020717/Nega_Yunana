@@ -116,6 +116,25 @@ function eventText(event: Record<string, unknown>) {
   return "";
 }
 
+function realtimeErrorMessage(event: Record<string, unknown>) {
+  const error = event.error;
+  const message = event.message;
+
+  if (error && typeof error === "object") {
+    const nestedMessage = (error as Record<string, unknown>).message;
+
+    if (typeof nestedMessage === "string" && nestedMessage.trim()) {
+      return nestedMessage.trim();
+    }
+  }
+
+  if (typeof message === "string" && message.trim()) {
+    return message.trim();
+  }
+
+  return "实时模型服务返回错误，请检查第三方 Realtime API 配置。";
+}
+
 export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const [state, setState] = useState<RealtimeRoomState>("Ready");
   const [transcriptTurns, setTranscriptTurns] = useState(initialTranscript);
@@ -224,6 +243,13 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     const type = event.type;
     const text = eventText(event);
     const audioDelta = event.delta;
+
+    if (type === "error" || type === "relay.error") {
+      closeRealtimeConnection();
+      setState("Connection Error");
+      addSystemTurn(`实时模型服务返回错误：${realtimeErrorMessage(event)}`);
+      return;
+    }
 
     if (type === "response.audio.delta" && typeof audioDelta === "string") {
       playPCM16AudioDelta(audioDelta);

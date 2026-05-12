@@ -267,4 +267,60 @@ describe("RealtimeRoom browser voice connection", () => {
       }),
     );
   });
+
+  it("surfaces realtime provider errors instead of silently staying connected", async () => {
+    const { sockets } = createMockWebSocketHarness();
+    createMockAudioContextHarness();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getAudioTracks: () => [{ enabled: true }],
+      getTracks: () => [{ stop: vi.fn() }],
+    });
+    const fetch = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          transport: "websocket_relay",
+          relayUrl: "wss://relay.example.com/realtime",
+          relayToken: "relay-token",
+          sessionId: "rt_session_123",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          model: "gpt-4o-realtime-preview",
+          instructionsPreview: "Technical Lead",
+        }),
+        { status: 201 },
+      ),
+    );
+
+    installGetUserMedia(getUserMedia);
+    vi.stubGlobal("fetch", fetch);
+
+    render(<RealtimeRoom sessionId="session_123" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+
+    await waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    sockets[0]?.open();
+    sockets[0]?.message({
+      model: "gpt-4o-realtime-preview",
+      realtimeSessionId: "rt_session_123",
+      type: "relay.ready",
+    });
+
+    await screen.findByText("当前状态：聆听中");
+
+    sockets[0]?.message({
+      type: "error",
+      error: {
+        message: "provider realtime handshake failed",
+      },
+    });
+
+    expect(await screen.findByText("当前状态：连接失败")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "实时模型服务返回错误：provider realtime handshake failed",
+      ),
+    ).toBeInTheDocument();
+  });
 });
