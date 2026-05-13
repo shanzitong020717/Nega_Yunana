@@ -9,7 +9,7 @@
 
 ## Variables Already Configured
 
-These non-secret values have been added to Vercel Production and Development:
+These values have been added to Vercel Production and Development:
 
 - `APP_BASE_URL`
   - Production: `https://nega-yunana.vercel.app`
@@ -19,19 +19,11 @@ These non-secret values have been added to Vercel Production and Development:
 - `CONFIDENTIAL_MODE_DEFAULT`
   - Production and Development: `true`
 
-Preview variables are not configured yet because the Vercel project is not connected to the GitHub repository. Connect the project to `shanzitong020717/Nega_Yunana`, then add Preview values in the Vercel dashboard.
+Preview values are configured for the active `feature/app-foundation` branch.
 
-CLI Git connection was attempted with:
+## AI Variables Configured
 
-```bash
-npx vercel git connect https://github.com/shanzitong020717/Nega_Yunana
-```
-
-Vercel returned: `You need to add a Login Connection to your GitHub account first.` Add the GitHub connection in Vercel account settings, then rerun the command or connect the repository from Project Settings -> Git.
-
-## Variables Still Required
-
-Add these in Vercel Project Settings > Environment Variables:
+These AI variables are configured in Vercel Production, Preview for `feature/app-foundation`, and Development:
 
 - `DEEPSEEK_API_KEY`
   - Environments: Production, Preview, Development
@@ -40,10 +32,6 @@ Add these in Vercel Project Settings > Environment Variables:
   - Environments: Production, Preview, Development
 - `DEEPSEEK_TEXT_MODEL=deepseek-v4-pro`
   - Environments: Production, Preview, Development
-- `DATABASE_URL`
-  - Environments: Production, Preview, Development
-  - Use a managed PostgreSQL database, not the local development URL.
-
 Recommended optional variables:
 
 - `AI_MOCK_MODE=false`
@@ -52,8 +40,10 @@ For Realtime voice practice, use Gemini Live through the Render relay:
 
 - `OPENAI_REALTIME_TRANSPORT=websocket_relay`
 - `REALTIME_RELAY_PROVIDER=gemini_live`
-- `REALTIME_RELAY_URL=wss://<your-render-service>.onrender.com/realtime`
+- `REALTIME_RELAY_URL=wss://nega-yunana-realtime-relay-oregon.onrender.com/realtime`
 - `REALTIME_RELAY_SHARED_SECRET=<same value as Render>`
+
+The active Render relay is `nega-yunana-realtime-relay-oregon` in Oregon. Keep the older Singapore relay unused for Gemini Live unless Google enables that Render egress path.
 
 See `docs/render-realtime-relay.md`.
 
@@ -67,16 +57,18 @@ npx vercel env ls
 npx vercel env add DEEPSEEK_API_KEY production --sensitive
 npx vercel env add DEEPSEEK_BASE_URL production
 npx vercel env add DEEPSEEK_TEXT_MODEL production
+npx vercel env add REALTIME_RELAY_URL production
 npx vercel env add DATABASE_URL production --sensitive
 npx vercel env pull .env.local --yes
 ```
 
-After connecting the GitHub repository to Vercel, also add Preview values:
+For branch-specific Preview values:
 
 ```bash
 npx vercel env add DEEPSEEK_API_KEY preview --sensitive
 npx vercel env add DEEPSEEK_BASE_URL preview
 npx vercel env add DEEPSEEK_TEXT_MODEL preview
+npx vercel env add REALTIME_RELAY_URL preview feature/app-foundation
 npx vercel env add DATABASE_URL preview --sensitive
 npx vercel env add APP_BASE_URL preview
 npx vercel env add UPLOAD_DIR preview

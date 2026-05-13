@@ -5,9 +5,9 @@ This service is required when the Realtime provider supports direct WebSocket ac
 ## Architecture
 
 - Vercel runs the Next.js app and creates a short-lived signed relay token.
-- Render runs `nega-yunana-realtime-relay`, a Node WebSocket service.
+- Render runs `nega-yunana-realtime-relay-oregon`, a Node WebSocket service.
 - The browser connects to the Render relay with the signed token.
-- The relay verifies the token, then connects to the provider WebSocket with `OPENAI_API_KEY`.
+- The relay verifies the token, then connects to Gemini Live with `GEMINI_API_KEY`.
 - The browser never receives the provider API key.
 
 ## Render Blueprint
@@ -18,6 +18,7 @@ Render service settings:
 
 - Service type: Web Service
 - Runtime: Node
+- Region: Oregon. The previous Singapore relay can reach Render, but Gemini Live closes with `User location is not supported for the API use.`
 - Build command: `npm ci --include=dev`
 - Start command: `npm run relay:start`
 - Health check path: `/health`
@@ -44,7 +45,7 @@ After the Render service is live, add these to the Vercel project:
 
 - `OPENAI_REALTIME_TRANSPORT=websocket_relay`
 - `REALTIME_RELAY_PROVIDER=gemini_live`
-- `REALTIME_RELAY_URL=wss://<your-render-service>.onrender.com/realtime`
+- `REALTIME_RELAY_URL=wss://nega-yunana-realtime-relay-oregon.onrender.com/realtime`
 - `REALTIME_RELAY_SHARED_SECRET=<same value as Render>`
 
 ## Local Smoke Test
@@ -69,5 +70,5 @@ curl http://localhost:4001/health
 Expected:
 
 ```json
-{"ok":true,"service":"nega-yunana-realtime-relay"}
+{"ok":true,"service":"nega-yunana-realtime-relay","websocketPath":"/realtime"}
 ```

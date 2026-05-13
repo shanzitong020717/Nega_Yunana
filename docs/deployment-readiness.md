@@ -9,7 +9,7 @@ Configure these variables in the deployment provider before enabling real AI cal
 - `DEEPSEEK_TEXT_MODEL`: `deepseek-v4-pro`.
 - `OPENAI_REALTIME_TRANSPORT`: use `websocket_relay` for the Render relay.
 - `REALTIME_RELAY_PROVIDER`: `gemini_live` for Gemini Live realtime voice.
-- `REALTIME_RELAY_URL`: Render relay WebSocket URL when `OPENAI_REALTIME_TRANSPORT=websocket_relay`.
+- `REALTIME_RELAY_URL`: Render relay WebSocket URL when `OPENAI_REALTIME_TRANSPORT=websocket_relay`; production uses `wss://nega-yunana-realtime-relay-oregon.onrender.com/realtime`.
 - `REALTIME_RELAY_SHARED_SECRET`: shared HMAC secret used by Vercel and Render to sign and verify relay tokens.
 - `GEMINI_API_KEY`: Gemini key configured on the Render relay service only.
 - `GEMINI_LIVE_MODEL`: `gemini-3.1-flash-live-preview`.

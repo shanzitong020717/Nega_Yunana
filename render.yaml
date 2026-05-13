@@ -1,7 +1,8 @@
 services:
   - type: web
-    name: nega-yunana-realtime-relay
+    name: nega-yunana-realtime-relay-oregon
     runtime: node
+    region: oregon
     buildCommand: npm ci --include=dev
     startCommand: npm run relay:start
     healthCheckPath: /health
