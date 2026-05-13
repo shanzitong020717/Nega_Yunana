@@ -24,9 +24,9 @@ Render service settings:
 
 Render environment variables:
 
-- `OPENAI_API_KEY`: Plato AI provider key. Mark as secret.
-- `OPENAI_BASE_URL`: `https://api.bltcy.ai/v1`
-- `OPENAI_REALTIME_MODEL`: `gpt-4o-realtime-preview`
+- `REALTIME_RELAY_PROVIDER`: `gemini_live`
+- `GEMINI_API_KEY`: Gemini API key. Mark as secret.
+- `GEMINI_LIVE_MODEL`: `gemini-3.1-flash-live-preview`
 - `REALTIME_RELAY_SHARED_SECRET`: a long random secret that you provide during Blueprint creation. Use the same value in Vercel.
 - `REALTIME_RELAY_ALLOWED_ORIGINS`: `https://nega-yunana.vercel.app`
 
@@ -43,24 +43,18 @@ Use that exact value for `REALTIME_RELAY_SHARED_SECRET` in both Render and Verce
 After the Render service is live, add these to the Vercel project:
 
 - `OPENAI_REALTIME_TRANSPORT=websocket_relay`
+- `REALTIME_RELAY_PROVIDER=gemini_live`
 - `REALTIME_RELAY_URL=wss://<your-render-service>.onrender.com/realtime`
 - `REALTIME_RELAY_SHARED_SECRET=<same value as Render>`
-
-Keep these existing Vercel variables:
-
-- `OPENAI_BASE_URL=https://api.bltcy.ai/v1`
-- `OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview`
-
-`OPENAI_API_KEY` can remain in Vercel for non-realtime AI routes, but Realtime WebSocket relay mode does not expose it to the browser.
 
 ## Local Smoke Test
 
 Start the relay locally:
 
 ```bash
-OPENAI_API_KEY=sk-... \
-OPENAI_BASE_URL=https://api.bltcy.ai/v1 \
-OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview \
+REALTIME_RELAY_PROVIDER=gemini_live \
+GEMINI_API_KEY=AIza... \
+GEMINI_LIVE_MODEL=gemini-3.1-flash-live-preview \
 REALTIME_RELAY_SHARED_SECRET=dev-relay-secret \
 REALTIME_RELAY_ALLOWED_ORIGINS=http://localhost:3000 \
 npm run relay:start

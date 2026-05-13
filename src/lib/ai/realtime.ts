@@ -1,4 +1,9 @@
 import type { CustomerPersona } from "@/data/personas";
+import {
+  DEFAULT_GEMINI_LIVE_MODEL,
+  GEMINI_LIVE_INPUT_SAMPLE_RATE,
+  GEMINI_LIVE_OUTPUT_SAMPLE_RATE,
+} from "@/lib/ai/gemini-live-relay";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
 import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import type { PrepCardPayload } from "@/lib/ai/prep-card";
@@ -35,6 +40,8 @@ export type RealtimeRelaySessionCredential = {
   sessionId: string;
   expiresAt: string;
   model: string;
+  inputAudioSampleRate: number;
+  outputAudioSampleRate: number;
   instructionsPreview: string;
 };
 
@@ -44,6 +51,8 @@ export type RealtimeSessionCredential =
 
 const DEFAULT_REALTIME_MODEL = "gpt-realtime-mini";
 const CLIENT_SECRET_TTL_SECONDS = 600;
+const OPENAI_REALTIME_INPUT_SAMPLE_RATE = 24_000;
+const OPENAI_REALTIME_OUTPUT_SAMPLE_RATE = 24_000;
 
 function getErrorField(
   error: unknown,
@@ -115,6 +124,29 @@ function getRealtimeRelayConfig() {
   return {
     relayUrl,
     sharedSecret,
+    provider: normalizeOptionalEnv(process.env.REALTIME_RELAY_PROVIDER),
+  };
+}
+
+function realtimeRelayProviderModel(provider: string | undefined) {
+  if (provider === "gemini_live") {
+    return process.env.GEMINI_LIVE_MODEL ?? DEFAULT_GEMINI_LIVE_MODEL;
+  }
+
+  return process.env.OPENAI_REALTIME_MODEL ?? DEFAULT_REALTIME_MODEL;
+}
+
+function realtimeRelayAudioRates(provider: string | undefined) {
+  if (provider === "gemini_live") {
+    return {
+      inputAudioSampleRate: GEMINI_LIVE_INPUT_SAMPLE_RATE,
+      outputAudioSampleRate: GEMINI_LIVE_OUTPUT_SAMPLE_RATE,
+    };
+  }
+
+  return {
+    inputAudioSampleRate: OPENAI_REALTIME_INPUT_SAMPLE_RATE,
+    outputAudioSampleRate: OPENAI_REALTIME_OUTPUT_SAMPLE_RATE,
   };
 }
 
@@ -181,7 +213,6 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
 export async function createRealtimeSession(
   input: CreateRealtimeSessionInput,
 ): Promise<RealtimeSessionCredential> {
-  const model = process.env.OPENAI_REALTIME_MODEL ?? DEFAULT_REALTIME_MODEL;
   const instructions = buildRealtimeInstructions(input);
   const instructionsPreview = instructions.slice(0, 1200);
   const sessionId = `rt_session_${crypto.randomUUID()}`;
@@ -189,8 +220,13 @@ export async function createRealtimeSession(
     Date.now() + CLIENT_SECRET_TTL_SECONDS * 1000,
   ).toISOString();
   const relayConfig = getRealtimeRelayConfig();
+  const model = relayConfig
+    ? realtimeRelayProviderModel(relayConfig.provider)
+    : process.env.OPENAI_REALTIME_MODEL ?? DEFAULT_REALTIME_MODEL;
 
   if (relayConfig && input.mockMode !== true) {
+    const audioRates = realtimeRelayAudioRates(relayConfig.provider);
+
     return {
       transport: "websocket_relay",
       relayUrl: relayConfig.relayUrl,
@@ -209,6 +245,7 @@ export async function createRealtimeSession(
       sessionId,
       expiresAt,
       model,
+      ...audioRates,
       instructionsPreview,
     };
   }

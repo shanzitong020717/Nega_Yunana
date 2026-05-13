@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
+import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
 
 const glossaryItemSchema = z.object({
   term: z.string().min(1),
@@ -37,7 +37,7 @@ function shouldUseMockMode(input: GenerateMaterialBriefInput) {
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test" ||
-    !hasOpenAIApiKey()
+    !hasTextAIApiKey()
   );
 }
 
@@ -140,11 +140,10 @@ export async function generateMaterialBrief(
     return generateMockMaterialBrief(input);
   }
 
-  const response = await getOpenAIClient().responses.create({
-    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5.4-mini",
-    input: buildMaterialBriefPrompt(input),
+  const parsed = await generateTextJSON({
+    prompt: buildMaterialBriefPrompt(input),
+    schemaName: "material brief",
   });
 
-  const parsed = JSON.parse(response.output_text) as unknown;
   return materialBriefSchema.parse(parsed);
 }

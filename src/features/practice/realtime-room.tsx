@@ -40,6 +40,8 @@ type RealtimeRelaySessionResponse = {
   sessionId: string;
   expiresAt: string;
   model: string;
+  inputAudioSampleRate?: number;
+  outputAudioSampleRate?: number;
   instructionsPreview: string;
 };
 
@@ -75,7 +77,8 @@ const cueResponses: Record<SmartCue, string> = {
   "Challenge Me":
     "Challenge: Why should we choose Rokid instead of a phone translation app?",
 };
-const REALTIME_AUDIO_SAMPLE_RATE = 24_000;
+const DEFAULT_INPUT_AUDIO_SAMPLE_RATE = 24_000;
+const DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
 const RELAY_READY_TIMEOUT_MS = 45_000;
 
@@ -301,7 +304,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     const audioBuffer = audioContext.createBuffer(
       1,
       samples.length,
-      REALTIME_AUDIO_SAMPLE_RATE,
+      DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE,
     );
     audioBuffer.copyToChannel(samples, 0);
 
@@ -330,7 +333,10 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
   }
 
-  async function startRelayMicrophoneStreaming(stream: MediaStream) {
+  async function startRelayMicrophoneStreaming(
+    stream: MediaStream,
+    inputAudioSampleRate = DEFAULT_INPUT_AUDIO_SAMPLE_RATE,
+  ) {
     const AudioContextConstructor = getBrowserAudioContext();
 
     if (!AudioContextConstructor) {
@@ -363,7 +369,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         event.inputBuffer.getChannelData(0),
         {
           inputSampleRate: audioContext.sampleRate,
-          outputSampleRate: REALTIME_AUDIO_SAMPLE_RATE,
+          outputSampleRate: inputAudioSampleRate,
         },
       );
 
@@ -412,7 +418,10 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       const startRelaySession = () => {
         setState("Listening");
         addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
-        void startRelayMicrophoneStreaming(stream).catch(() => {
+        void startRelayMicrophoneStreaming(
+          stream,
+          realtimeSession.inputAudioSampleRate,
+        ).catch(() => {
           addSystemTurn("实时音频初始化失败，请检查浏览器音频权限。");
         });
         sendRealtimeEvent({

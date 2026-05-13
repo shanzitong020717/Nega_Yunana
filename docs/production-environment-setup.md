@@ -33,31 +33,25 @@ Vercel returned: `You need to add a Login Connection to your GitHub account firs
 
 Add these in Vercel Project Settings > Environment Variables:
 
-- `OPENAI_API_KEY`
+- `DEEPSEEK_API_KEY`
   - Environments: Production, Preview, Development
   - Mark as sensitive.
-- `OPENAI_BASE_URL`
+- `DEEPSEEK_BASE_URL=https://api.deepseek.com`
   - Environments: Production, Preview, Development
-  - Use only for OpenAI-compatible third-party providers. Leave unset for official OpenAI.
+- `DEEPSEEK_TEXT_MODEL=deepseek-v4-pro`
+  - Environments: Production, Preview, Development
 - `DATABASE_URL`
   - Environments: Production, Preview, Development
   - Use a managed PostgreSQL database, not the local development URL.
 
 Recommended optional variables:
 
-- `OPENAI_TEXT_MODEL=gpt-5.4-mini`
-- `OPENAI_REALTIME_MODEL=gpt-realtime-mini`
 - `AI_MOCK_MODE=false`
 
-For the current Plato AI style third-party setup, use:
-
-- `OPENAI_BASE_URL=https://api.bltcy.ai/v1`
-- `OPENAI_TEXT_MODEL=gpt-4o-realtime-preview`
-- `OPENAI_REALTIME_MODEL=gpt-4o-realtime-preview`
-
-For Realtime, Plato AI currently supports direct WebSocket access but not the OpenAI ephemeral WebRTC client secret endpoint. Deploy the Render relay in `render.yaml`, then set these Vercel variables:
+For Realtime voice practice, use Gemini Live through the Render relay:
 
 - `OPENAI_REALTIME_TRANSPORT=websocket_relay`
+- `REALTIME_RELAY_PROVIDER=gemini_live`
 - `REALTIME_RELAY_URL=wss://<your-render-service>.onrender.com/realtime`
 - `REALTIME_RELAY_SHARED_SECRET=<same value as Render>`
 
@@ -70,8 +64,9 @@ Use these commands if you prefer the terminal. Do not paste secrets into committ
 ```bash
 npx vercel link --yes --project nega-yunana
 npx vercel env ls
-npx vercel env add OPENAI_API_KEY production --sensitive
-npx vercel env add OPENAI_BASE_URL production
+npx vercel env add DEEPSEEK_API_KEY production --sensitive
+npx vercel env add DEEPSEEK_BASE_URL production
+npx vercel env add DEEPSEEK_TEXT_MODEL production
 npx vercel env add DATABASE_URL production --sensitive
 npx vercel env pull .env.local --yes
 ```
@@ -79,8 +74,9 @@ npx vercel env pull .env.local --yes
 After connecting the GitHub repository to Vercel, also add Preview values:
 
 ```bash
-npx vercel env add OPENAI_API_KEY preview --sensitive
-npx vercel env add OPENAI_BASE_URL preview
+npx vercel env add DEEPSEEK_API_KEY preview --sensitive
+npx vercel env add DEEPSEEK_BASE_URL preview
+npx vercel env add DEEPSEEK_TEXT_MODEL preview
 npx vercel env add DATABASE_URL preview --sensitive
 npx vercel env add APP_BASE_URL preview
 npx vercel env add UPLOAD_DIR preview

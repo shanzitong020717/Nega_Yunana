@@ -3,6 +3,13 @@ import type { Duplex } from "node:stream";
 import { WebSocket, WebSocketServer, type RawData } from "ws";
 
 import {
+  browserRealtimeEventToGeminiLiveMessages,
+  buildGeminiLiveSetupMessage,
+  buildGeminiLiveWebSocketURL,
+  DEFAULT_GEMINI_LIVE_MODEL,
+  geminiLiveMessageToBrowserRealtimeEvents,
+} from "../src/lib/ai/gemini-live-relay";
+import {
   isRealtimeRelayOriginAllowed,
   parseRealtimeRelayAllowedOrigins,
 } from "../src/lib/ai/realtime-relay-origin";
@@ -16,6 +23,8 @@ type RelayWebSocket = WebSocket & {
 const DEFAULT_PORT = 4001;
 const DEFAULT_REALTIME_MODEL = "gpt-4o-realtime-preview";
 const MAX_QUEUED_MESSAGES = 25;
+
+type RealtimeRelayProvider = "openai_realtime" | "gemini_live";
 
 function stripQuotes(value: string | undefined) {
   const trimmedValue = value?.trim() ?? "";
@@ -115,7 +124,11 @@ function createProviderSocket(token: string, model: string) {
   });
 }
 
-function bridgeSockets({
+function createGeminiLiveSocket(apiKey: string) {
+  return new WebSocket(buildGeminiLiveWebSocketURL(apiKey));
+}
+
+function bridgeOpenAIRealtimeSockets({
   browserSocket,
   providerSocket,
   instructions,
@@ -199,10 +212,145 @@ function bridgeSockets({
   });
 }
 
+function parseJSONMessage(data: RawData) {
+  try {
+    return JSON.parse(data.toString()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function bridgeGeminiLiveSockets({
+  browserSocket,
+  providerSocket,
+  instructions,
+  realtimeSessionId,
+  model,
+}: {
+  browserSocket: RelayWebSocket;
+  providerSocket: WebSocket;
+  instructions: string;
+  realtimeSessionId: string;
+  model: string;
+}) {
+  const queuedMessages: Array<{ data: RawData }> = [];
+  let isGeminiReady = false;
+
+  function forwardBrowserMessage(data: RawData) {
+    const event = parseJSONMessage(data);
+
+    if (!event) {
+      return;
+    }
+
+    for (const message of browserRealtimeEventToGeminiLiveMessages(event)) {
+      providerSocket.send(JSON.stringify(message));
+    }
+  }
+
+  browserSocket.isAlive = true;
+  browserSocket.on("pong", () => {
+    browserSocket.isAlive = true;
+  });
+
+  browserSocket.on("message", (data) => {
+    if (providerSocket.readyState === WebSocket.OPEN && isGeminiReady) {
+      forwardBrowserMessage(data);
+      return;
+    }
+
+    if (queuedMessages.length < MAX_QUEUED_MESSAGES) {
+      queuedMessages.push({ data });
+    }
+  });
+
+  browserSocket.on("close", () => {
+    providerSocket.close();
+  });
+
+  browserSocket.on("error", () => {
+    providerSocket.close();
+  });
+
+  providerSocket.on("open", () => {
+    providerSocket.send(
+      JSON.stringify(
+        buildGeminiLiveSetupMessage({
+          instructions,
+          model,
+        }),
+      ),
+    );
+  });
+
+  providerSocket.on("message", (data) => {
+    const message = parseJSONMessage(data);
+
+    if (!message) {
+      return;
+    }
+
+    if (message.setupComplete) {
+      isGeminiReady = true;
+      browserSocket.send(
+        JSON.stringify({
+          type: "relay.ready",
+          realtimeSessionId,
+          model,
+        }),
+      );
+
+      for (const queuedMessage of queuedMessages.splice(0)) {
+        forwardBrowserMessage(queuedMessage.data);
+      }
+
+      return;
+    }
+
+    if (browserSocket.readyState === WebSocket.OPEN) {
+      for (const event of geminiLiveMessageToBrowserRealtimeEvents(message)) {
+        browserSocket.send(JSON.stringify(event));
+      }
+    }
+  });
+
+  providerSocket.on("close", (code, reason) => {
+    if (browserSocket.readyState === WebSocket.OPEN) {
+      browserSocket.close(code, reason);
+    }
+  });
+
+  providerSocket.on("error", (error) => {
+    console.warn("[relay] Gemini Live WebSocket failed.", {
+      name: error instanceof Error ? error.name : undefined,
+      message: error instanceof Error ? error.message : String(error),
+    });
+
+    if (browserSocket.readyState === WebSocket.OPEN) {
+      browserSocket.send(
+        JSON.stringify({
+          type: "relay.error",
+          message: "Gemini Live connection failed.",
+        }),
+      );
+      browserSocket.close(1011, "Gemini Live connection failed.");
+    }
+  });
+}
+
 const port = Number.parseInt(optionalEnv("PORT") ?? `${DEFAULT_PORT}`, 10);
 const sharedSecret = requiredEnv("REALTIME_RELAY_SHARED_SECRET");
-const providerApiKey = requiredEnv("OPENAI_API_KEY");
-const defaultModel = optionalEnv("OPENAI_REALTIME_MODEL") ?? DEFAULT_REALTIME_MODEL;
+const relayProvider =
+  (optionalEnv("REALTIME_RELAY_PROVIDER") as RealtimeRelayProvider | undefined) ??
+  "openai_realtime";
+const providerApiKey =
+  relayProvider === "gemini_live"
+    ? requiredEnv("GEMINI_API_KEY")
+    : requiredEnv("OPENAI_API_KEY");
+const defaultModel =
+  relayProvider === "gemini_live"
+    ? optionalEnv("GEMINI_LIVE_MODEL") ?? DEFAULT_GEMINI_LIVE_MODEL
+    : optionalEnv("OPENAI_REALTIME_MODEL") ?? DEFAULT_REALTIME_MODEL;
 const allowedOrigins = parseRealtimeRelayAllowedOrigins(
   optionalEnv("REALTIME_RELAY_ALLOWED_ORIGINS"),
 );
@@ -264,11 +412,21 @@ server.on("upgrade", (request, socket, head) => {
 
   webSocketServer.handleUpgrade(request, socket, head, (browserSocket) => {
     const model = payload.model || defaultModel;
-    const providerSocket = createProviderSocket(providerApiKey, model);
 
-    bridgeSockets({
+    if (relayProvider === "gemini_live") {
+      bridgeGeminiLiveSockets({
+        browserSocket: browserSocket as RelayWebSocket,
+        providerSocket: createGeminiLiveSocket(providerApiKey),
+        instructions: payload.instructions,
+        realtimeSessionId: payload.realtimeSessionId,
+        model,
+      });
+      return;
+    }
+
+    bridgeOpenAIRealtimeSockets({
       browserSocket: browserSocket as RelayWebSocket,
-      providerSocket,
+      providerSocket: createProviderSocket(providerApiKey, model),
       instructions: payload.instructions,
       realtimeSessionId: payload.realtimeSessionId,
       model,

@@ -1,21 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const parseResponseMock = vi.fn();
+const { generateTextJSONMock } = vi.hoisted(() => ({
+  generateTextJSONMock: vi.fn(),
+}));
 
-vi.mock("@/lib/ai/openai-client", () => ({
-  hasOpenAIApiKey: () => Boolean(process.env.OPENAI_API_KEY?.trim()),
-  getOpenAIClient: () => ({
-    responses: {
-      parse: parseResponseMock,
-    },
-  }),
+vi.mock("@/lib/ai/text-client", () => ({
+  hasTextAIApiKey: () =>
+    Boolean(
+      process.env.DEEPSEEK_API_KEY?.trim() ||
+        process.env.OPENAI_API_KEY?.trim(),
+    ),
+  generateTextJSON: generateTextJSONMock,
 }));
 
 import { generatePrepCard } from "@/lib/ai/prep-card";
 
 describe("generatePrepCard", () => {
   afterEach(() => {
-    parseResponseMock.mockReset();
+    generateTextJSONMock.mockReset();
     vi.unstubAllEnvs();
   });
 
@@ -53,11 +55,11 @@ describe("generatePrepCard", () => {
     });
   });
 
-  it("falls back to a usable prep card when OpenAI generation fails", async () => {
+  it("falls back to a usable prep card when text AI generation fails", async () => {
     vi.stubEnv("AI_MOCK_MODE", "false");
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OPENAI_API_KEY", "sk-test");
-    parseResponseMock.mockRejectedValueOnce(new Error("OpenAI unavailable"));
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-test");
+    generateTextJSONMock.mockRejectedValueOnce(new Error("DeepSeek unavailable"));
 
     await expect(
       generatePrepCard({
@@ -74,24 +76,22 @@ describe("generatePrepCard", () => {
       keyTalkingPoints: expect.any(Array),
       discoveryQuestions: expect.any(Array),
     });
-    expect(parseResponseMock).toHaveBeenCalledTimes(1);
+    expect(generateTextJSONMock).toHaveBeenCalledTimes(1);
   });
 
-  it("uses structured OpenAI output when the API is configured", async () => {
+  it("uses structured text AI output when the API is configured", async () => {
     vi.stubEnv("AI_MOCK_MODE", "false");
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("OPENAI_API_KEY", "sk-test");
-    parseResponseMock.mockResolvedValueOnce({
-      output_parsed: {
-        customerContext: "Enterprise buyer in Singapore.",
-        meetingGoal: "Qualify a pilot for multilingual meetings",
-        keyTalkingPoints: ["Connect the demo to workflow value."],
-        discoveryQuestions: ["What would a successful pilot prove?"],
-        likelyObjections: ["How is meeting data handled?"],
-        openingScript: "May I first understand your use case?",
-        mustUsePhrases: ["The key value is reducing communication friction."],
-        doNotOverpromise: ["Do not invent accuracy percentages."],
-      },
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-test");
+    generateTextJSONMock.mockResolvedValueOnce({
+      customerContext: "Enterprise buyer in Singapore.",
+      meetingGoal: "Qualify a pilot for multilingual meetings",
+      keyTalkingPoints: ["Connect the demo to workflow value."],
+      discoveryQuestions: ["What would a successful pilot prove?"],
+      likelyObjections: ["How is meeting data handled?"],
+      openingScript: "May I first understand your use case?",
+      mustUsePhrases: ["The key value is reducing communication friction."],
+      doNotOverpromise: ["Do not invent accuracy percentages."],
     });
 
     await expect(
@@ -107,13 +107,9 @@ describe("generatePrepCard", () => {
       customerContext: "Enterprise buyer in Singapore.",
       keyTalkingPoints: ["Connect the demo to workflow value."],
     });
-    expect(parseResponseMock).toHaveBeenCalledWith(
+    expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.objectContaining({
-          format: expect.objectContaining({
-            type: "json_schema",
-          }),
-        }),
+        schemaName: "prep card",
       }),
     );
   });

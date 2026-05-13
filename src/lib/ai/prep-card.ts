@@ -1,19 +1,7 @@
 import { z } from "zod";
-import { zodTextFormat } from "openai/helpers/zod";
 
-import { getOpenAIClient, hasOpenAIApiKey } from "@/lib/ai/openai-client";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
-
-const prepCardStructuredOutputSchema = z.object({
-  customerContext: z.string(),
-  meetingGoal: z.string(),
-  keyTalkingPoints: z.array(z.string()),
-  discoveryQuestions: z.array(z.string()),
-  likelyObjections: z.array(z.string()),
-  openingScript: z.string(),
-  mustUsePhrases: z.array(z.string()),
-  doNotOverpromise: z.array(z.string()),
-});
+import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
 
 export const prepCardSchema = z.object({
   customerContext: z.string().min(1),
@@ -45,7 +33,7 @@ function shouldUseMockMode(input: GeneratePrepCardInput) {
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test" ||
-    !hasOpenAIApiKey()
+    !hasTextAIApiKey()
   );
 }
 
@@ -131,21 +119,13 @@ function logPrepCardFallback(error: unknown) {
   );
 }
 
-async function generateOpenAIPrepCard(input: GeneratePrepCardInput) {
-  const response = await getOpenAIClient().responses.parse({
-    model: process.env.OPENAI_TEXT_MODEL ?? "gpt-5.4-mini",
-    input: buildPrepCardPrompt(input),
-    text: {
-      format: zodTextFormat(prepCardStructuredOutputSchema, "prep_card"),
-    },
+async function generateAIPrepCard(input: GeneratePrepCardInput) {
+  const parsed = await generateTextJSON({
+    prompt: buildPrepCardPrompt(input),
+    schemaName: "prep card",
   });
-  const parsedPrepCard = response.output_parsed;
 
-  if (!parsedPrepCard) {
-    throw new Error("OpenAI returned no parsed prep card.");
-  }
-
-  return prepCardSchema.parse(parsedPrepCard);
+  return prepCardSchema.parse(parsed);
 }
 
 export async function generatePrepCard(
@@ -156,7 +136,7 @@ export async function generatePrepCard(
   }
 
   try {
-    return await generateOpenAIPrepCard(input);
+    return await generateAIPrepCard(input);
   } catch (error) {
     logPrepCardFallback(error);
     return generateMockPrepCard(input);

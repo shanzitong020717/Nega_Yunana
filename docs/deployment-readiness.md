@@ -4,11 +4,15 @@
 
 Configure these variables in the deployment provider before enabling real AI calls:
 
-- `OPENAI_API_KEY`: server-side OpenAI API key.
-- `OPENAI_BASE_URL`: optional OpenAI-compatible API endpoint for third-party providers. Leave unset for official OpenAI.
-- `OPENAI_REALTIME_TRANSPORT`: use `webrtc` for official OpenAI ephemeral client secrets, or `websocket_relay` for the Render relay.
+- `DEEPSEEK_API_KEY`: server-side DeepSeek API key for text analysis, material briefs, prep cards, and reviews.
+- `DEEPSEEK_BASE_URL`: `https://api.deepseek.com`.
+- `DEEPSEEK_TEXT_MODEL`: `deepseek-v4-pro`.
+- `OPENAI_REALTIME_TRANSPORT`: use `websocket_relay` for the Render relay.
+- `REALTIME_RELAY_PROVIDER`: `gemini_live` for Gemini Live realtime voice.
 - `REALTIME_RELAY_URL`: Render relay WebSocket URL when `OPENAI_REALTIME_TRANSPORT=websocket_relay`.
 - `REALTIME_RELAY_SHARED_SECRET`: shared HMAC secret used by Vercel and Render to sign and verify relay tokens.
+- `GEMINI_API_KEY`: Gemini key configured on the Render relay service only.
+- `GEMINI_LIVE_MODEL`: `gemini-3.1-flash-live-preview`.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `APP_BASE_URL`: public app URL, such as `https://your-domain.com`.
 - `UPLOAD_DIR`: local upload directory for the current filesystem storage adapter.
@@ -26,14 +30,14 @@ See `docs/render-realtime-relay.md` for the Render WebSocket relay setup.
 - Material deletion removes the local stored file, material record, generated brief, related prep cards, related practice sessions, transcripts, and reviews.
 - The current local filesystem upload adapter is suitable for local development. For production hosting on Vercel or another serverless platform, replace or wrap it with persistent object storage before relying on uploaded files across deployments.
 
-## OpenAI Key Safety
+## AI Key Safety
 
-- `OPENAI_API_KEY` is read in server-side AI modules only.
-- `OPENAI_BASE_URL` is server-side configuration and must not include secrets.
+- `DEEPSEEK_API_KEY` is read in server-side AI modules only.
+- `GEMINI_API_KEY` is used by the Render relay only, not by browser code.
 - `REALTIME_RELAY_SHARED_SECRET` is server-side only and must match between Vercel and Render.
-- Client components never read `OPENAI_API_KEY` or any `NEXT_PUBLIC_OPENAI_*` variable.
-- The Realtime route returns an ephemeral Realtime client secret, not the standard OpenAI API key.
-- `tests/api/realtime-session.test.ts` verifies that the serialized Realtime response does not contain the standard API key or the `OPENAI_API_KEY` variable name.
+- Client components never read provider API keys or any `NEXT_PUBLIC_*` AI key variable.
+- The Realtime route returns a short-lived relay token, not a provider API key.
+- `tests/api/realtime-session.test.ts` verifies that the serialized Realtime response does not contain server-side secrets.
 
 ## Confidential Material UX
 
