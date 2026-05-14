@@ -113,8 +113,8 @@ describe("Gemini Live relay helpers", () => {
         transcript: "We need remote support.",
       },
       {
-        type: "response.audio_transcript.done",
-        transcript: "What systems do you need to integrate with?",
+        type: "response.audio_transcript.delta",
+        delta: "What systems do you need to integrate with?",
       },
     ]);
   });

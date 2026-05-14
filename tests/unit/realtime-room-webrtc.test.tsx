@@ -266,6 +266,20 @@ describe("RealtimeRoom browser voice connection", () => {
         type: "input_audio_buffer.append",
       }),
     );
+
+    sockets[0]?.message({
+      type: "response.audio_transcript.delta",
+      delta: "Yes, I",
+    });
+    sockets[0]?.message({
+      type: "response.audio_transcript.delta",
+      delta: "can.",
+    });
+    sockets[0]?.message({
+      type: "response.done",
+    });
+
+    expect(await screen.findByText("Yes, I can.")).toBeInTheDocument();
   });
 
   it("surfaces realtime provider errors instead of silently staying connected", async () => {

@@ -155,6 +155,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const relayOutputTimeRef = useRef(0);
   const relaySocketRef = useRef<WebSocket | null>(null);
   const isMutedRef = useRef(false);
+  const pendingAITranscriptRef = useRef("");
   const transcriptTurnsRef = useRef(initialTranscript);
 
   useEffect(() => {
@@ -191,6 +192,24 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     });
   }
 
+  function appendTranscriptPart(currentText: string, nextPart: string) {
+    const trimmedPart = nextPart.trim();
+
+    if (!trimmedPart) {
+      return currentText;
+    }
+
+    if (!currentText.trim()) {
+      return trimmedPart;
+    }
+
+    if (/^[.,!?;:)]/.test(trimmedPart) || /\s$/.test(currentText)) {
+      return `${currentText}${trimmedPart}`;
+    }
+
+    return `${currentText} ${trimmedPart}`;
+  }
+
   function closeRealtimeConnection() {
     dataChannelRef.current?.close();
     dataChannelRef.current = null;
@@ -205,6 +224,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     relayOutputTimeRef.current = 0;
     void relayOutputAudioContextRef.current?.close();
     relayOutputAudioContextRef.current = null;
+    pendingAITranscriptRef.current = "";
     peerConnectionRef.current?.close();
     peerConnectionRef.current = null;
     mediaStreamRef.current?.getTracks().forEach((track) => {
@@ -256,6 +276,30 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
 
     if (type === "response.audio.delta" && typeof audioDelta === "string") {
       void playPCM16AudioDelta(audioDelta);
+    }
+
+    if (
+      type === "response.audio_transcript.delta" &&
+      typeof audioDelta === "string"
+    ) {
+      pendingAITranscriptRef.current = appendTranscriptPart(
+        pendingAITranscriptRef.current,
+        audioDelta,
+      );
+      return;
+    }
+
+    if (type === "response.done") {
+      const pendingTranscript = pendingAITranscriptRef.current.trim();
+      pendingAITranscriptRef.current = "";
+
+      if (pendingTranscript) {
+        appendTurn({
+          speaker: "ai_customer",
+          text: pendingTranscript,
+        });
+      }
+      return;
     }
 
     if (!text) {

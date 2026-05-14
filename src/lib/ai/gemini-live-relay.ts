@@ -193,8 +193,8 @@ export function geminiLiveMessageToBrowserRealtimeEvents(
 
     if (typeof text === "string" && text.trim()) {
       browserEvents.push({
-        type: "response.audio_transcript.done",
-        transcript: text.trim(),
+        type: "response.audio_transcript.delta",
+        delta: text.trim(),
       });
     }
   }
