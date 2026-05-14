@@ -4,9 +4,7 @@ import { StatusPill } from "@/components/status-pill";
 
 export type RealtimeRoomState =
   | "Ready"
-  | "Listening"
-  | "Thinking"
-  | "Speaking"
+  | "In Conversation"
   | "Muted"
   | "Reconnecting"
   | "Mic Permission Required"
@@ -29,23 +27,9 @@ type LiveMeetingPanelProps = {
   isMuted: boolean;
 };
 
-const allStates: RealtimeRoomState[] = [
-  "Ready",
-  "Listening",
-  "Thinking",
-  "Speaking",
-  "Muted",
-  "Reconnecting",
-  "Mic Permission Required",
-  "Connection Error",
-  "Session Ended",
-];
-
 const stateLabels: Record<RealtimeRoomState, string> = {
   Ready: "准备就绪",
-  Listening: "聆听中",
-  Thinking: "思考中",
-  Speaking: "回复中",
+  "In Conversation": "对话中",
   Muted: "已静音",
   Reconnecting: "连接中",
   "Mic Permission Required": "需要麦克风权限",
@@ -88,22 +72,6 @@ export function LiveMeetingPanel({
         <StatusPill tone={state === "Session Ended" ? "neutral" : "primary"}>
           {stateLabels[state]}
         </StatusPill>
-      </div>
-
-      <div className="mt-5 flex flex-wrap gap-2">
-        {allStates.map((item) => (
-          <span
-            key={item}
-            className={[
-              "rounded-md border px-2.5 py-1 text-xs font-medium",
-              item === state
-                ? "border-[#b7d8d6] bg-[#e7f4f2] text-[var(--primary-strong)]"
-                : "border-[var(--border)] bg-[var(--surface-subtle)] text-[var(--muted)]",
-            ].join(" ")}
-          >
-            {stateLabels[item]}
-          </span>
-        ))}
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">

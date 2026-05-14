@@ -799,12 +799,11 @@ git commit -m "feat: add practice setup flow"
 
 ```text
 Ready
-Listening
-Thinking
-Speaking
+In Conversation
 Muted
 Reconnecting
 Mic Permission Required
+Connection Error
 Session Ended
 ```
 

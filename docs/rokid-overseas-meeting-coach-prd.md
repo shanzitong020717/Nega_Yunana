@@ -504,12 +504,11 @@ Meeting Prep Card 包含：
 ### 7.5.3 语音状态
 
 - Ready
-- Listening
-- Thinking
-- Speaking
+- In Conversation
 - Muted
 - Reconnecting
 - Mic Permission Required
+- Connection Error
 - Session Ended
 
 ### 7.5.4 Smart Cue Bar

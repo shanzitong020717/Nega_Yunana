@@ -177,7 +177,7 @@ describe("RealtimeRoom browser voice connection", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
     fireEvent.click(screen.getByRole("button", { name: "开始" }));
-    await screen.findByText("当前状态：聆听中");
+    await screen.findByText("当前状态：对话中");
 
     fireEvent.click(screen.getByRole("button", { name: "结束" }));
 
@@ -236,7 +236,7 @@ describe("RealtimeRoom browser voice connection", () => {
       type: "relay.ready",
     });
 
-    await screen.findByText("当前状态：聆听中");
+    await screen.findByText("当前状态：对话中");
     await waitFor(() => {
       expect(processors).toHaveLength(1);
     });
@@ -307,7 +307,7 @@ describe("RealtimeRoom browser voice connection", () => {
       type: "relay.ready",
     });
 
-    await screen.findByText("当前状态：聆听中");
+    await screen.findByText("当前状态：对话中");
 
     sockets[0]?.message({
       type: "error",

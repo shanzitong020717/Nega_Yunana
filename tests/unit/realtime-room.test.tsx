@@ -46,22 +46,10 @@ describe("RealtimeRoom mock UI", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders all live room states, controls, and mock transcript turns", () => {
+  it("renders the live room status, controls, and mock transcript turns", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
-    [
-      "准备就绪",
-      "聆听中",
-      "思考中",
-      "回复中",
-      "已静音",
-      "连接中",
-      "需要麦克风权限",
-      "连接失败",
-      "会话已结束",
-    ].forEach((state) => {
-      expect(screen.getAllByText(state).length).toBeGreaterThan(0);
-    });
+    expect(screen.getByText("当前状态：准备就绪")).toBeInTheDocument();
 
     [
       "开始",
@@ -89,7 +77,7 @@ describe("RealtimeRoom mock UI", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
     fireEvent.click(screen.getByRole("button", { name: "开始" }));
-    expect(await screen.findByText("当前状态：聆听中")).toBeInTheDocument();
+    expect(await screen.findByText("当前状态：对话中")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "静音" }));
     expect(screen.getByText("当前状态：已静音")).toBeInTheDocument();

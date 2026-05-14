@@ -48,6 +48,8 @@ export function buildGeminiLiveSetupMessage({
           },
         ],
       },
+      inputAudioTranscription: {},
+      outputAudioTranscription: {},
     },
   };
 }
@@ -116,12 +118,20 @@ export function browserRealtimeEventToGeminiLiveMessages(
     return [
       {
         realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: `audio/pcm;rate=${GEMINI_LIVE_INPUT_SAMPLE_RATE}`,
-              data: event.audio,
-            },
-          ],
+          audio: {
+            mimeType: `audio/pcm;rate=${GEMINI_LIVE_INPUT_SAMPLE_RATE}`,
+            data: event.audio,
+          },
+        },
+      },
+    ];
+  }
+
+  if (event.type === "input_audio_buffer.end") {
+    return [
+      {
+        realtimeInput: {
+          audioStreamEnd: true,
         },
       },
     ];
@@ -160,6 +170,33 @@ export function geminiLiveMessageToBrowserRealtimeEvents(
 
   if (!serverContent || typeof serverContent !== "object") {
     return browserEvents;
+  }
+
+  const inputTranscription = (serverContent as Record<string, unknown>)
+    .inputTranscription;
+  const outputTranscription = (serverContent as Record<string, unknown>)
+    .outputTranscription;
+
+  if (inputTranscription && typeof inputTranscription === "object") {
+    const text = (inputTranscription as Record<string, unknown>).text;
+
+    if (typeof text === "string" && text.trim()) {
+      browserEvents.push({
+        type: "conversation.item.input_audio_transcription.completed",
+        transcript: text.trim(),
+      });
+    }
+  }
+
+  if (outputTranscription && typeof outputTranscription === "object") {
+    const text = (outputTranscription as Record<string, unknown>).text;
+
+    if (typeof text === "string" && text.trim()) {
+      browserEvents.push({
+        type: "response.audio_transcript.done",
+        transcript: text.trim(),
+      });
+    }
   }
 
   const modelTurn = (serverContent as Record<string, unknown>).modelTurn;

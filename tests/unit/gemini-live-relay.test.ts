@@ -29,6 +29,8 @@ describe("Gemini Live relay helpers", () => {
         systemInstruction: {
           parts: [{ text: "Act as a customer." }],
         },
+        inputAudioTranscription: {},
+        outputAudioTranscription: {},
       },
     });
   });
@@ -42,12 +44,24 @@ describe("Gemini Live relay helpers", () => {
     ).toEqual([
       {
         realtimeInput: {
-          mediaChunks: [
-            {
-              mimeType: "audio/pcm;rate=16000",
-              data: "base64-audio",
-            },
-          ],
+          audio: {
+            mimeType: "audio/pcm;rate=16000",
+            data: "base64-audio",
+          },
+        },
+      },
+    ]);
+  });
+
+  it("translates browser audio end markers into Gemini realtime input", () => {
+    expect(
+      browserRealtimeEventToGeminiLiveMessages({
+        type: "input_audio_buffer.end",
+      }),
+    ).toEqual([
+      {
+        realtimeInput: {
+          audioStreamEnd: true,
         },
       },
     ]);
@@ -77,6 +91,30 @@ describe("Gemini Live relay helpers", () => {
       },
       {
         type: "response.done",
+      },
+    ]);
+  });
+
+  it("translates Gemini input and output transcripts into browser realtime events", () => {
+    expect(
+      geminiLiveMessageToBrowserRealtimeEvents({
+        serverContent: {
+          inputTranscription: {
+            text: "We need remote support.",
+          },
+          outputTranscription: {
+            text: "What systems do you need to integrate with?",
+          },
+        },
+      }),
+    ).toEqual([
+      {
+        type: "conversation.item.input_audio_transcription.completed",
+        transcript: "We need remote support.",
+      },
+      {
+        type: "response.audio_transcript.done",
+        transcript: "What systems do you need to integrate with?",
       },
     ]);
   });

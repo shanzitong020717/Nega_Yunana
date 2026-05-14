@@ -255,7 +255,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
 
     if (type === "response.audio.delta" && typeof audioDelta === "string") {
-      playPCM16AudioDelta(audioDelta);
+      void playPCM16AudioDelta(audioDelta);
     }
 
     if (!text) {
@@ -289,16 +289,52 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     }
   }
 
-  function playPCM16AudioDelta(base64Audio: string) {
+  function relayOutputAudioContext() {
     const AudioContextConstructor = getBrowserAudioContext();
 
     if (!AudioContextConstructor) {
-      return;
+      return null;
     }
 
     const audioContext =
       relayOutputAudioContextRef.current ?? new AudioContextConstructor();
     relayOutputAudioContextRef.current = audioContext;
+
+    return audioContext;
+  }
+
+  function unlockRelayOutputAudio() {
+    const audioContext = relayOutputAudioContext();
+
+    if (!audioContext) {
+      return;
+    }
+
+    if (audioContext.state === "suspended") {
+      void audioContext.resume().catch(() => undefined);
+    }
+
+    const buffer = audioContext.createBuffer(
+      1,
+      1,
+      DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE,
+    );
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioContext.destination);
+    source.start(audioContext.currentTime);
+  }
+
+  async function playPCM16AudioDelta(base64Audio: string) {
+    const audioContext = relayOutputAudioContext();
+
+    if (!audioContext) {
+      return;
+    }
+
+    if (audioContext.state === "suspended") {
+      await audioContext.resume().catch(() => undefined);
+    }
 
     const samples = decodePCM16Base64ToFloat32(base64Audio);
     const audioBuffer = audioContext.createBuffer(
@@ -416,7 +452,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         callback();
       }
       const startRelaySession = () => {
-        setState("Listening");
+        setState("In Conversation");
         addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
         void startRelayMicrophoneStreaming(
           stream,
@@ -499,7 +535,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       isMockRealtimeCredential(realtimeSession.clientSecret) ||
       typeof PeerConnection === "undefined"
     ) {
-      setState("Listening");
+      setState("In Conversation");
       addSystemTurn(`模拟实时会话 ${realtimeSession.sessionId} 已开始。`);
       return;
     }
@@ -556,15 +592,16 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       type: "answer",
       sdp: await sdpResponse.text(),
     });
-    setState("Listening");
+    setState("In Conversation");
     addSystemTurn(`实时语音会话 ${realtimeSession.sessionId} 已连接。`);
   }
 
   async function handleStart() {
-    if (state === "Listening" || state === "Speaking" || state === "Muted") {
+    if (state === "In Conversation" || state === "Muted") {
       return;
     }
 
+    unlockRelayOutputAudio();
     setState("Reconnecting");
 
     try {
@@ -646,14 +683,19 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       stream?.getAudioTracks().forEach((track) => {
         track.enabled = !nextMuted;
       });
-      setState(nextMuted ? "Muted" : "Listening");
+      if (nextMuted) {
+        sendRealtimeEvent({
+          type: "input_audio_buffer.end",
+        });
+      }
+      setState(nextMuted ? "Muted" : "In Conversation");
       isMutedRef.current = nextMuted;
       return nextMuted;
     });
   }
 
   function handleCue(cue: SmartCue) {
-    setState(cue === "Challenge Me" ? "Speaking" : "Thinking");
+    setState("In Conversation");
     sendRealtimeEvent({
       type: "conversation.item.create",
       item: {
