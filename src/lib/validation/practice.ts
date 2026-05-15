@@ -1,15 +1,26 @@
 import { z } from "zod";
 
 import { personas } from "@/data/personas";
+import { defaultScenarioPack } from "@/data/scenario-packs";
 import { nonEmptyString, optionalString, stringArraySchema } from "./shared";
 
-const personaIds = personas.map((persona) => persona.id) as [
-  string,
-  ...string[],
-];
+const personaIds = Array.from(
+  new Set([
+    ...personas.map((persona) => persona.id),
+    ...defaultScenarioPack.personas.map((persona) => persona.id),
+  ]),
+) as [string, ...string[]];
 
 export const practiceModeSchema = z.enum(
-  ["presentation_rehearsal", "customer_qa", "objection_challenge", "solution_meeting"],
+  [
+    "presentation_rehearsal",
+    "customer_qa",
+    "objection_challenge",
+    "solution_meeting",
+    "demo_narration",
+    "objection_handling",
+    "quick_pitch",
+  ],
   {
     error: "练习模式无效",
   },
@@ -26,6 +37,24 @@ export const personaIdSchema = z.enum(personaIds, {
   error: "客户角色无效",
 });
 
+export const goalIdSchema = z
+  .string()
+  .trim()
+  .min(1, "练习目标不能为空")
+  .default("customer_qa");
+
+export const voicePackIdSchema = z
+  .string()
+  .trim()
+  .min(1, "声音包不能为空")
+  .default(defaultScenarioPack.voicePacks[0]?.id ?? "ava-friendly-buyer");
+
+export const scenarioPackIdSchema = z
+  .string()
+  .trim()
+  .min(1, "场景包不能为空")
+  .default(defaultScenarioPack.id);
+
 export const createPrepCardInputSchema = z.object({
   materialId: optionalString,
   customerType: nonEmptyString("请填写客户类型"),
@@ -37,12 +66,16 @@ export const createPrepCardInputSchema = z.object({
 });
 
 export const createPracticeSessionInputSchema = z.object({
-  mode: practiceModeSchema,
+  scenarioPackId: scenarioPackIdSchema,
+  goalId: goalIdSchema,
+  mode: practiceModeSchema.default("customer_qa"),
   personaId: personaIdSchema,
+  voicePackId: voicePackIdSchema,
   materialId: optionalString,
   prepCardId: optionalString,
   difficulty: difficultySchema.default("normal"),
   trainingFocus: stringArraySchema,
+  focusTags: stringArraySchema.default([]),
   sourceObjectionId: optionalString,
 });
 

@@ -47,6 +47,16 @@ describe("ObjectionBankView practice launch", () => {
           body: expect.stringContaining("product-value-phone-app"),
         }),
       );
+      const requestBody = JSON.parse(
+        fetchMock.mock.calls[0]?.[1]?.body as string,
+      ) as Record<string, unknown>;
+      expect(requestBody).toMatchObject({
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "objection_handling",
+        mode: "objection_challenge",
+        voicePackId: "marcus-executive-customer",
+        focusTags: ["异议处理", "竞品差异"],
+      });
       expect(pushMock).toHaveBeenCalledWith("/practice/session_objection_123");
     });
   });

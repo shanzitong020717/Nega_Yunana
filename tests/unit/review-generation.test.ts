@@ -35,12 +35,16 @@ describe("generatePracticeReview", () => {
     const review = await generatePracticeReview({
       practiceSession: {
         id: "session_123",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
+        voicePackId: "ethan-technical-lead",
         materialId: "material_123",
         prepCardId: "prep_123",
         difficulty: "normal",
         trainingFocus: ["business value", "privacy objection"],
+        focusTags: ["商业价值", "隐私安全"],
         sourceObjectionId: undefined,
         status: "completed",
         createdAt: new Date().toISOString(),

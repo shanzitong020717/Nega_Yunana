@@ -99,8 +99,9 @@ describe("prep card views", () => {
         JSON.stringify({
           practiceSession: {
             id: "session_123",
-            mode: "customer_qa",
+            goalId: "customer_qa",
             personaId: "technical_lead",
+            voicePackId: "ethan-technical-lead",
             status: "created",
           },
         }),
@@ -111,19 +112,16 @@ describe("prep card views", () => {
 
     render(<PracticeSetup prepCards={[prepCard]} />);
 
-    expect(screen.getByLabelText("练习模式")).toBeInTheDocument();
-    expect(screen.getByLabelText("客户角色")).toBeInTheDocument();
-    expect(screen.getByLabelText("材料 ID")).toBeInTheDocument();
-    expect(screen.getByLabelText("准备卡")).toBeInTheDocument();
-    expect(screen.getByLabelText("难度")).toBeInTheDocument();
-    expect(screen.getByLabelText("训练重点")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "这次想练什么？" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /客户问答/ })).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("客户角色"), {
-      target: { value: "technical_lead" },
-    });
-    fireEvent.change(screen.getByLabelText("训练重点"), {
-      target: { value: "business value\nprivacy objection" },
-    });
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(screen.getByRole("heading", { name: "让 AI 扮演谁？" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^技术负责人/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(screen.getByRole("heading", { name: "要使用什么材料或记忆？" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /产品参数解释/ }));
     fireEvent.click(screen.getByRole("button", { name: /开始练习/ }));
 
     await waitFor(() => {
@@ -135,5 +133,13 @@ describe("prep card views", () => {
         method: "POST",
       }),
     );
+    const [, requestInit] = fetchMock.mock.calls[0];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      goalId: "customer_qa",
+      personaId: "technical_lead",
+      voicePackId: "ethan-technical-lead",
+      materialId: "material_123",
+      focusTags: expect.arrayContaining(["产品参数解释"]),
+    });
   });
 });

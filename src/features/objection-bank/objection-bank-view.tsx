@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { defaultScenarioPack } from "@/data/scenario-packs";
 import {
   objectionCategories,
   objections,
@@ -32,6 +33,15 @@ const frameworkLabels: Record<string, string> = {
   Position: "定位价值",
   Support: "补充支撑",
   "Next Step": "推进下一步",
+};
+
+const focusTagsByCategory: Record<ObjectionCategory, string[]> = {
+  "Product Value": ["异议处理", "竞品差异"],
+  "Accuracy & Reliability": ["异议处理", "产品参数解释"],
+  "Privacy & Security": ["异议处理", "隐私安全"],
+  Deployment: ["异议处理", "试点推进"],
+  Competition: ["异议处理", "竞品差异"],
+  "Pricing & Pilot": ["异议处理", "试点推进"],
 };
 
 function normalize(value: string) {
@@ -71,6 +81,10 @@ export function ObjectionBankView() {
   async function launchPractice(objectionId: string) {
     setLaunchingObjectionId(objectionId);
     setLaunchError(null);
+    const objection = objections.find((item) => item.id === objectionId);
+    const focusTags = objection
+      ? focusTagsByCategory[objection.category]
+      : ["异议处理"];
 
     try {
       const response = await fetch("/api/practice-sessions", {
@@ -79,10 +93,14 @@ export function ObjectionBankView() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
+          scenarioPackId: defaultScenarioPack.id,
+          goalId: "objection_handling",
           mode: "objection_challenge",
           personaId: "skeptical_executive",
+          voicePackId: "marcus-executive-customer",
           difficulty: "normal",
           trainingFocus: ["objection_handling"],
+          focusTags,
           sourceObjectionId: objectionId,
         }),
       });

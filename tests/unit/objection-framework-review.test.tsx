@@ -53,12 +53,16 @@ describe("objection handling framework review", () => {
     const review = await generatePracticeReview({
       practiceSession: {
         id: "session_objection_123",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "objection_handling",
         mode: "objection_challenge",
         personaId: "skeptical_executive",
+        voicePackId: "marcus-executive-customer",
         materialId: undefined,
         prepCardId: undefined,
         difficulty: "normal",
         trainingFocus: ["objection_handling"],
+        focusTags: ["异议处理"],
         sourceObjectionId: "product-value-phone-app",
         status: "completed",
         createdAt: new Date().toISOString(),

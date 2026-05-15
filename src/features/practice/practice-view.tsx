@@ -1,39 +1,18 @@
 "use client";
 
-import { useState } from "react";
-
 import { PageHeader } from "@/components/page-header";
-import { PracticeSetup } from "@/features/practice/practice-setup";
-import { PrepCardForm } from "@/features/practice/prep-card-form";
-import { PrepCardView } from "@/features/practice/prep-card-view";
-import type { PrepCardRecord } from "@/lib/practice/prep-card-store";
+import { PracticeWizard } from "@/features/practice/practice-wizard";
 
 export function PracticeView() {
-  const [prepCards, setPrepCards] = useState<PrepCardRecord[]>([]);
-  const [selectedPrepCard, setSelectedPrepCard] = useState<PrepCardRecord | null>(
-    null,
-  );
-
-  function handlePrepCardCreated(prepCard: PrepCardRecord) {
-    setPrepCards((currentPrepCards) => [prepCard, ...currentPrepCards]);
-    setSelectedPrepCard(prepCard);
-  }
-
   return (
     <>
       <PageHeader
         eyebrow="练习"
-        title="会议模拟设置"
-        description="Generate a customer-specific prep card, choose the practice mode and persona, then enter the meeting room."
+        title="创建一次练习"
+        description="用 3 步选择练习目标、客户角色、声音包和材料重点，默认设置可以直接开始。"
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="min-w-0 space-y-4">
-          <PrepCardForm onCreated={handlePrepCardCreated} />
-          <PrepCardView prepCard={selectedPrepCard} />
-        </div>
-        <PracticeSetup prepCards={prepCards} />
-      </div>
+      <PracticeWizard />
     </>
   );
 }

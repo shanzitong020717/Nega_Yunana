@@ -25,18 +25,28 @@ describe("base API route handlers", () => {
   it("creates a mock practice session for valid input", async () => {
     const response = await createPracticeSession(
       jsonRequest({
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
+        voicePackId: "ethan-technical-lead",
+        materialId: "recent_material",
         difficulty: "normal",
         trainingFocus: ["business_value"],
+        focusTags: ["商业价值", "产品参数解释"],
       }),
     );
 
     expect(response.status).toBe(201);
     await expect(readJson(response)).resolves.toMatchObject({
       practiceSession: {
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
+        voicePackId: "ethan-technical-lead",
+        materialId: "recent_material",
+        focusTags: ["商业价值", "产品参数解释"],
         status: "created",
       },
     });

@@ -66,12 +66,16 @@ export function ensurePracticeSessionRecord(
   const now = new Date().toISOString();
   const practiceSession: PracticeSessionRecord = {
     id: sessionId,
+    scenarioPackId: fallback?.scenarioPackId ?? "rokid-overseas-sales",
+    goalId: fallback?.goalId ?? "customer_qa",
     mode: fallback?.mode ?? "customer_qa",
     personaId: fallback?.personaId ?? "technical_lead",
+    voicePackId: fallback?.voicePackId ?? "ethan-technical-lead",
     materialId: fallback?.materialId,
     prepCardId: fallback?.prepCardId,
     difficulty: fallback?.difficulty ?? "normal",
     trainingFocus: fallback?.trainingFocus ?? ["business value"],
+    focusTags: fallback?.focusTags ?? ["商业价值"],
     sourceObjectionId: fallback?.sourceObjectionId,
     status: "created",
     createdAt: now,

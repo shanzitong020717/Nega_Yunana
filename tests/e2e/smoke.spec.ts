@@ -20,9 +20,10 @@ test.describe("product smoke flows", () => {
   test("practice setup opens", async ({ page }) => {
     await page.goto("/practice");
 
-    await expect(page.getByRole("heading", { name: "会议模拟设置" })).toBeVisible();
-    await expect(page.getByLabel("练习模式")).toBeVisible();
-    await expect(page.getByRole("button", { name: "开始练习" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "创建一次练习" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "这次想练什么？" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /客户问答/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "下一步", exact: true })).toBeVisible();
   });
 
   test("objection bank filters", async ({ page }) => {
