@@ -4,8 +4,9 @@ test.describe("product smoke flows", () => {
   test("dashboard loads", async ({ page }) => {
     await page.goto("/dashboard");
 
-    await expect(page.getByRole("heading", { name: "会议训练工作台" })).toBeVisible();
-    await expect(page.getByText("今日推荐练习")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
+    await expect(page.getByText("今日建议你练")).toBeVisible();
+    await expect(page.getByRole("link", { name: /开始今日练习/ })).toBeVisible();
   });
 
   test("materials page opens", async ({ page }) => {

@@ -31,14 +31,35 @@ describe("static product views", () => {
     expect(within(primaryNav).queryByText("异议库")).not.toBeInTheDocument();
   });
 
-  it("renders the dashboard learning loop sections", () => {
+  it("renders the redesigned today practice dashboard", () => {
     render(<DashboardView />);
 
-    expect(screen.getByText("今日推荐练习")).toBeInTheDocument();
-    expect(screen.getByText("客户会议准备")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "今日练习" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("今日建议你练")).toBeInTheDocument();
+    expect(screen.getByText("技术负责人 · 隐私与部署异议")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /开始今日练习/ })).toHaveAttribute(
+      "href",
+      "/practice",
+    );
+    expect(screen.getAllByRole("link", { name: /开始今日练习/ })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: /上传客户材料/ })).toHaveAttribute(
+      "href",
+      "/materials",
+    );
+    expect(screen.getByRole("link", { name: /练一个常见异议/ })).toHaveAttribute(
+      "href",
+      "/objection-bank",
+    );
+    expect(screen.getByRole("link", { name: /复习 5 句表达/ })).toHaveAttribute(
+      "href",
+      "/phrasebook",
+    );
     expect(screen.getByText("最近材料")).toBeInTheDocument();
     expect(screen.getByText("本周重点")).toBeInTheDocument();
     expect(screen.getByText("最近复盘")).toBeInTheDocument();
+    expect(screen.queryByText("会议训练工作台")).not.toBeInTheDocument();
   });
 
   it("filters objection cards by category", () => {
