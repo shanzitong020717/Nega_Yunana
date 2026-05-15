@@ -39,9 +39,9 @@ export function ProgressView({
   return (
     <>
       <PageHeader
-        eyebrow="进步"
-        title="个人弱项追踪"
-        description="Track repeated meeting-performance issues and convert them into the next focused English-speaking drill."
+        eyebrow="复盘"
+        title="复盘与弱项追踪"
+        description="查看最近练习总结、长期弱点和下一次建议，把每次对话转化成下一轮更聚焦的训练。"
         actions={
           <Link
             href="/practice"
@@ -86,6 +86,23 @@ export function ProgressView({
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
+              <h2 className="text-lg font-semibold">我的记忆</h2>
+            </div>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              这里会集中展示 AI 记住的材料、说话习惯和长期弱点。记忆中心将在后续 milestone 开启管理入口。
+            </p>
+          </div>
+          <span className="inline-flex min-h-9 items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-sm font-medium text-[var(--muted)]">
+            即将开放
+          </span>
         </div>
       </section>
 

@@ -43,4 +43,11 @@ test.describe("product smoke flows", () => {
     await expect(page.locator("article").filter({ hasText: "What does a successful pilot look like for your team?" })).toBeVisible();
     await expect(page.locator("article").filter({ hasText: "Let me walk you through a simple scenario." })).toHaveCount(0);
   });
+
+  test("review hub opens", async ({ page }) => {
+    await page.goto("/progress");
+
+    await expect(page.getByRole("heading", { name: "复盘与弱项追踪" })).toBeVisible();
+    await expect(page.getByText("我的记忆")).toBeVisible();
+  });
 });

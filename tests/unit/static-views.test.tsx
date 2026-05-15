@@ -1,18 +1,36 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardView } from "@/features/dashboard/dashboard-view";
 import { ObjectionBankView } from "@/features/objection-bank/objection-bank-view";
 import { PhrasebookView } from "@/features/phrasebook/phrasebook-view";
 import { ProgressView } from "@/features/progress/progress-view";
 
 vi.mock("next/navigation", () => ({
+  usePathname: () => "/dashboard",
   useRouter: () => ({
     push: vi.fn(),
   }),
 }));
 
 describe("static product views", () => {
+  it("renders the redesigned primary navigation", () => {
+    render(<AppSidebar />);
+
+    const primaryNav = screen.getByRole("navigation", { name: "主导航" });
+    const primaryLinks = within(primaryNav).getAllByRole("link");
+
+    expect(primaryLinks.map((link) => link.textContent)).toEqual([
+      "今日练习今天该练什么",
+      "客户材料材料与准备卡",
+      "表达库每日复习",
+      "复盘练习总结",
+    ]);
+    expect(within(primaryNav).queryByText("进步")).not.toBeInTheDocument();
+    expect(within(primaryNav).queryByText("异议库")).not.toBeInTheDocument();
+  });
+
   it("renders the dashboard learning loop sections", () => {
     render(<DashboardView />);
 
@@ -50,6 +68,8 @@ describe("static product views", () => {
   it("renders progress focus areas from mock weakness data", () => {
     render(<ProgressView />);
 
+    expect(screen.getByText("复盘")).toBeInTheDocument();
+    expect(screen.queryByText("进步")).not.toBeInTheDocument();
     expect(screen.getByText("只讲功能")).toBeInTheDocument();
     expect(screen.getAllByText("功能转价值练习").length).toBeGreaterThan(0);
   });
