@@ -21,8 +21,13 @@ import {
   decodePCM16Base64ToFloat32,
   encodeFloat32AudioToPCM16Base64,
 } from "@/lib/audio/pcm";
+import {
+  readPracticeSessionSelection,
+  type StoredPracticeSessionSelection,
+} from "@/lib/practice/practice-session-selection";
 
 type RealtimeRoomProps = {
+  initialPracticeSession?: StoredPracticeSessionSelection | null;
   sessionId: string;
 };
 
@@ -90,6 +95,60 @@ const DEFAULT_INPUT_AUDIO_SAMPLE_RATE = 24_000;
 const DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
 const RELAY_READY_TIMEOUT_MS = 45_000;
+const DEFAULT_PERSONA_ID = "technical_lead";
+const DEFAULT_VOICE_PACK_ID = "ethan-technical-lead";
+
+function defaultPracticeSessionSelection(
+  sessionId: string,
+): StoredPracticeSessionSelection {
+  return {
+    id: sessionId,
+    scenarioPackId: defaultScenarioPack.id,
+    goalId: "customer_qa",
+    mode: "customer_qa",
+    personaId: DEFAULT_PERSONA_ID,
+    voicePackId: DEFAULT_VOICE_PACK_ID,
+    difficulty: "normal",
+    trainingFocus: ["business value", "privacy objection"],
+    focusTags: ["商业价值", "隐私安全"],
+  };
+}
+
+function normalizePracticeSessionSelection(
+  sessionId: string,
+  practiceSession?: StoredPracticeSessionSelection | null,
+) {
+  const fallback = defaultPracticeSessionSelection(sessionId);
+
+  if (!practiceSession) {
+    return fallback;
+  }
+
+  return {
+    ...fallback,
+    ...practiceSession,
+    id: practiceSession.id || sessionId,
+    trainingFocus:
+      practiceSession.trainingFocus.length > 0
+        ? practiceSession.trainingFocus
+        : fallback.trainingFocus,
+    focusTags:
+      practiceSession.focusTags.length > 0
+        ? practiceSession.focusTags
+        : fallback.focusTags,
+  };
+}
+
+function resolveVoicePackLabel(voicePackId: string) {
+  return (
+    defaultScenarioPack.voicePacks.find((voicePack) => voicePack.id === voicePackId)
+      ?.name ??
+    defaultScenarioPack.voicePacks.find(
+      (voicePack) => voicePack.id === DEFAULT_VOICE_PACK_ID,
+    )?.name ??
+    "Ethan 技术负责人"
+  );
+}
 
 function nextTurnId() {
   return `turn_${crypto.randomUUID()}`;
@@ -166,9 +225,15 @@ function userFacingRealtimeError(message: string) {
     : "实时连接异常，请稍后重试。";
 }
 
-export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
+export function RealtimeRoom({
+  initialPracticeSession,
+  sessionId,
+}: RealtimeRoomProps) {
   const [state, setState] = useState<RealtimeRoomState>("Ready");
   const [transcriptTurns, setTranscriptTurns] = useState(initialTranscript);
+  const [practiceSessionSelection, setPracticeSessionSelection] = useState(() =>
+    normalizePracticeSessionSelection(sessionId, initialPracticeSession),
+  );
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [systemNotice, setSystemNotice] = useState<string | null>(null);
@@ -186,6 +251,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const relaySocketRef = useRef<WebSocket | null>(null);
   const isMutedRef = useRef(false);
   const pendingAITranscriptRef = useRef("");
+  const practiceSessionSelectionRef = useRef(practiceSessionSelection);
   const transcriptTurnsRef = useRef(initialTranscript);
 
   useEffect(() => {
@@ -193,6 +259,26 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       closeRealtimeConnection();
     };
   }, []);
+
+  useEffect(() => {
+    practiceSessionSelectionRef.current = practiceSessionSelection;
+  }, [practiceSessionSelection]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      const storedSelection = readPracticeSessionSelection(sessionId);
+
+      if (storedSelection) {
+        setPracticeSessionSelection(
+          normalizePracticeSessionSelection(sessionId, storedSelection),
+        );
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [sessionId]);
 
   function setTranscriptState(nextTurns: TranscriptTurn[]) {
     transcriptTurnsRef.current = nextTurns;
@@ -314,20 +400,26 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   }
 
   async function requestRealtimeSession() {
+    const currentPracticeSession = normalizePracticeSessionSelection(
+      sessionId,
+      readPracticeSessionSelection(sessionId) ?? practiceSessionSelectionRef.current,
+    );
     const response = await fetch("/api/realtime/session", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        scenarioPackId: defaultScenarioPack.id,
-        goalId: "customer_qa",
+        scenarioPackId: currentPracticeSession.scenarioPackId,
+        goalId: currentPracticeSession.goalId,
         practiceSessionId: sessionId,
-        personaId: "technical_lead",
-        voicePackId: "ethan-technical-lead",
-        mode: "customer_qa",
-        trainingFocus: ["business value", "privacy objection"],
-        focusTags: ["商业价值", "隐私安全"],
+        personaId: currentPracticeSession.personaId,
+        voicePackId: currentPracticeSession.voicePackId,
+        mode: currentPracticeSession.mode,
+        materialId: currentPracticeSession.materialId,
+        prepCardId: currentPracticeSession.prepCardId,
+        trainingFocus: currentPracticeSession.trainingFocus,
+        focusTags: currentPracticeSession.focusTags,
       }),
     });
 
@@ -863,7 +955,9 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
           onMute={handleMute}
           onEnd={handleEnd}
           isMuted={isMuted}
-          voicePackLabel="Ethan 技术负责人"
+          voicePackLabel={resolveVoicePackLabel(
+            practiceSessionSelection.voicePackId,
+          )}
         />
         {systemNotice ? (
           <p

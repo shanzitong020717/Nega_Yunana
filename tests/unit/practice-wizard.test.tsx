@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PracticeWizard } from "@/features/practice/practice-wizard";
+import { readPracticeSessionSelection } from "@/lib/practice/practice-session-selection";
 
 const pushMock = vi.hoisted(() => vi.fn());
 
@@ -15,6 +16,7 @@ describe("PracticeWizard", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     pushMock.mockClear();
+    window.sessionStorage.clear();
   });
 
   it("shows the five practice goals in the first step", () => {
@@ -111,5 +113,10 @@ describe("PracticeWizard", () => {
       focusTags: expect.arrayContaining(["应用场景说明", "产品参数解释"]),
     });
     expect(pushMock).toHaveBeenCalledWith("/practice/session_123");
+    expect(readPracticeSessionSelection("session_123")).toMatchObject({
+      id: "session_123",
+      personaId: "technical_lead",
+      voicePackId: "vivian-critical-procurement",
+    });
   });
 });

@@ -12,6 +12,10 @@ import {
   objections,
   type ObjectionCategory,
 } from "@/data/objections";
+import {
+  savePracticeSessionSelection,
+  type StoredPracticeSessionSelection,
+} from "@/lib/practice/practice-session-selection";
 
 type CategoryFilter = "all" | ObjectionCategory;
 
@@ -85,6 +89,17 @@ export function ObjectionBankView() {
     const focusTags = objection
       ? focusTagsByCategory[objection.category]
       : ["异议处理"];
+    const sessionPayload = {
+      scenarioPackId: defaultScenarioPack.id,
+      goalId: "objection_handling",
+      mode: "objection_challenge",
+      personaId: "skeptical_executive",
+      voicePackId: "marcus-executive-customer",
+      difficulty: "normal",
+      trainingFocus: ["objection_handling"],
+      focusTags,
+      sourceObjectionId: objectionId,
+    } satisfies Omit<StoredPracticeSessionSelection, "id">;
 
     try {
       const response = await fetch("/api/practice-sessions", {
@@ -92,32 +107,29 @@ export function ObjectionBankView() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          scenarioPackId: defaultScenarioPack.id,
-          goalId: "objection_handling",
-          mode: "objection_challenge",
-          personaId: "skeptical_executive",
-          voicePackId: "marcus-executive-customer",
-          difficulty: "normal",
-          trainingFocus: ["objection_handling"],
-          focusTags,
-          sourceObjectionId: objectionId,
-        }),
+        body: JSON.stringify(sessionPayload),
       });
 
       if (!response.ok) {
         throw new Error("练习会话创建失败");
       }
 
-      const payload = (await response.json()) as {
-        practiceSession?: { id?: string };
+      const responsePayload = (await response.json()) as {
+        practiceSession?: { id?: string } & Partial<
+          Omit<StoredPracticeSessionSelection, "id">
+        >;
       };
-      const sessionId = payload.practiceSession?.id;
+      const sessionId = responsePayload.practiceSession?.id;
 
       if (!sessionId) {
         throw new Error("练习会话缺少 ID");
       }
 
+      savePracticeSessionSelection({
+        ...sessionPayload,
+        ...responsePayload.practiceSession,
+        id: sessionId,
+      });
       router.push(`/practice/${sessionId}`);
     } catch {
       setLaunchError("无法开始这次练习，请稍后重试。");

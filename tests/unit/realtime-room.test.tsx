@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RealtimeRoom } from "@/features/practice/realtime-room";
+import { savePracticeSessionSelection } from "@/lib/practice/practice-session-selection";
 
 function installMockVoiceSession() {
   Object.defineProperty(navigator, "mediaDevices", {
@@ -44,6 +45,7 @@ describe("RealtimeRoom mock UI", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.sessionStorage.clear();
   });
 
   it("renders the live room status, controls, and mock transcript turns", () => {
@@ -107,5 +109,60 @@ describe("RealtimeRoom mock UI", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
     expect(screen.getByRole("heading", { name: "会话已结束" })).toBeInTheDocument();
+  });
+
+  it("uses the learner-selected persona and voice pack for realtime session creation", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop: vi.fn() }],
+          getAudioTracks: () => [{ enabled: true }],
+        }),
+      },
+    });
+    vi.stubGlobal("RTCPeerConnection", undefined);
+    const fetchMock = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          clientSecret: "mock_realtime_client_secret_123",
+          sessionId: "rt_session_123",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          model: "gpt-realtime-mini",
+          instructionsPreview: "Channel Partner",
+        }),
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    savePracticeSessionSelection({
+      id: "session_custom",
+      scenarioPackId: "rokid-overseas-sales",
+      goalId: "solution_meeting",
+      mode: "solution_meeting",
+      personaId: "channel_partner",
+      voicePackId: "noah-channel-partner",
+      difficulty: "normal",
+      trainingFocus: ["channel partnership"],
+      focusTags: ["渠道合作"],
+    });
+
+    render(<RealtimeRoom sessionId="session_custom" />);
+
+    expect(await screen.findByText("AI 声音：Noah 渠道伙伴")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+    expect(await screen.findByRole("heading", { name: "对话中" })).toBeInTheDocument();
+
+    const [, requestInit] = fetchMock.mock.calls[0];
+    expect(JSON.parse(String(requestInit.body))).toMatchObject({
+      practiceSessionId: "session_custom",
+      goalId: "solution_meeting",
+      mode: "solution_meeting",
+      personaId: "channel_partner",
+      voicePackId: "noah-channel-partner",
+      trainingFocus: ["channel partnership"],
+      focusTags: ["渠道合作"],
+    });
   });
 });

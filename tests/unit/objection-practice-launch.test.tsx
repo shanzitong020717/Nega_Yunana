@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ObjectionBankView } from "@/features/objection-bank/objection-bank-view";
+import { readPracticeSessionSelection } from "@/lib/practice/practice-session-selection";
 
 const pushMock = vi.hoisted(() => vi.fn());
 
@@ -15,6 +16,7 @@ describe("ObjectionBankView practice launch", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     pushMock.mockClear();
+    window.sessionStorage.clear();
   });
 
   it("creates an objection challenge session and navigates to the practice room", async () => {
@@ -23,10 +25,14 @@ describe("ObjectionBankView practice launch", () => {
         JSON.stringify({
           practiceSession: {
             id: "session_objection_123",
+            scenarioPackId: "rokid-overseas-sales",
+            goalId: "objection_handling",
             mode: "objection_challenge",
             personaId: "skeptical_executive",
+            voicePackId: "marcus-executive-customer",
             difficulty: "normal",
             trainingFocus: ["objection_handling"],
+            focusTags: ["异议处理", "竞品差异"],
             sourceObjectionId: "product-value-phone-app",
           },
         }),
@@ -58,6 +64,10 @@ describe("ObjectionBankView practice launch", () => {
         focusTags: ["异议处理", "竞品差异"],
       });
       expect(pushMock).toHaveBeenCalledWith("/practice/session_objection_123");
+      expect(readPracticeSessionSelection("session_objection_123")).toMatchObject({
+        personaId: "skeptical_executive",
+        voicePackId: "marcus-executive-customer",
+      });
     });
   });
 });

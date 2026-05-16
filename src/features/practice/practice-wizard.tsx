@@ -6,6 +6,10 @@ import { useState } from "react";
 
 import { defaultScenarioPack, type PracticeGoalId } from "@/data/scenario-packs";
 import { VoicePackSelector } from "@/features/practice/voice-pack-selector";
+import {
+  savePracticeSessionSelection,
+  type StoredPracticeSessionSelection,
+} from "@/lib/practice/practice-session-selection";
 
 type PracticeWizardProps = {
   materialId?: string;
@@ -44,7 +48,7 @@ const materialChoices = [
   },
 ] as const;
 
-const modeByGoalId: Record<PracticeGoalId, string> = {
+const modeByGoalId: Record<PracticeGoalId, StoredPracticeSessionSelection["mode"]> = {
   customer_qa: "customer_qa",
   demo_narration: "demo_narration",
   objection_handling: "objection_handling",
@@ -98,7 +102,7 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
       focusTags: selectedFocusTags,
       trainingFocus: selectedFocusTags,
       difficulty: "normal",
-    };
+    } satisfies Omit<StoredPracticeSessionSelection, "id">;
 
     try {
       const response = await fetch("/api/practice-sessions", {
@@ -109,7 +113,9 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
         },
       });
       const result = (await response.json()) as {
-        practiceSession?: { id: string };
+        practiceSession?: { id: string } & Partial<
+          Omit<StoredPracticeSessionSelection, "id">
+        >;
         error?: { message?: string };
       };
 
@@ -117,6 +123,11 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
         throw new Error(result.error?.message ?? "练习会话创建失败");
       }
 
+      savePracticeSessionSelection({
+        ...payload,
+        ...result.practiceSession,
+        id: result.practiceSession.id,
+      });
       router.push(`/practice/${result.practiceSession.id}`);
     } catch (caughtError) {
       setError(
