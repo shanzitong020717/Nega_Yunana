@@ -69,8 +69,29 @@ export type RealtimeSessionCredential =
 
 const DEFAULT_REALTIME_MODEL = "gpt-realtime-mini";
 const CLIENT_SECRET_TTL_SECONDS = 600;
+const INSTRUCTIONS_PREVIEW_CHARS = 2000;
 const OPENAI_REALTIME_INPUT_SAMPLE_RATE = 24_000;
 const OPENAI_REALTIME_OUTPUT_SAMPLE_RATE = 24_000;
+const DEFAULT_GEMINI_LIVE_VOICE = "Puck";
+const DEFAULT_OPENAI_REALTIME_VOICE = "marin";
+
+const GEMINI_LIVE_VOICE_BY_PACK_ID: Record<VoicePack["id"], string> = {
+  "ava-friendly-buyer": "Aoede",
+  "serena-enterprise-decision-maker": "Kore",
+  "ethan-technical-lead": "Charon",
+  "marcus-executive-customer": "Orus",
+  "vivian-critical-procurement": "Kore",
+  "noah-channel-partner": "Puck",
+};
+
+const OPENAI_REALTIME_VOICE_BY_PACK_ID: Record<VoicePack["id"], string> = {
+  "ava-friendly-buyer": "shimmer",
+  "serena-enterprise-decision-maker": "sage",
+  "ethan-technical-lead": "cedar",
+  "marcus-executive-customer": "marin",
+  "vivian-critical-procurement": "ash",
+  "noah-channel-partner": "verse",
+};
 
 function getErrorField(
   error: unknown,
@@ -168,6 +189,25 @@ function realtimeRelayAudioRates(provider: string | undefined) {
   };
 }
 
+export function resolveGeminiLiveVoiceName(voicePack?: VoicePack | null) {
+  if (!voicePack) {
+    return DEFAULT_GEMINI_LIVE_VOICE;
+  }
+
+  return GEMINI_LIVE_VOICE_BY_PACK_ID[voicePack.id] ?? DEFAULT_GEMINI_LIVE_VOICE;
+}
+
+function resolveOpenAIRealtimeVoice(voicePack?: VoicePack | null) {
+  if (!voicePack) {
+    return DEFAULT_OPENAI_REALTIME_VOICE;
+  }
+
+  return (
+    OPENAI_REALTIME_VOICE_BY_PACK_ID[voicePack.id] ??
+    DEFAULT_OPENAI_REALTIME_VOICE
+  );
+}
+
 function formatList(title: string, items?: string[] | null) {
   const usefulItems = (items ?? []).filter(Boolean);
 
@@ -194,8 +234,17 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     `Scenario primary goal: ${scenarioPack.primaryGoal}`,
     `Practice goal: ${practiceGoal?.label ?? input.mode}`,
     `Practice goal description: ${practiceGoal?.description ?? "Run the selected practice scenario."}`,
+    `Voice pack: ${voicePack?.name ?? "Default business customer voice"}`,
+    `Voice intent: ${voicePack?.modelVoiceHint ?? "natural_business_voice"}`,
+    `Voice personality: ${voicePack?.personality ?? "professional and realistic"}`,
+    `Voice style: ${voicePack?.voiceStyle ?? "clear spoken English"}`,
     formatList("Focus tags", input.focusTags),
     formatList("Relevant memory snippets", input.memorySnippets),
+    "",
+    "Model responsibilities:",
+    "- Realtime voice provider: Gemini Live handles the active live-audio conversation when the WebSocket relay is configured for gemini_live.",
+    "- Do not call DeepSeek during the active realtime audio loop; DeepSeek is reserved for offline text analysis such as material briefs, prep cards, reviews, phrase extraction, memory candidates, and subtitle translation after a turn or session.",
+    "- Memory snippets are loaded before the live session starts; use them as static context only during the live audio loop.",
     "",
     `Practice mode: ${input.mode}`,
     `AI customer role: ${input.persona.name}`,
@@ -203,10 +252,6 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     `Customer tone: ${input.persona.tone}`,
     formatList("Customer focus areas", input.persona.focusAreas),
     formatList("Sample customer questions", input.persona.sampleQuestions),
-    `Voice pack: ${voicePack?.name ?? "Default business customer voice"}`,
-    `Voice intent: ${voicePack?.modelVoiceHint ?? "natural_business_voice"}`,
-    `Voice personality: ${voicePack?.personality ?? "professional and realistic"}`,
-    `Voice style: ${voicePack?.voiceStyle ?? "clear spoken English"}`,
     "",
     "Material brief:",
     `Key message: ${materialBrief?.keyMessage ?? "No uploaded material brief is available for this session."}`,
@@ -248,7 +293,7 @@ export async function createRealtimeSession(
   input: CreateRealtimeSessionInput,
 ): Promise<RealtimeSessionCredential> {
   const instructions = buildRealtimeInstructions(input);
-  const instructionsPreview = instructions.slice(0, 1200);
+  const instructionsPreview = instructions.slice(0, INSTRUCTIONS_PREVIEW_CHARS);
   const sessionId = `rt_session_${crypto.randomUUID()}`;
   const expiresAt = new Date(
     Date.now() + CLIENT_SECRET_TTL_SECONDS * 1000,
@@ -270,6 +315,7 @@ export async function createRealtimeSession(
           realtimeSessionId: sessionId,
           model,
           instructions,
+          voiceName: resolveGeminiLiveVoiceName(input.voicePack),
         },
         {
           secret: relayConfig.sharedSecret,
@@ -320,7 +366,7 @@ export async function createRealtimeSession(
           },
         },
         output: {
-          voice: "marin",
+          voice: resolveOpenAIRealtimeVoice(input.voicePack),
         },
       },
     },

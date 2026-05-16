@@ -9,6 +9,10 @@ const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_MAX_TOKENS = 8192;
 
+export const TEXT_ANALYSIS_PROVIDER_NAME = "DeepSeek";
+export const TEXT_ANALYSIS_BOUNDARY =
+  "DeepSeek text analysis boundary: Use DeepSeek only for offline JSON text analysis outside the realtime audio loop. Do not use it for live microphone/audio turns.";
+
 function configuredTextApiKey() {
   return (
     normalizeOpenAIApiKey(process.env.DEEPSEEK_API_KEY) ??

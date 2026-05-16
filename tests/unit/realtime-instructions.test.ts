@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { defaultScenarioPack } from "@/data/scenario-packs";
-import { buildRealtimeInstructions } from "@/lib/ai/realtime";
+import {
+  buildRealtimeInstructions,
+  resolveGeminiLiveVoiceName,
+} from "@/lib/ai/realtime";
 
 describe("buildRealtimeInstructions", () => {
   it("combines scenario, goal, persona, voice pack, materials, memory, and focus tags", () => {
@@ -62,6 +65,13 @@ describe("buildRealtimeInstructions", () => {
     expect(instructions).toContain("Technical Lead");
     expect(instructions).toContain("Voice pack: Ethan 技术负责人");
     expect(instructions).toContain("Voice intent: steady_technical_male");
+    expect(instructions).toContain("Realtime voice provider: Gemini Live");
+    expect(instructions).toContain(
+      "Do not call DeepSeek during the active realtime audio loop",
+    );
+    expect(instructions).toContain(
+      "Memory snippets are loaded before the live session starts",
+    );
     expect(instructions).toContain("Rokid supports real-time translated captions.");
     expect(instructions).toContain("Technical lead in healthcare.");
     expect(instructions).toContain("business value");
@@ -70,5 +80,14 @@ describe("buildRealtimeInstructions", () => {
       "The learner often explains features before confirming customer scenarios.",
     );
     expect(instructions).toContain("Do not invent product claims");
+  });
+
+  it("maps voice packs to supported Gemini Live voice names", () => {
+    const technicalVoicePack = defaultScenarioPack.voicePacks.find(
+      (item) => item.id === "ethan-technical-lead",
+    );
+
+    expect(resolveGeminiLiveVoiceName(technicalVoicePack)).toBe("Charon");
+    expect(resolveGeminiLiveVoiceName(null)).toBe("Puck");
   });
 });

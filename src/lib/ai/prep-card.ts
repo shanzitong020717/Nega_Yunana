@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
-import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
+import {
+  TEXT_ANALYSIS_BOUNDARY,
+  generateTextJSON,
+  hasTextAIApiKey,
+} from "@/lib/ai/text-client";
 
 export const prepCardSchema = z.object({
   customerContext: z.string().min(1),
@@ -90,6 +94,7 @@ function generateMockPrepCard(input: GeneratePrepCardInput): PrepCardPayload {
 function buildPrepCardPrompt(input: GeneratePrepCardInput) {
   return [
     "You are preparing a focused English meeting prep card for a Rokid overseas sales and solutions manager.",
+    TEXT_ANALYSIS_BOUNDARY,
     "Return strict JSON with these keys: customerContext, meetingGoal, keyTalkingPoints, discoveryQuestions, likelyObjections, openingScript, mustUsePhrases, doNotOverpromise.",
     "Keep it specific to the customer context. Do not invent product claims, pricing, accuracy numbers, certifications, or contract terms.",
     `Material ID: ${input.materialId ?? "none"}`,

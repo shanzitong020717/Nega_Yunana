@@ -226,12 +226,14 @@ function bridgeGeminiLiveSockets({
   instructions,
   realtimeSessionId,
   model,
+  voiceName,
 }: {
   browserSocket: RelayWebSocket;
   providerSocket: WebSocket;
   instructions: string;
   realtimeSessionId: string;
   model: string;
+  voiceName?: string;
 }) {
   const queuedMessages: Array<{ data: RawData }> = [];
   let isGeminiReady = false;
@@ -278,6 +280,7 @@ function bridgeGeminiLiveSockets({
         buildGeminiLiveSetupMessage({
           instructions,
           model,
+          voiceName,
         }),
       ),
     );
@@ -420,6 +423,7 @@ server.on("upgrade", (request, socket, head) => {
         instructions: payload.instructions,
         realtimeSessionId: payload.realtimeSessionId,
         model,
+        voiceName: payload.voiceName,
       });
       return;
     }

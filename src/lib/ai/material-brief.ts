@@ -1,4 +1,8 @@
-import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
+import {
+  TEXT_ANALYSIS_BOUNDARY,
+  generateTextJSON,
+  hasTextAIApiKey,
+} from "@/lib/ai/text-client";
 import { materialBriefSchema } from "@/lib/validation/materials";
 import type { MaterialBriefPayload } from "@/lib/validation/materials";
 
@@ -129,6 +133,7 @@ function generateMockMaterialBrief(
 function buildMaterialBriefPrompt(input: GenerateMaterialBriefInput) {
   return [
     "You are helping a Rokid overseas sales and solutions manager prepare for an English customer meeting.",
+    TEXT_ANALYSIS_BOUNDARY,
     "Create a concise Material Brief as strict JSON with these keys: keyMessage, productPoints, customerValue, likelyQuestions, applicationScenarios, pros, cons, competitorDifferences, productParameters, memoryStatus, likelyObjections, riskyClaims, usefulPhrases, glossary, outline.",
     "Extract product application scenarios, product advantages, product disadvantages or fit boundaries, differences versus other products or alternatives, detailed product parameters, and likely follow-up questions from customers.",
     "For memoryStatus, use one of: session_only, available_for_future, saved_to_memory, confidential. Default to session_only unless the material is clearly confidential.",

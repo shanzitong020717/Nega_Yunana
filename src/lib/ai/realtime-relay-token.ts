@@ -5,6 +5,7 @@ export type RealtimeRelayUnsignedPayload = {
   realtimeSessionId: string;
   model: string;
   instructions: string;
+  voiceName?: string;
 };
 
 export type RealtimeRelayTokenPayload = RealtimeRelayUnsignedPayload & {
@@ -104,6 +105,13 @@ export function verifyRealtimeRelayToken(
     if (typeof typedPayload[field] !== "string") {
       throw new Error("Realtime relay token payload is invalid.");
     }
+  }
+
+  if (
+    typedPayload.voiceName !== undefined &&
+    typeof typedPayload.voiceName !== "string"
+  ) {
+    throw new Error("Realtime relay token payload is invalid.");
   }
 
   const expiresAt = Date.parse(typedPayload.expiresAt as string);

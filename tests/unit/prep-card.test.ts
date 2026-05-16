@@ -5,6 +5,8 @@ const { generateTextJSONMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/ai/text-client", () => ({
+  TEXT_ANALYSIS_BOUNDARY:
+    "DeepSeek text analysis boundary: Use DeepSeek only for offline JSON text analysis outside the realtime audio loop.",
   hasTextAIApiKey: () =>
     Boolean(
       process.env.DEEPSEEK_API_KEY?.trim() ||
@@ -115,7 +117,13 @@ describe("generatePrepCard", () => {
     });
     expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        prompt: expect.stringContaining("DeepSeek text analysis boundary"),
         schemaName: "prep card",
+      }),
+    );
+    expect(generateTextJSONMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining("outside the realtime audio loop"),
       }),
     );
   });

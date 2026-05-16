@@ -4,7 +4,11 @@ import { objections } from "@/data/objections";
 import type { CustomerPersona } from "@/data/personas";
 import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
 import type { PrepCardPayload } from "@/lib/ai/prep-card";
-import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
+import {
+  TEXT_ANALYSIS_BOUNDARY,
+  generateTextJSON,
+  hasTextAIApiKey,
+} from "@/lib/ai/text-client";
 import type { PracticeSessionRecord } from "@/lib/practice/practice-session-store";
 import type { TranscriptTurnInput } from "@/lib/validation/practice";
 import {
@@ -327,6 +331,7 @@ function generateMockReview(
 function buildReviewPrompt(input: GeneratePracticeReviewInput) {
   return [
     "You are generating a structured after-practice review for a Rokid overseas sales and solution professional.",
+    TEXT_ANALYSIS_BOUNDARY,
     "Return strict JSON only. Do not include Markdown.",
     "The JSON must include meetingOutcome, scores, topImprovements, bestMoments, sentenceUpgrades, materialCoverage, phrasebookSuggestions, weaknessUpdates, memoryCandidates, and nextSessionRecommendation.",
     "If the practice session is an objection_challenge, include objectionFramework with requiredSteps, usedSteps, missingSteps, and coachingNote. Score these five steps: Acknowledge, Clarify, Position, Support, Next Step.",

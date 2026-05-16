@@ -102,6 +102,11 @@ describe("generatePracticeReview", () => {
         }),
       ]),
     );
+    expect(
+      review.sentenceUpgrades.find(
+        (upgrade) => upgrade.status === "already_natural",
+      ),
+    ).not.toHaveProperty("naturalEnglish");
     expect(review.materialCoverage.covered).toContain("Real-time translated captions");
     expect(review.phrasebookSuggestions[0]).toMatchObject({
       source: "review",
