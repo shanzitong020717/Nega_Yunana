@@ -73,17 +73,51 @@ describe("static product views", () => {
     expect(screen.queryByText("Why not just use a phone translation app?")).not.toBeInTheDocument();
   });
 
-  it("filters phrasebook cards by tag and shows a personal empty state", () => {
+  it("renders the phrasebook as a daily practice tool", () => {
     render(<PhrasebookView />);
 
-    expect(screen.getByText("还没有收藏个人表达")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "表达库" })).toBeInTheDocument();
+
+    const dailyPractice = screen.getByRole("region", { name: "今天建议复习" });
+    expect(within(dailyPractice).getAllByRole("article")).toHaveLength(5);
+    expect(within(dailyPractice).getAllByRole("button", { name: "练这句" })).toHaveLength(5);
+
+    [
+      "产品应用场景",
+      "产品优点与缺点",
+      "竞品差异与替代方案对比",
+      "产品详细参数",
+    ].forEach((category) => {
+      expect(screen.getByRole("option", { name: category })).toBeInTheDocument();
+    });
+
+    [
+      "最近复盘保存",
+      "Rokid 高频产品表达",
+      "异议回答表达",
+      "我的个人表达",
+      "材料专属表达",
+    ].forEach((section) => {
+      expect(screen.getByRole("heading", { name: section })).toBeInTheDocument();
+    });
+  });
+
+  it("keeps phrasebook filters available without taking over the page", () => {
+    render(<PhrasebookView />);
 
     fireEvent.change(screen.getByLabelText("标签"), {
       target: { value: "pilot" },
     });
 
-    expect(screen.getByText("What does a successful pilot look like for your team?")).toBeInTheDocument();
-    expect(screen.queryByText("Let me walk you through a simple scenario.")).not.toBeInTheDocument();
+    const phraseSearch = screen.getByRole("region", { name: "全部表达检索" });
+    expect(
+      within(phraseSearch).getByText(
+        "What does a successful pilot look like for your team?",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      within(phraseSearch).queryByText("Let me walk you through a simple scenario."),
+    ).not.toBeInTheDocument();
   });
 
   it("renders progress focus areas from mock weakness data", () => {

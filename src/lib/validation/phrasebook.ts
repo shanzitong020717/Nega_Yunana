@@ -23,10 +23,10 @@ export const createPhraseInputSchema = z.object({
     })
     .default("user_added"),
   masteryStatus: z
-    .enum(["new", "needs_practice", "practicing", "mastered"], {
+    .enum(["new", "needs_practice", "reviewing", "mastered"], {
       error: "掌握状态无效",
     })
-    .default("new"),
+    .default("needs_practice"),
 });
 
 export type CreatePhraseInput = z.infer<typeof createPhraseInputSchema>;

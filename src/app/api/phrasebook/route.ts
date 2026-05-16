@@ -28,7 +28,7 @@ function findExistingPhrase(english: string) {
     return {
       id: `built_in_${seedPhrases.indexOf(builtInPhrase) + 1}`,
       source: "built_in",
-      masteryStatus: "new",
+      masteryStatus: "needs_practice",
       createdAt: null,
       ...builtInPhrase,
     };
@@ -47,7 +47,7 @@ export function GET() {
       ...seedPhrases.map((phrase, index) => ({
         id: `built_in_${index + 1}`,
         source: "built_in",
-        masteryStatus: "new",
+        masteryStatus: "needs_practice",
         createdAt: null,
         ...phrase,
       })),

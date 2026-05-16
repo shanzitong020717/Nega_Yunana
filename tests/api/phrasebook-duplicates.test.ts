@@ -23,7 +23,7 @@ describe("phrasebook duplicate handling", () => {
   it("returns the existing review phrase instead of saving a duplicate", async () => {
     const english = `Review phrase ${crypto.randomUUID()} reduces communication friction.`;
     const phraseInput = {
-      category: "Business Value",
+      category: "产品应用场景",
       english,
       chinese: "这句话用于解释客户价值。",
       useCase: "Saved from review sentence upgrade.",
@@ -33,11 +33,16 @@ describe("phrasebook duplicate handling", () => {
       relatedObjection: "Why not use a phone app?",
       tags: ["review", "business-value"],
       source: "review",
-      masteryStatus: "needs_practice",
     };
 
     const firstResponse = await createPhrase(jsonRequest(phraseInput));
     expect(firstResponse.status).toBe(201);
+    await expect(readJson(firstResponse)).resolves.toMatchObject({
+      phrase: {
+        category: "产品应用场景",
+        masteryStatus: "needs_practice",
+      },
+    });
 
     const duplicateResponse = await createPhrase(jsonRequest(phraseInput));
     expect(duplicateResponse.status).toBe(200);

@@ -39,11 +39,13 @@ test.describe("product smoke flows", () => {
   test("phrasebook filters", async ({ page }) => {
     await page.goto("/phrasebook");
 
-    await expect(page.getByRole("heading", { name: "Rokid 产品表达库" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "表达库" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "今天建议复习" })).toBeVisible();
     await page.getByLabel("标签").selectOption("pilot");
 
-    await expect(page.locator("article").filter({ hasText: "What does a successful pilot look like for your team?" })).toBeVisible();
-    await expect(page.locator("article").filter({ hasText: "Let me walk you through a simple scenario." })).toHaveCount(0);
+    const phraseSearch = page.getByRole("region", { name: "全部表达检索" });
+    await expect(phraseSearch.locator("article").filter({ hasText: "What does a successful pilot look like for your team?" })).toBeVisible();
+    await expect(phraseSearch.locator("article").filter({ hasText: "Let me walk you through a simple scenario." })).toHaveCount(0);
   });
 
   test("review hub opens", async ({ page }) => {

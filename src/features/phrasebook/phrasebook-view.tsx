@@ -1,10 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpenText, Filter, Languages } from "lucide-react";
+import {
+  BookOpenText,
+  Filter,
+  Languages,
+  LibraryBig,
+  RotateCcw,
+  ShieldQuestion,
+  Sparkles,
+  Upload,
+  UserRound,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import {
+  DailyPhrasePractice,
+  type PhraseMasteryStatus,
+} from "@/features/phrasebook/daily-phrase-practice";
 import {
   phraseCategories,
   seedPhrases,
@@ -12,34 +26,57 @@ import {
   type SeedPhrase,
 } from "@/data/seed-phrases";
 
-type PhraseSource = "all" | "built_in" | "personal";
-type MasteryStatus = "all" | "new" | "practicing" | "mastered";
+type PhraseSource = "all" | "built_in" | "material" | "review" | "user_added";
+type MasteryFilter = "all" | PhraseMasteryStatus;
 type CategoryFilter = "all" | PhraseCategory;
 
 type PhraseItem = SeedPhrase & {
   id: string;
-  source: "built_in" | "material" | "review" | "user_added";
-  masteryStatus: Exclude<MasteryStatus, "all">;
+  source: Exclude<PhraseSource, "all">;
+  masteryStatus: PhraseMasteryStatus;
   createdAt?: string | null;
 };
+
+type PhraseSectionProps = {
+  title: string;
+  description: string;
+  phrases: PhraseItem[];
+  emptyText: string;
+  icon: typeof LibraryBig;
+};
+
+const productCategories: PhraseCategory[] = [
+  "Product Positioning",
+  "Feature Explanation",
+  "Business Value",
+  "Demo Narration",
+  "产品应用场景",
+  "产品优点与缺点",
+  "竞品差异与替代方案对比",
+  "产品详细参数",
+];
 
 const builtInPhrases: PhraseItem[] = seedPhrases.map((phrase, index) => ({
   ...phrase,
   id: `seed-${index}`,
   source: "built_in",
-  masteryStatus: index < 3 ? "practicing" : "new",
+  masteryStatus:
+    index < 3 ? "needs_practice" : index < 5 ? "reviewing" : "new",
 }));
 
 const sourceLabels: Record<PhraseSource, string> = {
   all: "全部来源",
   built_in: "内置表达",
-  personal: "个人收藏",
+  review: "最近复盘保存",
+  material: "材料专属表达",
+  user_added: "我的个人表达",
 };
 
-const masteryLabels: Record<MasteryStatus, string> = {
+const masteryLabels: Record<MasteryFilter, string> = {
   all: "全部掌握状态",
   new: "新表达",
-  practicing: "练习中",
+  needs_practice: "需要练习",
+  reviewing: "复习中",
   mastered: "已掌握",
 };
 
@@ -51,6 +88,10 @@ const categoryLabels: Record<CategoryFilter, string> = {
   "Feature Explanation": "功能说明",
   "Business Value": "商业价值",
   "Demo Narration": "演示讲解",
+  产品应用场景: "产品应用场景",
+  产品优点与缺点: "产品优点与缺点",
+  竞品差异与替代方案对比: "竞品差异与替代方案对比",
+  产品详细参数: "产品详细参数",
   "Objection Handling": "异议处理",
   "Pricing & Pilot": "价格与试点",
   "Closing & Next Step": "收尾与下一步",
@@ -64,11 +105,115 @@ const phraseSourceLabels: Record<PhraseItem["source"], string> = {
   user_added: "手动添加",
 };
 
+function normalizeMasteryStatus(status: unknown): PhraseMasteryStatus {
+  if (
+    status === "new" ||
+    status === "needs_practice" ||
+    status === "reviewing" ||
+    status === "mastered"
+  ) {
+    return status;
+  }
+
+  if (status === "practicing") {
+    return "reviewing";
+  }
+
+  return "needs_practice";
+}
+
+function normalizeSavedPhrase(phrase: PhraseItem): PhraseItem {
+  return {
+    ...phrase,
+    masteryStatus: normalizeMasteryStatus(phrase.masteryStatus),
+  };
+}
+
+function PhraseCard({ phrase }: { phrase: PhraseItem }) {
+  return (
+    <article className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          <StatusPill tone="primary">{categoryLabels[phrase.category]}</StatusPill>
+          <StatusPill tone="neutral">{phraseSourceLabels[phrase.source]}</StatusPill>
+        </div>
+        <BookOpenText className="h-5 w-5 shrink-0 text-[var(--primary)]" aria-hidden="true" />
+      </div>
+
+      <h3 className="mt-3 text-base font-semibold leading-7">
+        {phrase.english}
+      </h3>
+      <div className="mt-3 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+        <div className="flex items-center gap-2">
+          <Languages className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
+          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+            中文含义
+          </p>
+        </div>
+        <p className="mt-2 text-sm leading-6">{phrase.chinese}</p>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+        {phrase.useCase}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {phrase.tags.map((item) => (
+          <span
+            key={item}
+            className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)]"
+          >
+            {item}
+          </span>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="mt-4 inline-flex min-h-10 items-center justify-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+      >
+        练这句
+      </button>
+    </article>
+  );
+}
+
+function PhraseSection({
+  title,
+  description,
+  phrases,
+  emptyText,
+  icon: Icon,
+}: PhraseSectionProps) {
+  return (
+    <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
+      <div className="flex items-start gap-3">
+        <Icon className="mt-0.5 h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+            {description}
+          </p>
+        </div>
+      </div>
+
+      {phrases.length > 0 ? (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {phrases.slice(0, 4).map((phrase) => (
+            <PhraseCard key={phrase.id} phrase={phrase} />
+          ))}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-md border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+          <p className="text-sm font-semibold">{emptyText}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function PhrasebookView() {
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [source, setSource] = useState<PhraseSource>("all");
   const [tag, setTag] = useState("all");
-  const [mastery, setMastery] = useState<MasteryStatus>("all");
+  const [mastery, setMastery] = useState<MasteryFilter>("all");
   const [savedPhrases, setSavedPhrases] = useState<PhraseItem[]>([]);
 
   useEffect(() => {
@@ -86,15 +231,13 @@ export function PhrasebookView() {
 
         if (isMounted) {
           setSavedPhrases(
-            (payload.phrases ?? []).filter(
-              (phrase) => phrase.source !== "built_in",
-            ),
+            (payload.phrases ?? [])
+              .filter((phrase) => phrase.source !== "built_in")
+              .map(normalizeSavedPhrase),
           );
         }
       } catch {
-        if (isMounted) {
-          setSavedPhrases([]);
-        }
+        return;
       }
     }
 
@@ -109,6 +252,13 @@ export function PhrasebookView() {
     () => [...builtInPhrases, ...savedPhrases],
     [savedPhrases],
   );
+  const dailyPhrases = useMemo(
+    () =>
+      allPhrases
+        .filter((phrase) => phrase.masteryStatus !== "mastered")
+        .slice(0, 5),
+    [allPhrases],
+  );
   const tagOptions = useMemo(
     () =>
       Array.from(new Set(allPhrases.flatMap((phrase) => phrase.tags))).sort(),
@@ -118,11 +268,7 @@ export function PhrasebookView() {
   const phrases = useMemo(() => {
     return allPhrases.filter((phrase) => {
       const matchesCategory = category === "all" || phrase.category === category;
-      const matchesSource =
-        source === "all" ||
-        (source === "personal"
-          ? phrase.source !== "built_in"
-          : phrase.source === source);
+      const matchesSource = source === "all" || phrase.source === source;
       const matchesTag = tag === "all" || phrase.tags.includes(tag);
       const matchesMastery =
         mastery === "all" || phrase.masteryStatus === mastery;
@@ -131,18 +277,34 @@ export function PhrasebookView() {
     });
   }, [allPhrases, category, source, tag, mastery]);
 
+  const reviewPhrases = savedPhrases.filter((phrase) => phrase.source === "review");
+  const productPhrases = allPhrases.filter((phrase) =>
+    productCategories.includes(phrase.category),
+  );
+  const objectionPhrases = allPhrases.filter(
+    (phrase) => phrase.category === "Objection Handling",
+  );
+  const userPhrases = savedPhrases.filter(
+    (phrase) => phrase.source === "user_added",
+  );
+  const materialPhrases = savedPhrases.filter(
+    (phrase) => phrase.source === "material",
+  );
+
   return (
     <>
       <PageHeader
-        eyebrow="表达库"
-        title="Rokid 产品表达库"
-        description="Practice bilingual business English phrases for openings, discovery, demo narration, objections, pilots, and follow-ups."
+        eyebrow="每日复习"
+        title="表达库"
+        description="每天优先复习少量高频表达，再按来源和场景查找需要练的句子。"
       />
+
+      <DailyPhrasePractice phrases={dailyPhrases} />
 
       <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
         <div className="flex items-center gap-2">
           <Filter className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-          <h2 className="text-base font-semibold">表达筛选</h2>
+          <h2 className="text-base font-semibold">筛选表达</h2>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="phrase-category">
@@ -200,7 +362,7 @@ export function PhrasebookView() {
             <select
               id="phrase-mastery"
               value={mastery}
-              onChange={(event) => setMastery(event.target.value as MasteryStatus)}
+              onChange={(event) => setMastery(event.target.value as MasteryFilter)}
               className="min-h-11 rounded-md border border-[var(--border)] bg-white px-3 text-sm outline-none transition focus:border-[var(--primary)]"
             >
               {Object.entries(masteryLabels).map(([value, label]) => (
@@ -213,100 +375,71 @@ export function PhrasebookView() {
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_18rem]">
-        <div className="min-w-0">
-          {phrases.length > 0 ? (
-            <div className="grid gap-4 lg:grid-cols-2">
-              {phrases.map((phrase) => (
-                <article
-                  key={phrase.id}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5"
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <StatusPill tone="primary">{categoryLabels[phrase.category]}</StatusPill>
-                      <h2 className="mt-3 text-lg font-semibold leading-7">
-                        {phrase.english}
-                      </h2>
-                    </div>
-                    <BookOpenText
-                      className="h-5 w-5 shrink-0 text-[var(--primary)]"
-                      aria-hidden="true"
-                    />
-                  </div>
-
-                  <div className="mt-4 rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-                    <div className="flex items-center gap-2">
-                      <Languages className="h-4 w-4 text-[var(--accent)]" aria-hidden="true" />
-                      <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                        中文含义
-                      </h3>
-                    </div>
-                    <p className="mt-2 text-sm leading-6">{phrase.chinese}</p>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-                        使用场景
-                      </h3>
-                      <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                        {phrase.useCase}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {phrase.tags.map((item) => (
-                        <span
-                          key={item}
-                          className="rounded-md border border-[var(--border)] px-2 py-1 text-xs text-[var(--muted)]"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-md border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center">
-              <h2 className="text-lg font-semibold">没有匹配的表达</h2>
-              <p className="mt-2 text-sm text-[var(--muted)]">
-                Change the category, source, tag, or mastery filter to keep reviewing.
-              </p>
-            </div>
-          )}
+      <section
+        aria-label="全部表达检索"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <LibraryBig className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
+            <h2 className="text-lg font-semibold">全部表达检索</h2>
+          </div>
+          <StatusPill tone="neutral">{`${phrases.length} 句`}</StatusPill>
         </div>
 
-        <aside className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
-          <h2 className="text-base font-semibold">个人收藏</h2>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-            Saved review expressions appear here with source, tags, and mastery status.
-          </p>
-          {savedPhrases.length > 0 ? (
-            <div className="mt-4 space-y-3">
-              {savedPhrases.slice(0, 4).map((phrase) => (
-                <div
-                  key={phrase.id}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-4"
-                >
-                  <StatusPill tone="neutral">{phraseSourceLabels[phrase.source]}</StatusPill>
-                  <p className="mt-2 text-sm font-semibold leading-6">
-                    {phrase.english}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="mt-4 rounded-md border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-4">
-              <p className="text-sm font-semibold">还没有收藏个人表达</p>
-              <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                Review-generated phrases will appear with source, tags, and mastery status.
-              </p>
-            </div>
-          )}
-        </aside>
+        {phrases.length > 0 ? (
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            {phrases.map((phrase) => (
+              <PhraseCard key={phrase.id} phrase={phrase} />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-md border border-dashed border-[var(--border)] bg-[var(--surface-subtle)] p-8 text-center">
+            <h2 className="text-lg font-semibold">没有匹配的表达</h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">
+              调整类别、来源、标签或掌握状态后继续查找。
+            </p>
+          </div>
+        )}
       </section>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <PhraseSection
+          title="最近复盘保存"
+          description="从复盘句子升级中保存下来的表达。"
+          phrases={reviewPhrases}
+          emptyText="复盘中保存的表达会出现在这里。"
+          icon={RotateCcw}
+        />
+        <PhraseSection
+          title="Rokid 高频产品表达"
+          description="围绕应用场景、产品优缺点、竞品差异和参数说明的高频表达。"
+          phrases={productPhrases}
+          emptyText="暂无产品表达。"
+          icon={Sparkles}
+        />
+        <PhraseSection
+          title="异议回答表达"
+          description="用于隐私、安全、部署、价格、竞品等客户异议。"
+          phrases={objectionPhrases}
+          emptyText="暂无异议回答表达。"
+          icon={ShieldQuestion}
+        />
+        <PhraseSection
+          title="我的个人表达"
+          description="用户手动添加或长期沉淀的个人表达。"
+          phrases={userPhrases}
+          emptyText="还没有收藏个人表达。"
+          icon={UserRound}
+        />
+        <PhraseSection
+          title="材料专属表达"
+          description="从客户材料和会前准备中沉淀的表达。"
+          phrases={materialPhrases}
+          emptyText="上传材料后，专属表达会出现在这里。"
+          icon={Upload}
+        />
+      </div>
     </>
   );
 }
