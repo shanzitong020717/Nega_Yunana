@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
+import { defaultScenarioPack } from "@/data/scenario-packs";
+import {
+  ConversationTranscriptPanel,
+  type TranscriptTurn,
+} from "@/features/practice/conversation-transcript-panel";
 import {
   LiveMeetingPanel,
   type RealtimeRoomState,
-  type TranscriptTurn,
 } from "@/features/practice/live-meeting-panel";
 import { MaterialNavigator } from "@/features/practice/material-navigator";
 import {
@@ -54,6 +58,7 @@ const initialTranscript: TranscriptTurn[] = [
     id: "turn_1",
     speaker: "ai_customer",
     text: "What business problem are you trying to solve with smart glasses?",
+    translationZh: "你想用智能眼镜解决什么业务问题？",
     timestamp: 0,
   },
   {
@@ -138,6 +143,25 @@ function realtimeErrorMessage(event: Record<string, unknown>) {
   return "实时模型服务返回错误，请检查第三方 Realtime API 配置。";
 }
 
+function userFacingRealtimeError(message: string) {
+  const trimmedMessage = message.trim();
+  const lowerMessage = trimmedMessage.toLowerCase();
+
+  if (
+    lowerMessage.includes("provider") ||
+    lowerMessage.includes("handshake") ||
+    lowerMessage.includes("api") ||
+    lowerMessage.includes("unauthorized") ||
+    lowerMessage.includes("forbidden")
+  ) {
+    return "实时模型连接失败，请检查 Realtime API 配置。";
+  }
+
+  return /[\u4e00-\u9fa5]/.test(trimmedMessage)
+    ? trimmedMessage
+    : "实时连接异常，请稍后重试。";
+}
+
 export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const [state, setState] = useState<RealtimeRoomState>("Ready");
   const [transcriptTurns, setTranscriptTurns] = useState(initialTranscript);
@@ -177,6 +201,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         timestamp: turn.timestamp ?? currentTurns.length * 8,
         speaker: turn.speaker,
         text: turn.text,
+        translationZh: turn.translationZh,
       },
     ];
 
@@ -240,10 +265,14 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        scenarioPackId: defaultScenarioPack.id,
+        goalId: "customer_qa",
         practiceSessionId: sessionId,
         personaId: "technical_lead",
+        voicePackId: "ethan-technical-lead",
         mode: "customer_qa",
         trainingFocus: ["business value", "privacy objection"],
+        focusTags: ["商业价值", "隐私安全"],
       }),
     });
 
@@ -270,7 +299,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     if (type === "error" || type === "relay.error") {
       closeRealtimeConnection();
       setState("Connection Error");
-      addSystemTurn(`实时模型服务返回错误：${realtimeErrorMessage(event)}`);
+      addSystemTurn(userFacingRealtimeError(realtimeErrorMessage(event)));
       return;
     }
 
@@ -673,7 +702,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       setState("Connection Error");
       addSystemTurn(
         error instanceof Error
-          ? error.message
+          ? userFacingRealtimeError(error.message)
           : "实时连接失败，请稍后重试。",
       );
     }
@@ -772,14 +801,17 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
       />
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.35fr_0.85fr]">
         <MaterialNavigator />
-        <LiveMeetingPanel
-          state={state}
-          transcriptTurns={transcriptTurns}
-          onStart={handleStart}
-          onMute={handleMute}
-          onEnd={handleEnd}
-          isMuted={isMuted}
-        />
+        <div className="grid gap-4">
+          <LiveMeetingPanel
+            state={state}
+            onStart={handleStart}
+            onMute={handleMute}
+            onEnd={handleEnd}
+            isMuted={isMuted}
+            voicePackLabel="Ethan 技术负责人"
+          />
+          <ConversationTranscriptPanel turns={transcriptTurns} />
+        </div>
         <SmartSupportPanel onCue={handleCue} />
       </section>
     </>

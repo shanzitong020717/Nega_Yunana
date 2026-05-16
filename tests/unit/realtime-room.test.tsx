@@ -49,12 +49,14 @@ describe("RealtimeRoom mock UI", () => {
   it("renders the live room status, controls, and mock transcript turns", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
-    expect(screen.getByText("当前状态：准备就绪")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "准备开始" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "开始" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "静音" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "结束并复盘" }),
+    ).not.toBeInTheDocument();
 
     [
-      "开始",
-      "静音",
-      "结束",
       "换个更自然表达",
       "使用材料要点",
       "问一个探索问题",
@@ -69,7 +71,7 @@ describe("RealtimeRoom mock UI", () => {
       screen.getByText("What business problem are you trying to solve with smart glasses?"),
     ).toBeInTheDocument();
     expect(screen.getByText("材料导航")).toBeInTheDocument();
-    expect(screen.getByText("智能辅助")).toBeInTheDocument();
+    expect(screen.getByText("提示")).toBeInTheDocument();
   });
 
   it("updates mock room state and transcript when controls are used", async () => {
@@ -77,17 +79,21 @@ describe("RealtimeRoom mock UI", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
     fireEvent.click(screen.getByRole("button", { name: "开始" }));
-    expect(await screen.findByText("当前状态：对话中")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "对话中" })).toBeInTheDocument();
+    expect(screen.queryByText("当前状态：对话中")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "静音" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "结束并复盘" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "静音" }));
-    expect(screen.getByText("当前状态：已静音")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "对话中" })).toBeInTheDocument();
+    expect(screen.getByText("麦克风已静音")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
     expect(
       screen.getByText("Try: The key value is reducing communication friction in real time."),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "结束" }));
-    expect(screen.getByText("当前状态：会话已结束")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
+    expect(screen.getByRole("heading", { name: "会话已结束" })).toBeInTheDocument();
   });
 });

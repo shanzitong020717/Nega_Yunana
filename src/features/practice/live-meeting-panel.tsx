@@ -11,115 +11,135 @@ export type RealtimeRoomState =
   | "Connection Error"
   | "Session Ended";
 
-export type TranscriptTurn = {
-  id: string;
-  speaker: "user" | "ai_customer" | "system";
-  text: string;
-  timestamp: number;
-};
-
 type LiveMeetingPanelProps = {
   state: RealtimeRoomState;
-  transcriptTurns: TranscriptTurn[];
   onStart: () => void;
   onMute: () => void;
   onEnd: () => void;
   isMuted: boolean;
+  voicePackLabel?: string;
 };
 
-const stateLabels: Record<RealtimeRoomState, string> = {
-  Ready: "准备就绪",
+const primaryStateLabels: Record<RealtimeRoomState, string> = {
+  Ready: "准备开始",
   "In Conversation": "对话中",
-  Muted: "已静音",
-  Reconnecting: "连接中",
+  Muted: "对话中",
+  Reconnecting: "正在连接",
   "Mic Permission Required": "需要麦克风权限",
   "Connection Error": "连接失败",
   "Session Ended": "会话已结束",
 };
 
-function speakerLabel(speaker: TranscriptTurn["speaker"]) {
-  if (speaker === "ai_customer") {
-    return "AI 客户";
+function helperText(state: RealtimeRoomState, isMuted: boolean) {
+  if (state === "Ready") {
+    return "语音通道尚未开启。";
   }
 
-  if (speaker === "user") {
-    return "你";
+  if (state === "Muted" || isMuted) {
+    return "麦克风已静音";
   }
 
-  return "系统";
+  if (state === "Reconnecting") {
+    return "正在建立实时语音连接。";
+  }
+
+  if (state === "Mic Permission Required") {
+    return "浏览器麦克风权限未开启。";
+  }
+
+  if (state === "Connection Error") {
+    return "实时连接异常，请检查网络或语音服务配置。";
+  }
+
+  if (state === "Session Ended") {
+    return "本次练习已结束，转写会用于后续复盘。";
+  }
+
+  return "语音通道已连接。";
+}
+
+function canControlLiveSession(state: RealtimeRoomState) {
+  return (
+    state === "In Conversation" ||
+    state === "Muted" ||
+    state === "Reconnecting"
+  );
 }
 
 export function LiveMeetingPanel({
   state,
-  transcriptTurns,
   onStart,
   onMute,
   onEnd,
   isMuted,
+  voicePackLabel = "Ethan 技术负责人",
 }: LiveMeetingPanelProps) {
+  const isLiveSession = canControlLiveSession(state);
+
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
             <Mic2 className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-            <h2 className="text-lg font-semibold">实时会议面板</h2>
+            <p className="text-sm font-semibold text-[var(--muted)]">
+              实时语音练习
+            </p>
           </div>
-          <p className="mt-2 text-sm font-medium text-[var(--primary-strong)]">
-            当前状态：{stateLabels[state]}
+          <h2 className="mt-3 text-3xl font-semibold text-[var(--foreground)]">
+            {primaryStateLabels[state]}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            {helperText(state, isMuted)}
+          </p>
+          <p className="mt-2 text-xs font-medium text-[var(--primary-strong)]">
+            AI 声音：{voicePackLabel}
           </p>
         </div>
-        <StatusPill tone={state === "Session Ended" ? "neutral" : "primary"}>
-          {stateLabels[state]}
+        <StatusPill
+          tone={
+            state === "Connection Error"
+              ? "danger"
+              : state === "Session Ended"
+                ? "neutral"
+                : "primary"
+          }
+        >
+          {primaryStateLabels[state]}
         </StatusPill>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onStart}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
-        >
-          <Mic2 className="h-4 w-4" aria-hidden="true" />
-          开始
-        </button>
-        <button
-          type="button"
-          onClick={onMute}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-4 text-sm font-medium transition hover:border-[var(--primary)]"
-        >
-          <MicOff className="h-4 w-4" aria-hidden="true" />
-          {isMuted ? "取消静音" : "静音"}
-        </button>
-        <button
-          type="button"
-          onClick={onEnd}
-          className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] bg-[#fff0ee] px-4 text-sm font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
-        >
-          <PhoneOff className="h-4 w-4" aria-hidden="true" />
-          结束
-        </button>
-      </div>
-
-      <div className="mt-5 max-h-[30rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-        <h3 className="text-xs font-semibold uppercase text-[var(--muted)]">
-          实时转写
-        </h3>
-        <div className="mt-3 space-y-3">
-          {transcriptTurns.map((turn) => (
-            <article
-              key={turn.id}
-              className="rounded-md border border-[var(--border)] bg-white p-3"
+        {!isLiveSession ? (
+          <button
+            type="button"
+            onClick={onStart}
+            className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
+          >
+            <Mic2 className="h-4 w-4" aria-hidden="true" />
+            开始
+          </button>
+        ) : null}
+        {isLiveSession ? (
+          <>
+            <button
+              type="button"
+              onClick={onMute}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-4 text-sm font-medium transition hover:border-[var(--primary)]"
             >
-              <p className="text-xs font-semibold text-[var(--primary-strong)]">
-                {speakerLabel(turn.speaker)}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                {turn.text}
-              </p>
-            </article>
-          ))}
-        </div>
+              <MicOff className="h-4 w-4" aria-hidden="true" />
+              {isMuted ? "取消静音" : "静音"}
+            </button>
+            <button
+              type="button"
+              onClick={onEnd}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] bg-[#fff0ee] px-4 text-sm font-medium text-[var(--danger)] transition hover:border-[var(--danger)]"
+            >
+              <PhoneOff className="h-4 w-4" aria-hidden="true" />
+              结束并复盘
+            </button>
+          </>
+        ) : null}
       </div>
     </section>
   );

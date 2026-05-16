@@ -28,11 +28,16 @@ describe("realtime session API", () => {
 
     const response = await createRealtimeSession(
       jsonRequest({
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "customer_qa",
         practiceSessionId: "session_123",
         personaId: "technical_lead",
+        voicePackId: "ethan-technical-lead",
         materialId: "material_123",
         mode: "customer_qa",
         trainingFocus: ["business value"],
+        focusTags: ["商业价值", "产品参数解释"],
+        memorySnippets: ["The learner tends to answer before clarifying the use case."],
       }),
     );
 
@@ -47,6 +52,10 @@ describe("realtime session API", () => {
       model: expect.any(String),
       instructionsPreview: expect.stringContaining("Technical Lead"),
     });
+    expect(payload.instructionsPreview).toContain("Rokid 海外商务会谈");
+    expect(payload.instructionsPreview).toContain("客户问答");
+    expect(payload.instructionsPreview).toContain("Ethan 技术负责人");
+    expect(payload.instructionsPreview).toContain("商业价值");
     expect(serializedPayload).not.toContain("sk-standard-secret");
     expect(serializedPayload).not.toContain("OPENAI_API_KEY");
   });
@@ -120,6 +129,28 @@ describe("realtime session API", () => {
       model: "gemini-3.1-flash-live-preview",
       inputAudioSampleRate: 16_000,
       outputAudioSampleRate: 24_000,
+    });
+  });
+
+  it("accepts scenario-pack-only customer personas", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "true");
+
+    const response = await createRealtimeSession(
+      jsonRequest({
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "solution_meeting",
+        practiceSessionId: "session_123",
+        personaId: "channel_partner",
+        voicePackId: "noah-channel-partner",
+        mode: "solution_meeting",
+        trainingFocus: ["channel partnership"],
+        focusTags: ["渠道合作"],
+      }),
+    );
+
+    expect(response.status).toBe(201);
+    await expect(readJson(response)).resolves.toMatchObject({
+      instructionsPreview: expect.stringContaining("渠道合作伙伴"),
     });
   });
 

@@ -135,7 +135,7 @@ describe("RealtimeRoom browser voice connection", () => {
     await waitFor(() => {
       expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
       expect(
-        screen.getByText("当前状态：需要麦克风权限"),
+        screen.getByRole("heading", { name: "需要麦克风权限" }),
       ).toBeInTheDocument();
     });
   });
@@ -177,9 +177,9 @@ describe("RealtimeRoom browser voice connection", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
     fireEvent.click(screen.getByRole("button", { name: "开始" }));
-    await screen.findByText("当前状态：对话中");
+    await screen.findByRole("heading", { name: "对话中" });
 
-    fireEvent.click(screen.getByRole("button", { name: "结束" }));
+    fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenLastCalledWith(
@@ -190,7 +190,7 @@ describe("RealtimeRoom browser voice connection", () => {
       );
     });
     expect(stop).toHaveBeenCalled();
-    expect(screen.getByText("当前状态：会话已结束")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "会话已结束" })).toBeInTheDocument();
   });
 
   it("streams microphone audio to the configured realtime WebSocket relay", async () => {
@@ -236,7 +236,7 @@ describe("RealtimeRoom browser voice connection", () => {
       type: "relay.ready",
     });
 
-    await screen.findByText("当前状态：对话中");
+    await screen.findByRole("heading", { name: "对话中" });
     await waitFor(() => {
       expect(processors).toHaveLength(1);
     });
@@ -321,7 +321,7 @@ describe("RealtimeRoom browser voice connection", () => {
       type: "relay.ready",
     });
 
-    await screen.findByText("当前状态：对话中");
+    await screen.findByRole("heading", { name: "对话中" });
 
     sockets[0]?.message({
       type: "error",
@@ -330,11 +330,9 @@ describe("RealtimeRoom browser voice connection", () => {
       },
     });
 
-    expect(await screen.findByText("当前状态：连接失败")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "连接失败" })).toBeInTheDocument();
     expect(
-      screen.getByText(
-        "实时模型服务返回错误：provider realtime handshake failed",
-      ),
+      screen.getByText("实时模型连接失败，请检查 Realtime API 配置。"),
     ).toBeInTheDocument();
   });
 });

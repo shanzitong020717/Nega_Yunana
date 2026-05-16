@@ -1,4 +1,9 @@
-import type { CustomerPersona } from "@/data/personas";
+import {
+  defaultScenarioPack,
+  type PracticeGoal,
+  type ScenarioPack,
+  type VoicePack,
+} from "@/data/scenario-packs";
 import {
   DEFAULT_GEMINI_LIVE_MODEL,
   GEMINI_LIVE_INPUT_SAMPLE_RATE,
@@ -11,12 +16,25 @@ import { createRealtimeRelayToken } from "@/lib/ai/realtime-relay-token";
 import type { CreatePracticeSessionInput } from "@/lib/validation/practice";
 import type { ClientSecretCreateParams } from "openai/resources/realtime/client-secrets";
 
+export type RealtimePersona = {
+  id: string;
+  name: string;
+  focusAreas: string[];
+  tone: string;
+  sampleQuestions: string[];
+};
+
 export type BuildRealtimeInstructionsInput = {
   mode: CreatePracticeSessionInput["mode"];
-  persona: CustomerPersona;
+  persona: RealtimePersona;
+  scenarioPack?: ScenarioPack | null;
+  practiceGoal?: PracticeGoal | null;
+  voicePack?: VoicePack | null;
   materialBrief?: MaterialBriefPayload | null;
   prepCard?: PrepCardPayload | null;
   trainingFocus?: string[];
+  focusTags?: string[];
+  memorySnippets?: string[];
 };
 
 export type CreateRealtimeSessionInput = BuildRealtimeInstructionsInput & {
@@ -161,6 +179,9 @@ function formatList(title: string, items?: string[] | null) {
 }
 
 export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput) {
+  const scenarioPack = input.scenarioPack ?? defaultScenarioPack;
+  const practiceGoal = input.practiceGoal;
+  const voicePack = input.voicePack;
   const materialBrief = input.materialBrief;
   const prepCard = input.prepCard;
 
@@ -168,11 +189,24 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     "You are an overseas customer meeting simulator and English speaking coach for a Rokid overseas sales and solution professional.",
     "Run a realistic English business conversation. Act as the customer first, then give concise learning support only when the learner asks for it or when a live support cue is used.",
     "",
+    `Scenario pack: ${scenarioPack.name}`,
+    `Scenario target user: ${scenarioPack.targetUser}`,
+    `Scenario primary goal: ${scenarioPack.primaryGoal}`,
+    `Practice goal: ${practiceGoal?.label ?? input.mode}`,
+    `Practice goal description: ${practiceGoal?.description ?? "Run the selected practice scenario."}`,
+    formatList("Focus tags", input.focusTags),
+    formatList("Relevant memory snippets", input.memorySnippets),
+    "",
     `Practice mode: ${input.mode}`,
+    `AI customer role: ${input.persona.name}`,
     `Customer persona: ${input.persona.name}`,
     `Customer tone: ${input.persona.tone}`,
     formatList("Customer focus areas", input.persona.focusAreas),
     formatList("Sample customer questions", input.persona.sampleQuestions),
+    `Voice pack: ${voicePack?.name ?? "Default business customer voice"}`,
+    `Voice intent: ${voicePack?.modelVoiceHint ?? "natural_business_voice"}`,
+    `Voice personality: ${voicePack?.personality ?? "professional and realistic"}`,
+    `Voice style: ${voicePack?.voiceStyle ?? "clear spoken English"}`,
     "",
     "Material brief:",
     `Key message: ${materialBrief?.keyMessage ?? "No uploaded material brief is available for this session."}`,

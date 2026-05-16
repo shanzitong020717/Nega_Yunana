@@ -38,9 +38,9 @@ export function SmartSupportPanel({ onCue }: SmartSupportPanelProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
-          <h2 className="text-lg font-semibold">智能辅助</h2>
+          <h2 className="text-lg font-semibold">提示</h2>
         </div>
-        <StatusPill tone="warning">实时提示</StatusPill>
+        <StatusPill tone="warning">可选</StatusPill>
       </div>
 
       <div className="mt-5 grid gap-2">
