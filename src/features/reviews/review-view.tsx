@@ -158,7 +158,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                   "复盘已删除。",
                 )
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "review"
@@ -175,7 +175,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                   "转写已删除。",
                 )
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "transcript"
@@ -192,7 +192,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
                   "练习会话已删除。",
                 )
               }
-              className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingPrivacyAction === "session"

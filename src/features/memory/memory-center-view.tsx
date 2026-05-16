@@ -193,7 +193,7 @@ export function MemoryCenterView({ initialMemories }: MemoryCenterViewProps) {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <label className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium">
+                  <label className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium">
                     <input
                       type="checkbox"
                       aria-label="用于 AI 练习"
@@ -211,7 +211,7 @@ export function MemoryCenterView({ initialMemories }: MemoryCenterViewProps) {
                         current === memory.id ? null : memory.id,
                       )
                     }
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
                   >
                     <Edit3 className="h-4 w-4" aria-hidden="true" />
                     编辑
@@ -221,7 +221,7 @@ export function MemoryCenterView({ initialMemories }: MemoryCenterViewProps) {
                     onClick={() => {
                       void deleteMemory(memory);
                     }}
-                    className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee]"
+                    className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee]"
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                     删除

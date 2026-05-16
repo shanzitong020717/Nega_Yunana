@@ -79,7 +79,7 @@ export function DailyPhrasePractice({ phrases }: DailyPhrasePracticeProps) {
 
             <button
               type="button"
-              className="mt-auto inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+              className="mt-auto inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
             >
               <Play className="h-4 w-4" aria-hidden="true" />
               练这句

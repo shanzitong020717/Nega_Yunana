@@ -145,7 +145,7 @@ export function SentenceUpgradeTable({ upgrades }: SentenceUpgradeTableProps) {
                       onClick={() => {
                         void saveUpgrade(upgrade);
                       }}
-                      className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-subtle)] disabled:text-[var(--muted)]"
+                      className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)] disabled:cursor-not-allowed disabled:bg-[var(--surface-subtle)] disabled:text-[var(--muted)]"
                     >
                       <BookmarkPlus className="h-4 w-4" aria-hidden="true" />
                       {saveState === "saving"
@@ -157,7 +157,7 @@ export function SentenceUpgradeTable({ upgrades }: SentenceUpgradeTableProps) {
                             : "保存到表达库"}
                     </button>
                   ) : (
-                    <span className="inline-flex min-h-10 items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-sm font-medium text-[var(--muted)]">
+                    <span className="inline-flex min-h-11 items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-sm font-medium text-[var(--muted)]">
                       已自然，无需保存
                     </span>
                   )}

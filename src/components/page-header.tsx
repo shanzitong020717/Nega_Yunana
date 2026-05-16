@@ -14,8 +14,8 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <header className="flex flex-col gap-4 border-b border-[var(--border)] pb-5 lg:flex-row lg:items-end lg:justify-between">
-      <div className="max-w-3xl">
+    <header className="flex min-w-0 flex-col gap-4 border-b border-[var(--border)] pb-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="min-w-0 max-w-3xl">
         {eyebrow ? (
           <p className="mb-2 text-xs font-semibold uppercase text-[var(--primary)]">
             {eyebrow}
@@ -28,7 +28,9 @@ export function PageHeader({
           {description}
         </p>
       </div>
-      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex min-w-0 flex-wrap gap-2 sm:w-auto">{actions}</div>
+      ) : null}
     </header>
   );
 }

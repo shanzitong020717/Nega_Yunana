@@ -46,7 +46,7 @@ export function ReplayPractice({ upgrades }: ReplayPracticeProps) {
                 <button
                   key={action.label}
                   type="button"
-                  className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
                 >
                   <Icon className="h-4 w-4" aria-hidden="true" />
                   {action.label}

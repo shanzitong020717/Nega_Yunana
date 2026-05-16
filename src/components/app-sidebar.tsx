@@ -48,8 +48,8 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="border-b border-[var(--border)] bg-[var(--surface)] md:sticky md:top-0 md:h-dvh md:border-b-0 md:border-r">
-      <div className="flex h-full flex-col gap-5 p-4">
+    <aside className="min-w-0 border-b border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-0 lg:h-dvh lg:border-b-0 lg:border-r">
+      <div className="flex h-full min-w-0 flex-col gap-5 p-4">
         <Link
           href="/dashboard"
           className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-4 transition hover:border-[var(--primary)]"
@@ -67,7 +67,10 @@ export function AppSidebar() {
           </div>
         </Link>
 
-        <nav aria-label="主导航" className="flex gap-2 overflow-x-auto pb-1 md:flex-col md:overflow-visible">
+        <nav
+          aria-label="主导航"
+          className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:flex-col"
+        >
           {primaryNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -79,7 +82,7 @@ export function AppSidebar() {
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
                 className={[
-                  "flex min-w-48 items-center gap-3 rounded-md border px-3 py-3 transition md:min-w-0",
+                  "flex min-w-0 items-center gap-3 rounded-md border px-3 py-3 transition",
                   isActive
                     ? "border-[var(--primary)] bg-[#e7f4f2] text-[var(--primary-strong)]"
                     : "border-transparent text-[var(--muted)] hover:border-[var(--border)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]",
@@ -95,7 +98,7 @@ export function AppSidebar() {
           })}
         </nav>
 
-        <nav aria-label="辅助导航" className="mt-auto flex gap-2 md:flex-col">
+        <nav aria-label="辅助导航" className="mt-auto flex min-w-0 gap-2 lg:flex-col">
           {auxiliaryNavItems.map((item) => {
             const Icon = item.icon;
             const isActive =

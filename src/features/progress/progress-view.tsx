@@ -110,7 +110,7 @@ export function ProgressView({
           </div>
           <Link
             href="/memory"
-            className="inline-flex min-h-9 items-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+            className="inline-flex min-h-11 items-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             管理记忆
           </Link>

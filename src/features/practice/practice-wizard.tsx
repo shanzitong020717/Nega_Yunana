@@ -281,7 +281,7 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
                     aria-pressed={isSelected}
                     onClick={() => toggleFocusTag(tag)}
                     className={[
-                      "inline-flex min-h-10 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
+                      "inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm font-medium transition",
                       isSelected
                         ? "border-[var(--primary)] bg-[#e7f4f2] text-[var(--primary-strong)]"
                         : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:border-[var(--primary)]",

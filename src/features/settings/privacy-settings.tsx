@@ -138,7 +138,7 @@ export function PrivacySettings() {
             <button
               type="submit"
               disabled={pendingTarget === config.target}
-              className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-md border border-[#f3b8b2] px-3 text-sm font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
               {pendingTarget === config.target ? "删除中..." : config.buttonLabel}

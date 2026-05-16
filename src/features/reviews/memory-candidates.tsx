@@ -151,7 +151,7 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
             onClick={() => {
               void saveAllCandidates();
             }}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
             {isSaving ? "保存中..." : "保存全部"}
@@ -162,7 +162,7 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
               setIsEditing(true);
               setActionStatus("已进入逐条编辑记忆候选。");
             }}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             <Edit3 className="h-4 w-4" aria-hidden="true" />
             逐条编辑
@@ -172,7 +172,7 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
             onClick={() => {
               setIsDismissed(true);
             }}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--danger)]"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--danger)]"
           >
             <XCircle className="h-4 w-4" aria-hidden="true" />
             不保存

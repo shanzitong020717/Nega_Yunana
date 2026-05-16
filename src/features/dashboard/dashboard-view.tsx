@@ -65,7 +65,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
             </div>
             <Link
               href="/materials"
-              className="inline-flex min-h-10 items-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+              className="inline-flex min-h-11 items-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
             >
               管理材料
             </Link>

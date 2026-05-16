@@ -68,7 +68,7 @@ export function MaterialList({
             return (
               <div
                 key={material.id}
-                className="flex items-start justify-between gap-3 py-4 first:pt-0 last:pb-0"
+                className="flex flex-col items-stretch gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between"
               >
                 <button
                   type="button"
@@ -88,8 +88,8 @@ export function MaterialList({
                     {memoryStatusLabels[material.memoryStatus ?? "session_only"]}
                   </span>
                 </button>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="flex flex-wrap justify-end gap-2">
+                <div className="flex min-w-0 flex-col items-start gap-2 sm:shrink-0 sm:items-end">
+                  <span className="flex flex-wrap gap-2 sm:justify-end">
                     <StatusPill tone={material.memoryStatus === "confidential" ? "neutral" : "primary"}>
                       {memoryStatusLabels[material.memoryStatus ?? "session_only"]}
                     </StatusPill>
@@ -109,7 +109,7 @@ export function MaterialList({
                             event.target.value as MaterialMemoryStatus,
                           )
                         }
-                        className="min-h-9 rounded-md border border-[var(--border)] bg-white px-2 text-xs outline-none transition focus:border-[var(--primary)]"
+                        className="min-h-11 rounded-md border border-[var(--border)] bg-white px-2 text-xs outline-none transition focus:border-[var(--primary)]"
                       >
                         {Object.entries(memoryStatusLabels).map(([value, label]) => (
                           <option key={value} value={value}>
@@ -125,7 +125,7 @@ export function MaterialList({
                       aria-label={`删除材料 ${material.name}`}
                       disabled={deletingMaterialId === material.id}
                       onClick={() => onDeleteMaterial(material.id)}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-md border border-[#f3b8b2] px-2.5 text-xs font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[#f3b8b2] px-2.5 text-xs font-medium text-[var(--danger)] transition hover:bg-[#fff0ee] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                       {deletingMaterialId === material.id ? "删除中" : "删除"}

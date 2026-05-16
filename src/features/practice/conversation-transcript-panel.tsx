@@ -49,13 +49,15 @@ export function ConversationTranscriptPanel({
     return (
       <button
         type="button"
+        aria-expanded={false}
+        aria-controls="complete-transcript-panel"
         onClick={() => setIsExpanded(true)}
         className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[#f6fbfa]"
       >
         <span className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2">
             <Languages className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
-          <span className="text-base font-semibold text-[var(--foreground)]">
+            <span className="text-base font-semibold text-[var(--foreground)]">
               实时字幕
             </span>
           </span>
@@ -81,7 +83,10 @@ export function ConversationTranscriptPanel({
   }
 
   return (
-    <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
+    <section
+      id="complete-transcript-panel"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+    >
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Languages className="h-5 w-5 text-[var(--primary)]" aria-hidden="true" />
@@ -91,8 +96,10 @@ export function ConversationTranscriptPanel({
         </div>
         <button
           type="button"
+          aria-expanded={true}
+          aria-controls="complete-transcript-panel"
           onClick={() => setIsExpanded(false)}
-          className="inline-flex min-h-10 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+          className="inline-flex min-h-11 items-center gap-1 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
         >
           <ChevronUp className="h-4 w-4" aria-hidden="true" />
           折叠

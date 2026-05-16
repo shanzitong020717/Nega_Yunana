@@ -257,7 +257,7 @@ export function ObjectionBankView() {
                   type="button"
                   onClick={() => void launchPractice(objection.id)}
                   disabled={launchingObjectionId === objection.id}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-md bg-[var(--primary)] px-3 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:bg-[#8cb9b5]"
+                  className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-3 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)] disabled:cursor-not-allowed disabled:bg-[#8cb9b5]"
                 >
                   <PlayCircle className="h-4 w-4" aria-hidden="true" />
                   {launchingObjectionId === objection.id ? "启动中..." : "开始练习"}
