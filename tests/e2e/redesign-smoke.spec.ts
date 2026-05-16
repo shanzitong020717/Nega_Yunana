@@ -94,6 +94,16 @@ test.describe("redesign smoke coverage", () => {
     });
 
     await page.goto("/practice/session_123");
+
+    await expect(page.getByText("材料导航")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "打开提示" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "换个更自然表达" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "打开提示" }).click();
+    await expect(page.getByRole("button", { name: "换个更自然表达" })).toBeVisible();
+    await page.getByRole("button", { name: "隐藏提示" }).click();
+    await expect(page.getByRole("button", { name: "换个更自然表达" })).toHaveCount(0);
+
     await page.getByRole("button", { name: "开始" }).click();
 
     await expect(page.getByRole("heading", { name: "对话中" })).toBeVisible();

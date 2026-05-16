@@ -56,6 +56,17 @@ describe("RealtimeRoom mock UI", () => {
       screen.queryByRole("button", { name: "结束并复盘" }),
     ).not.toBeInTheDocument();
 
+    expect(
+      screen.getByText("What business problem are you trying to solve with smart glasses?"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("材料导航")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开提示" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "换个更自然表达" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示" }));
+
     [
       "换个更自然表达",
       "使用材料要点",
@@ -67,11 +78,11 @@ describe("RealtimeRoom mock UI", () => {
       expect(screen.getByRole("button", { name: control })).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByRole("button", { name: "隐藏提示" }));
+
     expect(
-      screen.getByText("What business problem are you trying to solve with smart glasses?"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("材料导航")).toBeInTheDocument();
-    expect(screen.getByText("提示")).toBeInTheDocument();
+      screen.queryByRole("button", { name: "换个更自然表达" }),
+    ).not.toBeInTheDocument();
   });
 
   it("updates mock room state and transcript when controls are used", async () => {
@@ -88,6 +99,7 @@ describe("RealtimeRoom mock UI", () => {
     expect(screen.getByRole("heading", { name: "对话中" })).toBeInTheDocument();
     expect(screen.getByText("麦克风已静音")).toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "打开提示" }));
     fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
     expect(
       screen.getByText("Try: The key value is reducing communication friction in real time."),

@@ -27,23 +27,16 @@ function speakerLabel(speaker: TranscriptTurn["speaker"]) {
   return "系统";
 }
 
-function fallbackTranslation(turn: TranscriptTurn) {
-  if (turn.translationZh) {
-    return turn.translationZh;
-  }
-
-  if (turn.speaker === "ai_customer") {
-    return "中文翻译生成中。";
-  }
-
-  return undefined;
+function turnTranslation(turn: TranscriptTurn) {
+  return turn.translationZh?.trim() || undefined;
 }
 
 export function ConversationTranscriptPanel({
   turns,
 }: ConversationTranscriptPanelProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const visibleTurns = turns.slice(-3);
+  const conversationTurns = turns.filter((turn) => turn.speaker !== "system");
+  const visibleTurns = conversationTurns.slice(-3);
 
   if (!isExpanded) {
     return (
@@ -107,8 +100,8 @@ export function ConversationTranscriptPanel({
       </div>
 
       <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto pr-1">
-        {turns.map((turn) => {
-          const translation = fallbackTranslation(turn);
+        {conversationTurns.map((turn) => {
+          const translation = turnTranslation(turn);
 
           return (
             <article

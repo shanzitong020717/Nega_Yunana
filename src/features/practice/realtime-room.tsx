@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown, ChevronUp, Lightbulb } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
@@ -12,7 +13,6 @@ import {
   LiveMeetingPanel,
   type RealtimeRoomState,
 } from "@/features/practice/live-meeting-panel";
-import { MaterialNavigator } from "@/features/practice/material-navigator";
 import {
   SmartSupportPanel,
   type SmartCue,
@@ -52,6 +52,10 @@ type RealtimeRelaySessionResponse = {
 type RealtimeSessionResponse =
   | RealtimeWebRTCSessionResponse
   | RealtimeRelaySessionResponse;
+
+type SubtitleTranslationResponse = {
+  translationZh?: string;
+};
 
 const initialTranscript: TranscriptTurn[] = [
   {
@@ -165,7 +169,9 @@ function userFacingRealtimeError(message: string) {
 export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   const [state, setState] = useState<RealtimeRoomState>("Ready");
   const [transcriptTurns, setTranscriptTurns] = useState(initialTranscript);
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [systemNotice, setSystemNotice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -188,29 +194,78 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
     };
   }, []);
 
+  function setTranscriptState(nextTurns: TranscriptTurn[]) {
+    transcriptTurnsRef.current = nextTurns;
+    setTranscriptTurns(nextTurns);
+  }
+
+  function updateTurnTranslation(turnId: string, translationZh: string) {
+    const nextTurns = transcriptTurnsRef.current.map((turn) =>
+      turn.id === turnId ? { ...turn, translationZh } : turn,
+    );
+
+    setTranscriptState(nextTurns);
+  }
+
+  async function translateTranscriptTurn(turn: TranscriptTurn) {
+    if (turn.speaker !== "ai_customer" || turn.translationZh) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/subtitle-translation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          speaker: turn.speaker,
+          text: turn.text,
+        }),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as SubtitleTranslationResponse;
+      const translationZh = payload.translationZh?.trim();
+
+      if (translationZh) {
+        updateTurnTranslation(turn.id, translationZh);
+      }
+    } catch {
+      // Subtitle translation is helpful for review, but it must not interrupt live voice.
+    }
+  }
+
   function appendTurn(
     turn: Omit<TranscriptTurn, "id" | "timestamp"> & {
       timestamp?: number;
     },
   ) {
     const currentTurns = transcriptTurnsRef.current;
+    const nextTurn: TranscriptTurn = {
+      id: nextTurnId(),
+      timestamp: turn.timestamp ?? currentTurns.length * 8,
+      speaker: turn.speaker,
+      text: turn.text,
+      translationZh: turn.translationZh,
+    };
     const nextTurns: TranscriptTurn[] = [
       ...currentTurns,
-      {
-        id: nextTurnId(),
-        timestamp: turn.timestamp ?? currentTurns.length * 8,
-        speaker: turn.speaker,
-        text: turn.text,
-        translationZh: turn.translationZh,
-      },
+      nextTurn,
     ];
 
-    transcriptTurnsRef.current = nextTurns;
-    setTranscriptTurns(nextTurns);
+    setTranscriptState(nextTurns);
+
+    void translateTranscriptTurn(nextTurn);
+
     return nextTurns;
   }
 
   function addSystemTurn(text: string) {
+    setSystemNotice(text);
     return appendTurn({
       speaker: "system",
       text,
@@ -709,6 +764,8 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
   }
 
   async function saveTranscript(turns: TranscriptTurn[]) {
+    const conversationTurns = turns.filter((turn) => turn.speaker !== "system");
+
     const response = await fetch(
       `/api/practice-sessions/${sessionId}/transcript`,
       {
@@ -717,7 +774,7 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          turns: turns.map((turn) => ({
+          turns: conversationTurns.map((turn) => ({
             speaker: turn.speaker,
             text: turn.text,
             timestamp: turn.timestamp,
@@ -799,20 +856,53 @@ export function RealtimeRoom({ sessionId }: RealtimeRoomProps) {
         title="实时会议练习"
         description="Practice a customer conversation with material guidance, live transcript, and smart support controls."
       />
-      <section className="grid gap-4 xl:grid-cols-[0.85fr_1.35fr_0.85fr]">
-        <MaterialNavigator />
-        <div className="grid gap-4">
-          <LiveMeetingPanel
-            state={state}
-            onStart={handleStart}
-            onMute={handleMute}
-            onEnd={handleEnd}
-            isMuted={isMuted}
-            voicePackLabel="Ethan 技术负责人"
-          />
-          <ConversationTranscriptPanel turns={transcriptTurns} />
-        </div>
-        <SmartSupportPanel onCue={handleCue} />
+      <section className="mx-auto grid w-full max-w-5xl gap-4">
+        <LiveMeetingPanel
+          state={state}
+          onStart={handleStart}
+          onMute={handleMute}
+          onEnd={handleEnd}
+          isMuted={isMuted}
+          voicePackLabel="Ethan 技术负责人"
+        />
+        {systemNotice ? (
+          <p
+            role="status"
+            className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm leading-6 text-[var(--muted)]"
+          >
+            {systemNotice}
+          </p>
+        ) : null}
+        <ConversationTranscriptPanel turns={transcriptTurns} />
+        <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
+              <h2 className="text-base font-semibold text-[var(--foreground)]">
+                提示
+              </h2>
+            </div>
+            <button
+              type="button"
+              aria-expanded={isSupportOpen}
+              aria-controls="smart-support-panel"
+              onClick={() => setIsSupportOpen((current) => !current)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+            >
+              {isSupportOpen ? (
+                <ChevronUp className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+              )}
+              {isSupportOpen ? "隐藏提示" : "打开提示"}
+            </button>
+          </div>
+          {isSupportOpen ? (
+            <div id="smart-support-panel" className="mt-4">
+              <SmartSupportPanel embedded onCue={handleCue} />
+            </div>
+          ) : null}
+        </section>
       </section>
     </>
   );

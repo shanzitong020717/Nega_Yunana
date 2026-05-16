@@ -29,6 +29,22 @@ const turns: TranscriptTurn[] = [
   },
 ];
 
+const turnsWithSystemMessages: TranscriptTurn[] = [
+  ...turns,
+  {
+    id: "turn_system",
+    speaker: "system",
+    text: "实时 Relay 已连接，正在等待模型服务就绪。",
+    timestamp: 20,
+  },
+  {
+    id: "turn_4",
+    speaker: "ai_customer",
+    text: "Could you define the product use case first?",
+    timestamp: 24,
+  },
+];
+
 describe("ConversationTranscriptPanel", () => {
   it("shows recent English transcript by default without Chinese translations", () => {
     render(<ConversationTranscriptPanel turns={turns} />);
@@ -72,5 +88,26 @@ describe("ConversationTranscriptPanel", () => {
 
     expect(screen.getByRole("button", { name: /实时字幕/ })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "完整字幕" })).not.toBeInTheDocument();
+  });
+
+  it("keeps system notices out of both subtitle modes", () => {
+    render(<ConversationTranscriptPanel turns={turnsWithSystemMessages} />);
+
+    expect(screen.queryByText("系统")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("实时 Relay 已连接，正在等待模型服务就绪。"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /实时字幕/ }));
+
+    expect(screen.getByRole("heading", { name: "完整字幕" })).toBeInTheDocument();
+    expect(screen.queryByText("系统")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("实时 Relay 已连接，正在等待模型服务就绪。"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Could you define the product use case first?"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("中文翻译生成中。")).not.toBeInTheDocument();
   });
 });

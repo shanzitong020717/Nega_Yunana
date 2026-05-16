@@ -200,20 +200,27 @@ describe("RealtimeRoom browser voice connection", () => {
       getAudioTracks: () => [{ enabled: true }],
       getTracks: () => [{ stop: vi.fn() }],
     });
-    const fetch = vi.fn().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          transport: "websocket_relay",
-          relayUrl: "wss://relay.example.com/realtime",
-          relayToken: "relay-token",
-          sessionId: "rt_session_123",
-          expiresAt: new Date(Date.now() + 60_000).toISOString(),
-          model: "gpt-4o-realtime-preview",
-          instructionsPreview: "Technical Lead",
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            transport: "websocket_relay",
+            relayUrl: "wss://relay.example.com/realtime",
+            relayToken: "relay-token",
+            sessionId: "rt_session_123",
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+            model: "gpt-4o-realtime-preview",
+            instructionsPreview: "Technical Lead",
+          }),
+          { status: 201 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ translationZh: "是的，我可以。" }), {
+          status: 201,
         }),
-        { status: 201 },
-      ),
-    );
+      );
 
     installGetUserMedia(getUserMedia);
     vi.stubGlobal("fetch", fetch);
@@ -280,6 +287,15 @@ describe("RealtimeRoom browser voice connection", () => {
     });
 
     expect(await screen.findByText("Yes, I can.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /实时字幕/ }));
+
+    expect(await screen.findByText("是的，我可以。")).toBeInTheDocument();
+    expect(fetch).toHaveBeenLastCalledWith(
+      "/api/subtitle-translation",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
   });
 
   it("surfaces realtime provider errors instead of silently staying connected", async () => {

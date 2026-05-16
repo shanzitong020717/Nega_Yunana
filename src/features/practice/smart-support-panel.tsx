@@ -29,12 +29,22 @@ const cueLabels: Record<SmartCue, string> = {
 };
 
 type SmartSupportPanelProps = {
+  embedded?: boolean;
   onCue: (cue: SmartCue) => void;
 };
 
-export function SmartSupportPanel({ onCue }: SmartSupportPanelProps) {
+export function SmartSupportPanel({
+  embedded = false,
+  onCue,
+}: SmartSupportPanelProps) {
   return (
-    <aside className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
+    <aside
+      className={
+        embedded
+          ? "rounded-md bg-[var(--surface-subtle)] p-4"
+          : "rounded-md border border-[var(--border)] bg-[var(--surface)] p-5"
+      }
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Lightbulb className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
