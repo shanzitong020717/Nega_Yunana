@@ -2,11 +2,16 @@ import { FileText, Trash2 } from "lucide-react";
 
 import { StatusPill } from "@/components/status-pill";
 import type { UploadedMaterialSummary } from "@/features/materials/material-upload";
+import type { MaterialMemoryStatus } from "@/lib/validation/materials";
 
 type MaterialListProps = {
   materials: UploadedMaterialSummary[];
   selectedMaterialId?: string | null;
   onSelectMaterial?: (material: UploadedMaterialSummary) => void;
+  onMemoryStatusChange?: (
+    materialId: string,
+    memoryStatus: MaterialMemoryStatus,
+  ) => void;
   onDeleteMaterial?: (materialId: string) => void;
   deletingMaterialId?: string | null;
 };
@@ -33,10 +38,18 @@ function statusLabel(status: string) {
   return labels[status] ?? status;
 }
 
+const memoryStatusLabels: Record<MaterialMemoryStatus, string> = {
+  session_only: "仅本次使用",
+  available_for_future: "可用于后续练习",
+  saved_to_memory: "已加入长期记忆",
+  confidential: "保密材料",
+};
+
 export function MaterialList({
   materials,
   selectedMaterialId,
   onSelectMaterial,
+  onMemoryStatusChange,
   onDeleteMaterial,
   deletingMaterialId,
 }: MaterialListProps) {
@@ -71,16 +84,41 @@ export function MaterialList({
                   <span className="mt-1 block text-xs text-[var(--muted)]">
                     {material.originalFileName} · {material.fileType}
                   </span>
+                  <span className="mt-2 block text-xs text-[var(--muted)]">
+                    {memoryStatusLabels[material.memoryStatus ?? "session_only"]}
+                  </span>
                 </button>
                 <div className="flex shrink-0 flex-col items-end gap-2">
                   <span className="flex flex-wrap justify-end gap-2">
-                    {material.confidentialMode ? (
-                      <StatusPill tone="neutral">保密</StatusPill>
-                    ) : null}
+                    <StatusPill tone={material.memoryStatus === "confidential" ? "neutral" : "primary"}>
+                      {memoryStatusLabels[material.memoryStatus ?? "session_only"]}
+                    </StatusPill>
                     <StatusPill tone={statusTone(material.processingStatus)}>
                       {statusLabel(material.processingStatus)}
                     </StatusPill>
                   </span>
+                  {onMemoryStatusChange ? (
+                    <label className="flex flex-col gap-1 text-xs font-medium text-[var(--muted)]">
+                      记忆状态
+                      <select
+                        aria-label={`${material.name} 记忆状态`}
+                        value={material.memoryStatus ?? "session_only"}
+                        onChange={(event) =>
+                          onMemoryStatusChange(
+                            material.id,
+                            event.target.value as MaterialMemoryStatus,
+                          )
+                        }
+                        className="min-h-9 rounded-md border border-[var(--border)] bg-white px-2 text-xs outline-none transition focus:border-[var(--primary)]"
+                      >
+                        {Object.entries(memoryStatusLabels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
                   {onDeleteMaterial ? (
                     <button
                       type="button"

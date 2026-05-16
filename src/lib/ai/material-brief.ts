@@ -1,26 +1,8 @@
-import { z } from "zod";
-
 import { generateTextJSON, hasTextAIApiKey } from "@/lib/ai/text-client";
+import { materialBriefSchema } from "@/lib/validation/materials";
+import type { MaterialBriefPayload } from "@/lib/validation/materials";
 
-const glossaryItemSchema = z.object({
-  term: z.string().min(1),
-  definition: z.string().min(1),
-  chinese: z.string().optional(),
-});
-
-export const materialBriefSchema = z.object({
-  keyMessage: z.string().min(1),
-  productPoints: z.array(z.string().min(1)),
-  customerValue: z.array(z.string().min(1)),
-  likelyQuestions: z.array(z.string().min(1)),
-  likelyObjections: z.array(z.string().min(1)),
-  riskyClaims: z.array(z.string().min(1)),
-  usefulPhrases: z.array(z.string().min(1)),
-  glossary: z.array(glossaryItemSchema),
-  outline: z.array(z.string().min(1)),
-});
-
-export type MaterialBriefPayload = z.infer<typeof materialBriefSchema>;
+export type { MaterialBriefPayload } from "@/lib/validation/materials";
 
 export type GenerateMaterialBriefInput = {
   materialName: string;
@@ -81,6 +63,32 @@ function generateMockMaterialBrief(
       "How is meeting data handled?",
       "What does a successful pilot look like for our team?",
     ],
+    applicationScenarios: [
+      "Multilingual customer meetings where participants need live captions without switching devices.",
+      "Overseas product demos where the seller needs to stay visually engaged with the customer.",
+      "Pilot workshops that need to test translation, workflow fit, and user adoption in one session.",
+    ],
+    pros: [
+      "Keeps the seller hands-free and visually present during the conversation.",
+      "Connects meeting preparation, live captions, and follow-up practice in one workflow.",
+      "Makes language support feel embedded in the meeting instead of handled on a separate phone.",
+    ],
+    cons: [
+      "The exact translation quality depends on the meeting environment and supported language pair.",
+      "Privacy, data handling, and IT review still need customer-specific confirmation.",
+      "It should be positioned as a pilotable workflow improvement, not a guaranteed replacement for every interpreter scenario.",
+    ],
+    competitorDifferences: [
+      "Compared with phone translation apps, Rokid keeps the user's eyes and hands in the meeting.",
+      "Compared with standard meeting software captions, Rokid is designed for wearable, in-person, hands-free scenarios.",
+      "Compared with generic smart glasses, the value story should focus on overseas meeting communication and workflow fit.",
+    ],
+    productParameters: [
+      "Live translated captions are the main capability referenced by this material.",
+      "Pilot setup should define users, meeting environments, language pairs, and success metrics.",
+      "Do not state unverified accuracy, latency, certification, battery, pricing, or deployment numbers.",
+    ],
+    memoryStatus: "session_only",
     likelyObjections: [
       "We can already use a phone translation app.",
       "Our IT team may have privacy concerns.",
@@ -121,7 +129,10 @@ function generateMockMaterialBrief(
 function buildMaterialBriefPrompt(input: GenerateMaterialBriefInput) {
   return [
     "You are helping a Rokid overseas sales and solutions manager prepare for an English customer meeting.",
-    "Create a concise Material Brief as strict JSON with these keys: keyMessage, productPoints, customerValue, likelyQuestions, likelyObjections, riskyClaims, usefulPhrases, glossary, outline.",
+    "Create a concise Material Brief as strict JSON with these keys: keyMessage, productPoints, customerValue, likelyQuestions, applicationScenarios, pros, cons, competitorDifferences, productParameters, memoryStatus, likelyObjections, riskyClaims, usefulPhrases, glossary, outline.",
+    "Extract product application scenarios, product advantages, product disadvantages or fit boundaries, differences versus other products or alternatives, detailed product parameters, and likely follow-up questions from customers.",
+    "For memoryStatus, use one of: session_only, available_for_future, saved_to_memory, confidential. Default to session_only unless the material is clearly confidential.",
+    "Use Chinese business categories mentally, but write concise English content suitable for sales preparation.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, or contract terms not provided in the source material.",
     `Material name: ${input.materialName}`,
     `Customer type: ${input.customerType ?? "unknown"}`,

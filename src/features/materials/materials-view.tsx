@@ -12,17 +12,20 @@ import {
   MaterialUpload,
   type UploadedMaterialSummary,
 } from "@/features/materials/material-upload";
+import type { MaterialMemoryStatus } from "@/lib/validation/materials";
 
 export function MaterialsView() {
   const [materials, setMaterials] = useState<UploadedMaterialSummary[]>([]);
   const [selectedMaterialId, setSelectedMaterialId] = useState<string | null>(null);
   const [brief, setBrief] = useState<MaterialBrief | null>(null);
   const [briefStatus, setBriefStatus] = useState("waiting");
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [deletingMaterialId, setDeletingMaterialId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   async function fetchBrief(material: UploadedMaterialSummary) {
     setBrief(null);
+    setActionStatus(null);
 
     if (material.processingStatus === "processing_not_supported_yet") {
       setBriefStatus("processing_not_supported_yet");
@@ -45,6 +48,19 @@ export function MaterialsView() {
 
       setBrief(payload.brief);
       setBriefStatus(payload.status ?? "ready");
+      setMaterials((currentMaterials) =>
+        currentMaterials.map((currentMaterial) =>
+          currentMaterial.id === material.id
+            ? {
+                ...currentMaterial,
+                memoryStatus:
+                  payload.brief?.memoryStatus ??
+                  currentMaterial.memoryStatus ??
+                  "session_only",
+              }
+            : currentMaterial,
+        ),
+      );
     } catch {
       setBriefStatus("failed");
     }
@@ -59,6 +75,32 @@ export function MaterialsView() {
   function handleSelectMaterial(material: UploadedMaterialSummary) {
     setSelectedMaterialId(material.id);
     void fetchBrief(material);
+  }
+
+  function handleMemoryStatusChange(
+    materialId: string,
+    memoryStatus: MaterialMemoryStatus,
+  ) {
+    setMaterials((currentMaterials) =>
+      currentMaterials.map((material) =>
+        material.id === materialId ? { ...material, memoryStatus } : material,
+      ),
+    );
+
+    if (selectedMaterialId === materialId && brief) {
+      setBrief({
+        ...brief,
+        memoryStatus,
+      });
+    }
+  }
+
+  function handleCreatePrepCard(materialId: string) {
+    setActionStatus(`已选择材料 ${materialId} 生成会议准备卡。`);
+  }
+
+  function handleStartPractice(materialId: string) {
+    setActionStatus(`已选择材料 ${materialId} 开始练习。`);
   }
 
   async function handleDeleteMaterial(materialId: string) {
@@ -82,6 +124,7 @@ export function MaterialsView() {
         setSelectedMaterialId(null);
         setBrief(null);
         setBriefStatus("waiting");
+        setActionStatus(null);
       }
     } catch {
       setDeleteError("无法删除该材料，请稍后重试。");
@@ -101,7 +144,14 @@ export function MaterialsView() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
           <MaterialUpload onUploaded={handleUploaded} />
-          <MaterialBriefView brief={brief} status={briefStatus} />
+          <MaterialBriefView
+            brief={brief}
+            status={briefStatus}
+            selectedMaterialId={selectedMaterialId}
+            onCreatePrepCard={handleCreatePrepCard}
+            onStartPractice={handleStartPractice}
+            actionStatus={actionStatus}
+          />
         </div>
         <div className="space-y-3">
           {deleteError ? (
@@ -116,6 +166,7 @@ export function MaterialsView() {
             materials={materials}
             selectedMaterialId={selectedMaterialId}
             onSelectMaterial={handleSelectMaterial}
+            onMemoryStatusChange={handleMemoryStatusChange}
             onDeleteMaterial={handleDeleteMaterial}
             deletingMaterialId={deletingMaterialId}
           />

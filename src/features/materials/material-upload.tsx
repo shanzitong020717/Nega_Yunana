@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { FileUp, ShieldCheck } from "lucide-react";
 
 import { StatusPill } from "@/components/status-pill";
+import type { MaterialMemoryStatus } from "@/lib/validation/materials";
 
 const maxUploadSizeBytes = 25 * 1024 * 1024;
 
@@ -15,7 +16,12 @@ export type UploadedMaterialSummary = {
   originalFileName: string;
   fileType: string;
   processingStatus: string;
+  memoryStatus?: MaterialMemoryStatus;
   confidentialMode: boolean;
+  customerType?: string;
+  industry?: string;
+  meetingGoal?: string;
+  notes?: string;
   createdAt: string;
 };
 

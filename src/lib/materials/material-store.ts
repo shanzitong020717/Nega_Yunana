@@ -1,5 +1,8 @@
-import type { CreateMaterialInput } from "@/lib/validation/materials";
-import type { MaterialBriefPayload } from "@/lib/ai/material-brief";
+import type {
+  CreateMaterialInput,
+  MaterialBriefPayload,
+  MaterialMemoryStatus,
+} from "@/lib/validation/materials";
 
 export type MaterialProcessingStatus =
   | "uploaded"
@@ -11,6 +14,7 @@ export type MaterialProcessingStatus =
 export type MaterialRecord = CreateMaterialInput & {
   id: string;
   processingStatus: MaterialProcessingStatus;
+  memoryStatus: MaterialMemoryStatus;
   extractedText?: string;
   extractionStatus?: string;
   createdAt: string;
@@ -40,6 +44,7 @@ export function getMaterialRecord(materialId: string) {
 export function saveMaterialRecord(
   input: CreateMaterialInput & {
     processingStatus?: MaterialProcessingStatus;
+    memoryStatus?: MaterialMemoryStatus;
     extractedText?: string;
     extractionStatus?: string;
   },
@@ -48,6 +53,8 @@ export function saveMaterialRecord(
   const material: MaterialRecord = {
     id: `material_${crypto.randomUUID()}`,
     processingStatus: input.processingStatus ?? "processing",
+    memoryStatus:
+      input.memoryStatus ?? (input.confidentialMode ? "confidential" : "session_only"),
     createdAt: now,
     updatedAt: now,
     ...input,
