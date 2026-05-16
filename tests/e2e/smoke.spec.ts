@@ -52,6 +52,13 @@ test.describe("product smoke flows", () => {
     await page.goto("/progress");
 
     await expect(page.getByRole("heading", { name: "复盘与弱项追踪" })).toBeVisible();
-    await expect(page.getByText("我的记忆")).toBeVisible();
+    await expect(page.getByRole("link", { name: "我的记忆" })).toBeVisible();
+  });
+
+  test("memory center opens", async ({ page }) => {
+    await page.goto("/memory");
+
+    await expect(page.getByRole("heading", { name: "我的记忆" })).toBeVisible();
+    await expect(page.getByLabel("记忆分类")).toBeVisible();
   });
 });

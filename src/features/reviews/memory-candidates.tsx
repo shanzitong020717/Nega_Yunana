@@ -10,6 +10,13 @@ type MemoryCandidatesProps = {
   candidates: PracticeReviewPayload["memoryCandidates"];
 };
 
+type MemoryCandidate = PracticeReviewPayload["memoryCandidates"][number];
+
+type EditableCandidate = MemoryCandidate & {
+  draftTitle: string;
+  draftSummary: string;
+};
+
 const sensitivityLabels: Record<
   PracticeReviewPayload["memoryCandidates"][number]["sensitivity"],
   string
@@ -29,10 +36,105 @@ const sensitivityTones: Record<
 };
 
 export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
+  const [editableCandidates, setEditableCandidates] = useState<EditableCandidate[]>(
+    candidates.map((candidate) => ({
+      ...candidate,
+      draftTitle: candidate.title,
+      draftSummary: candidate.summary,
+    })),
+  );
+  const [isEditing, setIsEditing] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
 
-  if (candidates.length === 0) {
+  if (candidates.length === 0 || isDismissed) {
     return null;
+  }
+
+  function normalizeMemoryType(candidateType: string) {
+    const normalizedType = candidateType.toLowerCase();
+
+    if (normalizedType.includes("material")) {
+      return "material_context";
+    }
+
+    if (normalizedType.includes("customer")) {
+      return "customer_context";
+    }
+
+    if (normalizedType.includes("weakness")) {
+      return "weakness";
+    }
+
+    if (normalizedType.includes("phrase")) {
+      return "phrase_preference";
+    }
+
+    if (normalizedType.includes("practice") || normalizedType.includes("learning")) {
+      return "learning_preference";
+    }
+
+    if (normalizedType.includes("profile")) {
+      return "profile";
+    }
+
+    return "speaking_habit";
+  }
+
+  async function saveAllCandidates() {
+    setIsSaving(true);
+    setActionStatus(null);
+
+    try {
+      await Promise.all(
+        editableCandidates.map((candidate) =>
+          fetch("/api/memories", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              type: normalizeMemoryType(candidate.type),
+              title: candidate.draftTitle,
+              summary: candidate.draftSummary,
+              source: "review",
+              confidence: candidate.confidence,
+              importance: candidate.sensitivity === "high" ? 5 : 3,
+              sensitive: candidate.sensitivity === "high",
+            }),
+          }).then((response) => {
+            if (!response.ok) {
+              throw new Error("保存记忆失败");
+            }
+          }),
+        ),
+      );
+
+      setActionStatus(`已保存 ${editableCandidates.length} 条记忆。`);
+      setIsEditing(false);
+    } catch {
+      setActionStatus("记忆保存失败，请稍后重试。");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function updateDraft(
+    candidateIndex: number,
+    field: "draftTitle" | "draftSummary",
+    value: string,
+  ) {
+    setEditableCandidates((currentCandidates) =>
+      currentCandidates.map((candidate, index) =>
+        index === candidateIndex
+          ? {
+              ...candidate,
+              [field]: value,
+            }
+          : candidate,
+      ),
+    );
   }
 
   return (
@@ -45,15 +147,21 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setActionStatus("已选择保存全部记忆候选。")}
+            disabled={isSaving}
+            onClick={() => {
+              void saveAllCandidates();
+            }}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-            保存全部
+            {isSaving ? "保存中..." : "保存全部"}
           </button>
           <button
             type="button"
-            onClick={() => setActionStatus("已进入逐条编辑记忆候选。")}
+            onClick={() => {
+              setIsEditing(true);
+              setActionStatus("已进入逐条编辑记忆候选。");
+            }}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
           >
             <Edit3 className="h-4 w-4" aria-hidden="true" />
@@ -61,7 +169,9 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
           </button>
           <button
             type="button"
-            onClick={() => setActionStatus("本次记忆候选不会保存。")}
+            onClick={() => {
+              setIsDismissed(true);
+            }}
             className="inline-flex min-h-10 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--danger)]"
           >
             <XCircle className="h-4 w-4" aria-hidden="true" />
@@ -71,7 +181,7 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {candidates.map((candidate) => (
+        {editableCandidates.map((candidate, index) => (
           <article
             key={`${candidate.type}-${candidate.title}`}
             className="rounded-md border border-[var(--border)] bg-white p-4"
@@ -81,7 +191,7 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
                 <p className="text-xs font-semibold uppercase text-[var(--muted)]">
                   {candidate.type}
                 </p>
-                <h3 className="mt-2 text-sm font-semibold">{candidate.title}</h3>
+                <h3 className="mt-2 text-sm font-semibold">{candidate.draftTitle}</h3>
               </div>
               <div className="flex flex-wrap gap-2">
                 <StatusPill tone={sensitivityTones[candidate.sensitivity]}>
@@ -93,8 +203,32 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
               </div>
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              {candidate.summary}
+              {candidate.draftSummary}
             </p>
+            {isEditing ? (
+              <div className="mt-4 grid gap-3">
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  记忆标题
+                  <input
+                    value={candidate.draftTitle}
+                    onChange={(event) =>
+                      updateDraft(index, "draftTitle", event.target.value)
+                    }
+                    className="min-h-11 rounded-md border border-[var(--border)] px-3 text-sm"
+                  />
+                </label>
+                <label className="flex flex-col gap-2 text-sm font-medium">
+                  记忆摘要
+                  <textarea
+                    value={candidate.draftSummary}
+                    onChange={(event) =>
+                      updateDraft(index, "draftSummary", event.target.value)
+                    }
+                    className="min-h-24 rounded-md border border-[var(--border)] px-3 py-2 text-sm"
+                  />
+                </label>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>

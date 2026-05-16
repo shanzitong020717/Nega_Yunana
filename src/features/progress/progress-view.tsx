@@ -43,13 +43,21 @@ export function ProgressView({
         title="复盘与弱项追踪"
         description="查看最近练习总结、长期弱点和下一次建议，把每次对话转化成下一轮更聚焦的训练。"
         actions={
-          <Link
-            href="/practice"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
-          >
-            开始下一组练习
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/memory"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-4 text-sm font-medium transition hover:border-[var(--primary)]"
+            >
+              我的记忆
+            </Link>
+            <Link
+              href="/practice"
+              className="inline-flex min-h-11 items-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
+            >
+              开始下一组练习
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          </div>
         }
       />
 
@@ -100,9 +108,12 @@ export function ProgressView({
               这里会集中展示 AI 记住的材料、说话习惯和长期弱点。记忆中心将在后续 milestone 开启管理入口。
             </p>
           </div>
-          <span className="inline-flex min-h-9 items-center rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 text-sm font-medium text-[var(--muted)]">
-            即将开放
-          </span>
+          <Link
+            href="/memory"
+            className="inline-flex min-h-9 items-center rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
+          >
+            管理记忆
+          </Link>
         </div>
       </section>
 

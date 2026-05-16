@@ -162,4 +162,45 @@ describe("ReviewView", () => {
     });
     expect(await screen.findByRole("button", { name: /已保存/ })).toBeDisabled();
   });
+
+  it("saves, edits, and dismisses memory candidates", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          memory: {
+            id: "memory_123",
+            title: "Feature-first answering pattern",
+          },
+        }),
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ReviewView reviewId="review_123" sessionId="session_123" review={review} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "逐条编辑" }));
+    expect(screen.getByLabelText("记忆标题")).toHaveValue(
+      "Feature-first answering pattern",
+    );
+    fireEvent.change(screen.getByLabelText("记忆标题"), {
+      target: { value: "Updated speaking pattern" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存全部" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memories",
+        expect.objectContaining({
+          method: "POST",
+          body: expect.stringContaining("Updated speaking pattern"),
+        }),
+      );
+    });
+    expect(await screen.findByText("已保存 1 条记忆。")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "不保存" }));
+    expect(screen.queryByText("Feature-first answering pattern")).not.toBeInTheDocument();
+  });
 });
