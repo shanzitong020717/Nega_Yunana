@@ -47,6 +47,7 @@ const reviewBody = {
   bestMoments: ["Kept the answer safe."],
   sentenceUpgrades: [
     {
+      status: "needs_upgrade",
       original: "We have translation function.",
       naturalEnglish:
         "Rokid supports real-time translated captions for multilingual customer meetings.",

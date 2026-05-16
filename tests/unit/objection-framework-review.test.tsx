@@ -34,6 +34,7 @@ const baseReview: PracticeReviewPayload = {
   },
   phrasebookSuggestions: [],
   weaknessUpdates: [],
+  memoryCandidates: [],
   nextSessionRecommendation: {
     focus: "objection handling",
     drill: "Acknowledge, clarify, position, support, next step.",

@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 
 import { StatusPill } from "@/components/status-pill";
+import { MemoryCandidates } from "@/features/reviews/memory-candidates";
 import { ReplayPractice } from "@/features/reviews/replay-practice";
+import { ReviewSummaryCard } from "@/features/reviews/review-summary-card";
 import { SentenceUpgradeTable } from "@/features/reviews/sentence-upgrade-table";
 import type { PracticeReviewPayload } from "@/lib/validation/reviews";
 
@@ -105,6 +107,8 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
 
   return (
     <div className="grid gap-4">
+      <ReviewSummaryCard review={review} />
+
       <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
         <div className="flex flex-wrap gap-2">
           <StatusPill tone="primary">{reviewId}</StatusPill>
@@ -338,6 +342,8 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
           ))}
         </div>
       </Section>
+
+      <MemoryCandidates candidates={review.memoryCandidates} />
 
       <Section title="下一次练习建议" icon={Target}>
         <div className="grid gap-3 md:grid-cols-3">

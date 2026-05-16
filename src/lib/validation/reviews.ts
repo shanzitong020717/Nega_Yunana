@@ -3,11 +3,31 @@ import { z } from "zod";
 import { createPhraseInputSchema } from "@/lib/validation/phrasebook";
 import { nonEmptyString, stringArraySchema } from "./shared";
 
-export const sentenceUpgradeSchema = z.object({
+const sentenceUpgradeBaseSchema = z.object({
   original: nonEmptyString("原句不能为空"),
-  naturalEnglish: nonEmptyString("自然英文句子不能为空"),
   chineseExplanation: nonEmptyString("中文解释不能为空"),
   practicePrompt: nonEmptyString("练习提示不能为空"),
+});
+
+export const sentenceUpgradeSchema = z.discriminatedUnion("status", [
+  sentenceUpgradeBaseSchema.extend({
+    status: z.literal("needs_upgrade"),
+    naturalEnglish: nonEmptyString("自然英文句子不能为空"),
+  }),
+  sentenceUpgradeBaseSchema.extend({
+    status: z.literal("already_natural"),
+    positiveFeedback: nonEmptyString("肯定反馈不能为空"),
+  }),
+]);
+
+export const memoryCandidateSchema = z.object({
+  type: nonEmptyString("记忆类型不能为空"),
+  title: nonEmptyString("记忆标题不能为空"),
+  summary: nonEmptyString("记忆摘要不能为空"),
+  sensitivity: z.enum(["low", "medium", "high"], {
+    error: "敏感度无效",
+  }),
+  confidence: z.number().min(0).max(1),
 });
 
 export const meetingOutcomeSchema = z.object({
@@ -93,6 +113,7 @@ export const createReviewInputSchema = z.object({
   objectionFramework: objectionFrameworkReviewSchema.optional(),
   phrasebookSuggestions: z.array(createPhraseInputSchema).default([]),
   weaknessUpdates: z.array(weaknessUpdateInputSchema).default([]),
+  memoryCandidates: z.array(memoryCandidateSchema).default([]),
   nextSessionRecommendation: nextSessionRecommendationSchema,
 });
 
@@ -101,5 +122,6 @@ export type ObjectionFrameworkReview = z.infer<
   typeof objectionFrameworkReviewSchema
 >;
 export type WeaknessUpdateInput = z.infer<typeof weaknessUpdateInputSchema>;
+export type MemoryCandidate = z.infer<typeof memoryCandidateSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type PracticeReviewPayload = z.infer<typeof createReviewInputSchema>;

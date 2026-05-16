@@ -28,12 +28,21 @@ const review: PracticeReviewPayload = {
   ],
   sentenceUpgrades: [
     {
+      status: "needs_upgrade",
       original: "We have translation function.",
       naturalEnglish:
         "Rokid supports real-time translated captions, helping users follow multilingual conversations more smoothly.",
       chineseExplanation:
         "不要只说有翻译功能，要说明它如何帮助客户更顺畅地开会。",
       practicePrompt: "Explain this again in your own words.",
+    },
+    {
+      status: "already_natural",
+      original:
+        "A practical next step would be to run a small pilot with one team.",
+      positiveFeedback: "这句话已经自然、清楚，适合当前商务场景。",
+      chineseExplanation: "这句话清楚表达了下一步。",
+      practicePrompt: "Use this structure in another scenario.",
     },
   ],
   materialCoverage: {
@@ -64,6 +73,16 @@ const review: PracticeReviewPayload = {
       recommendedDrill: "Feature-to-value conversion drill",
     },
   ],
+  memoryCandidates: [
+    {
+      type: "speaking_pattern",
+      title: "Feature-first answering pattern",
+      summary:
+        "The learner tends to start with product features before explaining customer value.",
+      sensitivity: "low",
+      confidence: 0.84,
+    },
+  ],
   nextSessionRecommendation: {
     focus: "business value and privacy objection",
     drill: "Run a technical buyer Q&A.",
@@ -80,6 +99,7 @@ describe("ReviewView", () => {
     render(<ReviewView reviewId="review_123" sessionId="session_123" review={review} />);
 
     [
+      "30秒复盘结论",
       "会议结果",
       "商务评分卡",
       "前三个改进点",
@@ -88,15 +108,24 @@ describe("ReviewView", () => {
       "材料覆盖情况",
       "跟读练习",
       "表达库建议",
+      "可沉淀记忆",
       "下一次练习建议",
     ].forEach((section) => {
       expect(screen.getByText(section)).toBeInTheDocument();
     });
 
     expect(screen.getByText("原句")).toBeInTheDocument();
-    expect(screen.getByText("自然商务英语")).toBeInTheDocument();
-    expect(screen.getByText("中文解释")).toBeInTheDocument();
-    expect(screen.getByText("练习提示")).toBeInTheDocument();
+    expect(screen.getByText("更自然英文")).toBeInTheDocument();
+    expect(screen.getByText("为什么更好")).toBeInTheDocument();
+    expect(screen.getByText("肯定反馈")).toBeInTheDocument();
+    expect(screen.getByText("做得好的原因")).toBeInTheDocument();
+    expect(screen.getByText("这次最好的地方")).toBeInTheDocument();
+    expect(screen.getByText("这次最需要改的地方")).toBeInTheDocument();
+    expect(screen.getByText("下一次建议练什么")).toBeInTheDocument();
+    expect(screen.getByText("Feature-first answering pattern")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "保存全部" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "逐条编辑" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "不保存" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /保存到表达库/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /听一遍/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /影子跟读/ })).toBeInTheDocument();

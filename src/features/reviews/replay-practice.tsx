@@ -13,7 +13,17 @@ const actions = [
 ] as const;
 
 export function ReplayPractice({ upgrades }: ReplayPracticeProps) {
-  const practiceItems = upgrades.slice(0, 3);
+  const practiceItems = upgrades
+    .filter((upgrade) => upgrade.status === "needs_upgrade")
+    .slice(0, 3);
+
+  if (practiceItems.length === 0) {
+    return (
+      <p className="rounded-md border border-[var(--border)] bg-white p-4 text-sm leading-6 text-[var(--muted)]">
+        本次没有需要跟读重练的句子。
+      </p>
+    );
+  }
 
   return (
     <div className="grid gap-3">

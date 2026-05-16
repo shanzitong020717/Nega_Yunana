@@ -229,6 +229,7 @@ function generateMockReview(
     ],
     sentenceUpgrades: [
       {
+        status: "needs_upgrade",
         original: userSentence,
         naturalEnglish: `Rokid supports ${productPoint.toLowerCase()}, helping users follow multilingual conversations more smoothly during customer meetings.`,
         chineseExplanation:
@@ -237,6 +238,7 @@ function generateMockReview(
           "Explain this value again in your own words, then ask one follow-up question about the customer's workflow.",
       },
       {
+        status: "needs_upgrade",
         original: "You can use it for pilot and review privacy later.",
         naturalEnglish:
           "We can start with a focused pilot and involve your IT team early to review the data flow and deployment requirements.",
@@ -244,6 +246,16 @@ function generateMockReview(
           "这句话把“之后再看隐私”升级成更专业的企业客户表达：提前邀请 IT 参与，确认数据流和部署要求。",
         practicePrompt:
           "Say this as a confident next-step proposal to a technical buyer.",
+      },
+      {
+        status: "already_natural",
+        original:
+          "A practical next step would be to run a small pilot with one team.",
+        positiveFeedback:
+          "This sentence is already natural, specific, and suitable for a business meeting.",
+        chineseExplanation: "这句话清楚表达了下一步，并且范围具体。",
+        practicePrompt:
+          "Reuse this structure when proposing a pilot for another customer scenario.",
       },
     ],
     materialCoverage: {
@@ -285,6 +297,24 @@ function generateMockReview(
         recommendedDrill: "Ask two discovery questions before presenting.",
       },
     ],
+    memoryCandidates: [
+      {
+        type: "speaking_pattern",
+        title: "Feature-first answering pattern",
+        summary:
+          "The learner tends to start with product functions before translating them into customer workflow value.",
+        sensitivity: "low",
+        confidence: 0.82,
+      },
+      {
+        type: "practice_focus",
+        title: "Needs stronger discovery before positioning",
+        summary:
+          "Future sessions should prompt the learner to ask about workflow, stakeholders, and pilot success criteria before presenting Rokid.",
+        sensitivity: "low",
+        confidence: 0.78,
+      },
+    ],
     nextSessionRecommendation: {
       focus,
       drill: "Technical buyer Q&A with privacy and workflow-fit objections.",
@@ -298,8 +328,15 @@ function buildReviewPrompt(input: GeneratePracticeReviewInput) {
   return [
     "You are generating a structured after-practice review for a Rokid overseas sales and solution professional.",
     "Return strict JSON only. Do not include Markdown.",
-    "The JSON must include meetingOutcome, scores, topImprovements, bestMoments, sentenceUpgrades, materialCoverage, phrasebookSuggestions, weaknessUpdates, and nextSessionRecommendation.",
+    "The JSON must include meetingOutcome, scores, topImprovements, bestMoments, sentenceUpgrades, materialCoverage, phrasebookSuggestions, weaknessUpdates, memoryCandidates, and nextSessionRecommendation.",
     "If the practice session is an objection_challenge, include objectionFramework with requiredSteps, usedSteps, missingSteps, and coachingNote. Score these five steps: Acknowledge, Clarify, Position, Support, Next Step.",
+    "For sentenceUpgrades, classify each user sentence as either needs_upgrade or already_natural.",
+    "If status is needs_upgrade, include original, naturalEnglish, chineseExplanation, and practicePrompt.",
+    "If status is already_natural, do not rewrite the sentence. Include original, positiveFeedback, chineseExplanation, and practicePrompt instead.",
+    "Only rewrite sentences that sound unnatural, vague, overly literal, feature-only, or unsuitable for a business conversation.",
+    "Generate memoryCandidates after each review. Each candidate must include type, title, summary, sensitivity, and confidence. sensitivity must be low, medium, or high. confidence must be a number from 0 to 1.",
+    "Memory candidates should focus on durable user traits, recurring speaking patterns, useful customer context, material facts worth reusing, or next-session learning focus. Avoid storing secrets or confidential customer details.",
+    "The nextSessionRecommendation must give one concrete next practice focus, drill, and prompt.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, or contract terms not provided in the material.",
     `Practice session: ${JSON.stringify(input.practiceSession)}`,
     `Persona: ${JSON.stringify(input.persona)}`,

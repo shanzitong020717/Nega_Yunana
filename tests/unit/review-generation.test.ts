@@ -85,11 +85,23 @@ describe("generatePracticeReview", () => {
     expect(review.scores.clarity.score).toBeGreaterThanOrEqual(1);
     expect(review.topImprovements).toHaveLength(3);
     expect(review.sentenceUpgrades[0]).toMatchObject({
+      status: "needs_upgrade",
       original: expect.stringContaining("translation function"),
       naturalEnglish: expect.stringContaining("real-time translated captions"),
       chineseExplanation: expect.any(String),
       practicePrompt: expect.any(String),
     });
+    expect(review.sentenceUpgrades).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          status: "already_natural",
+          original: expect.stringContaining("practical next step"),
+          positiveFeedback: expect.any(String),
+          chineseExplanation: expect.any(String),
+          practicePrompt: expect.any(String),
+        }),
+      ]),
+    );
     expect(review.materialCoverage.covered).toContain("Real-time translated captions");
     expect(review.phrasebookSuggestions[0]).toMatchObject({
       source: "review",
@@ -99,6 +111,17 @@ describe("generatePracticeReview", () => {
       type: expect.any(String),
       severity: expect.any(Number),
     });
+    expect(review.memoryCandidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          type: expect.any(String),
+          title: expect.any(String),
+          summary: expect.any(String),
+          sensitivity: expect.any(String),
+          confidence: expect.any(Number),
+        }),
+      ]),
+    );
     expect(review.nextSessionRecommendation.focus).toContain("business value");
   });
 });

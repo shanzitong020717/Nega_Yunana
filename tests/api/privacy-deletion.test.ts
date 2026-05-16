@@ -101,6 +101,7 @@ const reviewPayload: PracticeReviewPayload = {
   },
   phrasebookSuggestions: [],
   weaknessUpdates: [],
+  memoryCandidates: [],
   nextSessionRecommendation: {
     focus: "privacy",
     drill: "Technical buyer Q&A.",

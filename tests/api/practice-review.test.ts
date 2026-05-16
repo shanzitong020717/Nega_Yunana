@@ -74,6 +74,7 @@ describe("practice review API", () => {
       },
       sentenceUpgrades: expect.arrayContaining([
         expect.objectContaining({
+          status: "needs_upgrade",
           original: expect.stringContaining("translation function"),
           naturalEnglish: expect.any(String),
           chineseExplanation: expect.any(String),
@@ -86,6 +87,14 @@ describe("practice review API", () => {
       },
       phrasebookSuggestions: expect.any(Array),
       weaknessUpdates: expect.any(Array),
+      memoryCandidates: expect.arrayContaining([
+        expect.objectContaining({
+          title: expect.any(String),
+          summary: expect.any(String),
+          sensitivity: expect.any(String),
+          confidence: expect.any(Number),
+        }),
+      ]),
       nextSessionRecommendation: {
         focus: expect.any(String),
       },
