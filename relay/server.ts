@@ -9,10 +9,12 @@ import {
   DEFAULT_GEMINI_LIVE_MODEL,
   geminiLiveMessageToBrowserRealtimeEvents,
 } from "../src/lib/ai/gemini-live-relay";
+import { buildOpenAIRealtimeSessionUpdate } from "../src/lib/ai/openai-realtime-relay";
 import {
   isRealtimeRelayOriginAllowed,
   parseRealtimeRelayAllowedOrigins,
 } from "../src/lib/ai/realtime-relay-origin";
+import { buildRelayReadyEvent } from "../src/lib/ai/realtime-relay-ready";
 import { buildProviderRealtimeWebSocketURL } from "../src/lib/ai/realtime-relay-url";
 import { verifyRealtimeRelayToken } from "../src/lib/ai/realtime-relay-token";
 
@@ -78,30 +80,6 @@ function jsonResponse(status: number, payload: Record<string, unknown>) {
   };
 }
 
-function buildSessionUpdate(instructions: string) {
-  return {
-    type: "session.update",
-    session: {
-      modalities: ["audio", "text"],
-      instructions,
-      voice: "marin",
-      input_audio_format: "pcm16",
-      output_audio_format: "pcm16",
-      input_audio_transcription: {
-        model: "gpt-4o-mini-transcribe",
-        language: "en",
-        prompt:
-          "Expect English business meeting speech about Rokid smart glasses, real-time translation, overseas sales, pilots, deployment, security, ROI, and customer objections.",
-      },
-      turn_detection: {
-        type: "server_vad",
-        create_response: true,
-        interrupt_response: true,
-      },
-    },
-  };
-}
-
 function closeSocket(socket: Duplex, statusCode: number) {
   const statusText = statusCode === 401 ? "Unauthorized" : "Forbidden";
 
@@ -134,12 +112,14 @@ function bridgeOpenAIRealtimeSockets({
   instructions,
   realtimeSessionId,
   model,
+  voiceName,
 }: {
   browserSocket: RelayWebSocket;
   providerSocket: WebSocket;
   instructions: string;
   realtimeSessionId: string;
   model: string;
+  voiceName?: string;
 }) {
   const queuedMessages: Array<{ data: RawData; isBinary: boolean }> = [];
 
@@ -168,13 +148,23 @@ function bridgeOpenAIRealtimeSockets({
   });
 
   providerSocket.on("open", () => {
-    providerSocket.send(JSON.stringify(buildSessionUpdate(instructions)));
+    providerSocket.send(
+      JSON.stringify(
+        buildOpenAIRealtimeSessionUpdate({
+          instructions,
+          voiceName,
+        }),
+      ),
+    );
     browserSocket.send(
-      JSON.stringify({
-        type: "relay.ready",
-        realtimeSessionId,
-        model,
-      }),
+      JSON.stringify(
+        buildRelayReadyEvent({
+          provider: "openai_realtime",
+          realtimeSessionId,
+          model,
+          voiceName,
+        }),
+      ),
     );
 
     for (const message of queuedMessages.splice(0)) {
@@ -296,11 +286,14 @@ function bridgeGeminiLiveSockets({
     if (message.setupComplete) {
       isGeminiReady = true;
       browserSocket.send(
-        JSON.stringify({
-          type: "relay.ready",
-          realtimeSessionId,
-          model,
-        }),
+        JSON.stringify(
+          buildRelayReadyEvent({
+            provider: "gemini_live",
+            realtimeSessionId,
+            model,
+            voiceName,
+          }),
+        ),
       );
 
       for (const queuedMessage of queuedMessages.splice(0)) {
@@ -434,6 +427,7 @@ server.on("upgrade", (request, socket, head) => {
       instructions: payload.instructions,
       realtimeSessionId: payload.realtimeSessionId,
       model,
+      voiceName: payload.voiceName,
     });
   });
 });
