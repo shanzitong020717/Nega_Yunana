@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppSidebar } from "@/components/app-sidebar";
 import { DashboardView } from "@/features/dashboard/dashboard-view";
@@ -15,6 +15,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("static product views", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders the redesigned primary navigation", () => {
     render(<AppSidebar />);
 
@@ -31,14 +35,41 @@ describe("static product views", () => {
     expect(within(primaryNav).queryByText("异议库")).not.toBeInTheDocument();
   });
 
-  it("renders the redesigned today practice dashboard", () => {
+  it("renders the redesigned today practice dashboard with backend recommendation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            recommendation: {
+              title: "采购经理 · 竞品差异说明",
+              reason: "AI 根据最近复盘和材料生成的今日练习建议。",
+              goalId: "competitive_differences",
+              goalLabel: "竞品差异说明",
+              personaId: "procurement_manager",
+              personaLabel: "采购经理",
+              voicePackId: "fenrir-excitable",
+              voicePackLabel: "Fenrir 高能追问",
+              materialMode: "recent_material",
+              materialLabel: "最近客户材料",
+              durationMinutes: 12,
+              href: "/practice",
+              source: "ai",
+              evidence: ["recent review"],
+            },
+          }),
+          { status: 200 },
+        ),
+      ),
+    );
+
     render(<DashboardView />);
 
     expect(
       screen.getByRole("heading", { name: "今日练习" }),
     ).toBeInTheDocument();
     expect(screen.getByText("今日建议你练")).toBeInTheDocument();
-    expect(screen.getByText("技术负责人 · 隐私与部署异议")).toBeInTheDocument();
+    expect(await screen.findByText("采购经理 · 竞品差异说明")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /开始今日练习/ })).toHaveAttribute(
       "href",
       "/practice",

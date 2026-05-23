@@ -291,6 +291,8 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     `Scenario pack: ${scenarioPack.name}`,
     `Scenario target user: ${scenarioPack.targetUser}`,
     `Scenario primary goal: ${scenarioPack.primaryGoal}`,
+    `Selected customer role: ${input.persona.name}`,
+    `Selected AI Studio voice pack: ${voicePack?.name ?? "Default business customer voice"}`,
     `Practice goal: ${practiceGoal?.label ?? input.mode}`,
     `Practice goal description: ${practiceGoal?.description ?? "Run the selected practice scenario."}`,
     `Practice opening hint: ${practiceGoal?.openingStrategyHint ?? "Use the selected practice mode to choose a realistic business opening."}`,

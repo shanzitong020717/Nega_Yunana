@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
 import { QuickActionStrip } from "@/features/dashboard/quick-action-strip";
 import { TodayPracticeCard } from "@/features/dashboard/today-practice-card";
-import { getTodayRecommendation } from "@/lib/recommendations/today-recommendation";
 import type { ProgressSummary } from "@/lib/progress/weakness-store";
 
 const recentMaterials = [
@@ -38,7 +37,6 @@ type DashboardViewProps = {
 };
 
 export function DashboardView({ progress }: DashboardViewProps) {
-  const recommendation = getTodayRecommendation();
   const weeklyFocusItems =
     progress && progress.recommendedDrills.length > 0
       ? progress.recommendedDrills
@@ -52,7 +50,7 @@ export function DashboardView({ progress }: DashboardViewProps) {
         description="打开后先完成今天最值得练的一次会谈，再用复盘和表达库把它沉淀下来。"
       />
 
-      <TodayPracticeCard recommendation={recommendation} />
+      <TodayPracticeCard />
 
       <QuickActionStrip />
 
