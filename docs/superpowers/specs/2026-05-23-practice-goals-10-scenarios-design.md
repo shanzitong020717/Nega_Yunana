@@ -21,6 +21,21 @@
 - 不重构实时语音 relay。
 - 不把 10 个场景做成动态数据库配置，本阶段先使用代码配置，保证稳定可测。
 
+## 与会谈节奏策略的兼容关系
+
+本设计必须兼容 `2026-05-23-conversation-opening-strategy-design.md` 中的方案三：`客户角色 + AI 音色 + 训练目标` 共同决定会谈节奏。
+
+第一步的 10 个场景只负责定义“这次练什么”和“业务切入方向”，不能单独决定完整开场方式；第二步的客户角色和音色仍然参与最终会谈节奏合成。
+
+最终解析优先级如下：
+
+1. 第一​​步场景定义训练目标、默认重点、业务主题和建议追问方向。
+2. 第二步客户角色定义客户身份、关注领域、压力上限和追问风格。
+3. 第二步音色定义开场温度、语气和压力爬坡速度，但不能改变客户身份。
+4. 会谈节奏策略根据 `goalId + personaId + voicePackId` 合成最终 prompt。
+
+因此，第一步场景中的 `openingStrategyHint` 只是提示，不是最终规则。最终规则必须由 `conversationOpeningStrategy` 统一生成，避免出现“场景说要高压开场，但 Fenrir/角色策略又要求先礼貌铺垫”这类冲突。
+
 ## 信息架构
 
 第一步仍然叫“这次想练什么？”，但其本质从 `practiceGoals` 升级为“练习场景配置”。
@@ -37,11 +52,18 @@ type PracticeGoal = {
   recommendedPersonaIds: string[];
   recommendedVoicePackIds: VoicePackId[];
   openingStrategyHint: string;
+  conversationStrategyModifiers: {
+    preferredOpeningModes: OpeningMode[];
+    escalationBias: "slow" | "standard" | "faster_after_context";
+    firstTurnIntent: string;
+  };
   questionGuidance: string[];
   reviewDimensions: string[];
   phrasebookTags: string[];
 };
 ```
+
+其中 `conversationStrategyModifiers` 只作为第一步场景对会谈节奏的输入，不能绕过或覆盖第二步角色/音色配置。
 
 ## 10 个场景配置
 
@@ -58,6 +80,7 @@ type PracticeGoal = {
 - 推荐角色：企业买家、技术负责人、采购经理
 - 推荐音色：Kore、Charon、Leda
 - 开场策略：正式商务开场，先确认客户场景，再逐步提问
+- 会谈节奏修饰：偏 `formal_business`，标准升级，第一轮先确认客户希望讨论的场景
 - AI 追问方向：客户需求、业务问题、产品价值、下一步
 - 复盘维度：回答清晰度、是否先确认需求、是否有边界感
 - 表达库标签：客户问答、探索式提问、商务回应
@@ -77,6 +100,7 @@ type PracticeGoal = {
 - 推荐角色：渠道合作伙伴、企业买家、技术负责人
 - 推荐音色：Zephyr、Puck、Leda
 - 开场策略：用户先介绍，AI 客户再追问 demo flow
+- 会谈节奏修饰：偏 `learner_led_intro`，慢速升级，第一轮邀请用户先演示或介绍
 - AI 追问方向：演示顺序、客户能否听懂、功能到价值的转换
 - 复盘维度：演示结构、场景化表达、是否避免功能堆砌
 - 表达库标签：产品演示、场景讲解、功能转价值
@@ -96,6 +120,7 @@ type PracticeGoal = {
 - 推荐角色：企业买家、渠道合作伙伴、高管决策者
 - 推荐音色：Kore、Zephyr、Leda
 - 开场策略：轻量商务开场，从客户业务问题切入
+- 会谈节奏修饰：偏 `efficient_warm_start`，标准升级，第一轮确认客户业务场景
 - AI 追问方向：目标用户、会议场景、跨语言沟通、落地部门
 - 复盘维度：场景具体度、客户匹配度、价值连接
 - 表达库标签：应用场景、客户画像、业务痛点
@@ -113,6 +138,7 @@ type PracticeGoal = {
 - 推荐角色：采购经理、企业买家、高管决策者
 - 推荐音色：Kore、Fenrir、Leda
 - 开场策略：先确认评估标准，再进入优缺点
+- 会谈节奏修饰：偏 `formal_business`，背景建立后再挑战，第一轮确认客户评价标准
 - AI 追问方向：优势是否真实、限制是什么、什么情况下不适合
 - 复盘维度：平衡表达、可信度、是否过度承诺
 - 表达库标签：优缺点、适配边界、风险回应
@@ -130,6 +156,7 @@ type PracticeGoal = {
 - 推荐角色：采购经理、高管决策者、渠道合作伙伴
 - 推荐音色：Fenrir、Kore、Puck
 - 开场策略：先确认客户正在比较什么，再说明差异
+- 会谈节奏修饰：偏 `efficient_warm_start`，背景建立后更快挑战，第一轮确认客户正在比较的替代方案
 - AI 追问方向：为什么不用手机、为什么不用会议软件、Rokid 的独特价值
 - 复盘维度：差异是否清楚、是否尊重竞品、是否连接客户场景
 - 表达库标签：竞品差异、替代方案、差异化表达
@@ -147,6 +174,7 @@ type PracticeGoal = {
 - 推荐角色：技术负责人、企业买家、采购经理
 - 推荐音色：Charon、Kore、Fenrir
 - 开场策略：先确认 use case，再进入参数细节
+- 会谈节奏修饰：偏 `efficient_warm_start`，标准升级，第一轮先确认 use case，不能直接技术审查
 - AI 追问方向：参数含义、限制、客户环境适配、未知信息如何确认
 - 复盘维度：参数解释清晰度、是否避免编造、是否能转化为客户价值
 - 表达库标签：产品参数、技术解释、边界说明
@@ -164,6 +192,7 @@ type PracticeGoal = {
 - 推荐角色：技术负责人、企业买家、采购经理
 - 推荐音色：Charon、Kore、Fenrir
 - 开场策略：先确认客户安全关注点，再进入审查路径
+- 会谈节奏修饰：偏 `formal_business`，背景建立后再高压，第一轮先确认安全审查目标
 - AI 追问方向：数据如何处理、谁能访问、是否支持客户安全审查、不能承诺什么
 - 复盘维度：安全边界、可信表达、确认路径
 - 表达库标签：隐私安全、数据治理、IT 审查
@@ -181,6 +210,7 @@ type PracticeGoal = {
 - 推荐角色：技术负责人、企业买家、渠道合作伙伴
 - 推荐音色：Charon、Kore、Puck
 - 开场策略：先确认客户现有流程和 IT 环境，再讨论部署
+- 会谈节奏修饰：偏 `formal_business + efficient_warm_start`，标准升级，第一轮确认客户现有流程
 - AI 追问方向：部署方式、系统对接、试点范围、客户需要提供什么
 - 复盘维度：流程化表达、边界说明、下一步明确度
 - 表达库标签：部署、集成、试点范围
@@ -198,6 +228,7 @@ type PracticeGoal = {
 - 推荐角色：企业买家、高管决策者、渠道合作伙伴
 - 推荐音色：Kore、Fenrir、Puck
 - 开场策略：确认会议目标、决策人、成功标准和下一步
+- 会谈节奏修饰：偏 `formal_business`，标准升级，第一轮确认会议目标和成功标准
 - AI 追问方向：方案范围、决策流程、试点指标、行动计划
 - 复盘维度：推进力、下一步清晰度、客户目标连接
 - 表达库标签：方案会议、试点推进、下一步
@@ -217,6 +248,7 @@ type PracticeGoal = {
 - 推荐角色：高管决策者、企业买家、采购经理
 - 推荐音色：Fenrir、Kore、Leda
 - 开场策略：短寒暄，直接邀请用户做 30-60 秒表达
+- 会谈节奏修饰：偏 `efficient_warm_start + learner_led_intro`，背景建立后快速升级，第一轮邀请用户给出 30-60 秒版本
 - AI 追问方向：一句话价值、为什么现在、下一步怎么验证
 - 复盘维度：简洁度、重点突出、是否有行动建议
 - 表达库标签：快速表达、电梯演讲、价值总结
@@ -242,7 +274,7 @@ type PracticeGoal = {
 3. 第二步角色和音色可以根据该场景展示推荐顺序或推荐标记。
 4. 第三步训练重点默认使用该场景的 `defaultFocusTags`，用户仍可增删。
 5. 创建 practice session 时，后端保存完整 `resolvedContext`。
-6. 实时 prompt 使用场景配置影响 AI 客户开场、追问方向和练习重点。
+6. 实时 prompt 先读取场景配置，再交给 `conversationOpeningStrategy` 与角色、音色一起合成最终开场节奏。
 7. 复盘和表达库使用 `reviewDimensions`、`phrasebookTags` 做归类。
 
 ## 兼容策略
@@ -258,9 +290,11 @@ type PracticeGoal = {
 
 - `defaultScenarioPack.practiceGoals` 应包含 10 个可见场景。
 - 每个场景都应包含 `mode`、`defaultFocusTags`、`recommendedPersonaIds`、`recommendedVoicePackIds`、`questionGuidance`、`reviewDimensions`、`phrasebookTags`。
+- 每个场景都应包含 `conversationStrategyModifiers`，并且该字段只能影响、不能覆盖角色和音色策略。
 - 旧的 5 个场景应被细化，不能只有标题和描述。
 - `modeByGoalId` 应覆盖全部 10 个场景。
 - 每个场景推荐的 persona 和 voice pack 必须存在于当前 scenario pack。
+- `resolveConversationOpeningStrategy` 应接受新增场景 ID，并与 persona、voice pack 合成最终节奏。
 
 API 测试：
 
@@ -281,3 +315,4 @@ UI 测试：
 - 现有 5 个场景配置被细化，不再只是 `id + label + description`。
 - 新增场景可以正常创建练习并进入实时对话。
 - AI 客户会根据不同场景调整开场、追问方向和复盘重点。
+- 第一​​步场景、第二步角色和第二步音色共同影响会谈节奏，不出现两套开场策略互相覆盖的问题。
