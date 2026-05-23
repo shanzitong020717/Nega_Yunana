@@ -1,5 +1,9 @@
 import { PracticeView } from "@/features/practice/practice-view";
 
-export default function PracticePage() {
-  return <PracticeView />;
+type PracticePageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function PracticePage({ searchParams }: PracticePageProps) {
+  return <PracticeView searchParams={(await searchParams) ?? {}} />;
 }

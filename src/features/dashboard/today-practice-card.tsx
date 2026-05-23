@@ -4,7 +4,10 @@ import { ArrowRight, Clock3, Mic2, UserRound, Volume2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import type { TodayRecommendation } from "@/lib/recommendations/today-recommendation";
+import {
+  buildPracticeHrefFromRecommendation,
+  type TodayRecommendation,
+} from "@/lib/recommendations/today-recommendation";
 
 type TodayPracticeCardProps = {
   initialRecommendation?: TodayRecommendation | null;
@@ -40,6 +43,9 @@ export function TodayPracticeCard({
   const [failed, setFailed] = useState(false);
   const visibleRecommendation =
     recommendation ?? (failed ? errorRecommendation : loadingRecommendation);
+  const practiceHref = recommendation
+    ? buildPracticeHrefFromRecommendation(recommendation)
+    : visibleRecommendation.href;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -94,11 +100,11 @@ export function TodayPracticeCard({
         </div>
 
         <Link
-          href={visibleRecommendation.href}
+          href={practiceHref}
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
         >
           <Mic2 className="h-4 w-4" aria-hidden="true" />
-          开始今日练习
+          快速训练
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>

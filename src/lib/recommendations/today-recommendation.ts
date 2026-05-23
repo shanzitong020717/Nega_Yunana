@@ -49,6 +49,11 @@ export type TodayRecommendation = {
   evidence: string[];
 };
 
+export type PracticeRecommendationLinkParams = Pick<
+  TodayRecommendation,
+  "goalId" | "personaId" | "voicePackId" | "materialMode" | "materialId"
+>;
+
 type GenerateTodayRecommendationInput = {
   progress: ProgressSummary;
   recentMaterials: MaterialContext[];
@@ -130,7 +135,7 @@ function normalizeRecommendation(
     payload.materialLabel ??
     (payload.materialMode === "no_material" ? "不使用材料" : "系统记忆");
 
-  return {
+  const recommendation = {
     title: payload.title ?? `${persona.label} · ${goal.label}`,
     reason: payload.reason,
     goalId: goal.id,
@@ -147,6 +152,30 @@ function normalizeRecommendation(
     source,
     evidence: payload.evidence,
   };
+
+  return {
+    ...recommendation,
+    href: buildPracticeHrefFromRecommendation(recommendation),
+  };
+}
+
+export function buildPracticeHrefFromRecommendation(
+  recommendation: PracticeRecommendationLinkParams,
+) {
+  const params = new URLSearchParams({
+    source: "today-recommendation",
+    initialStep: "confirm",
+    goalId: recommendation.goalId,
+    personaId: recommendation.personaId,
+    voicePackId: recommendation.voicePackId,
+    materialMode: recommendation.materialMode,
+  });
+
+  if (recommendation.materialId) {
+    params.set("materialId", recommendation.materialId);
+  }
+
+  return `/practice?${params.toString()}`;
 }
 
 function formatProgressContext(progress: ProgressSummary) {

@@ -70,11 +70,27 @@ describe("static product views", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("今日建议你练")).toBeInTheDocument();
     expect(await screen.findByText("采购经理 · 竞品差异说明")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /开始今日练习/ })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "开始训练" })).toHaveAttribute(
       "href",
       "/practice",
     );
-    expect(screen.getAllByRole("link", { name: /开始今日练习/ })).toHaveLength(1);
+    const quickPracticeLink = screen.getByRole("link", { name: /快速训练/ });
+    expect(quickPracticeLink).toHaveAttribute(
+      "href",
+      expect.stringContaining("/practice?"),
+    );
+    expect(quickPracticeLink).toHaveAttribute(
+      "href",
+      expect.stringContaining("goalId=competitive_differences"),
+    );
+    expect(quickPracticeLink).toHaveAttribute(
+      "href",
+      expect.stringContaining("personaId=procurement_manager"),
+    );
+    expect(quickPracticeLink).toHaveAttribute(
+      "href",
+      expect.stringContaining("voicePackId=fenrir-excitable"),
+    );
     expect(screen.getByRole("link", { name: /上传客户材料/ })).toHaveAttribute(
       "href",
       "/materials",

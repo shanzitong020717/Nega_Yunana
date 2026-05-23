@@ -80,6 +80,46 @@ describe("PracticeWizard", () => {
     });
   });
 
+  it("preselects the daily recommendation and opens on the confirmation step", () => {
+    render(
+      <PracticeWizard
+        initialSelection={{
+          goalId: "competitive_differences",
+          personaId: "procurement_manager",
+          voicePackId: "fenrir-excitable",
+          materialMode: "memory_context",
+        }}
+        initialStep={3}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "要使用什么材料或记忆？" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /使用系统记忆/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /竞品差异/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(screen.getByRole("button", { name: /^采购经理/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /Fenrir 高能追问/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    expect(screen.getByRole("button", { name: /竞品差异说明/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
   it("creates a session payload with goal, persona, voice pack, focus tags, and material", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(

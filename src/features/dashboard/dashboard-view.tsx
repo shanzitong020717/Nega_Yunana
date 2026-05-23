@@ -1,4 +1,4 @@
-import { BarChart3, CheckCircle2, FileText, ShieldCheck } from "lucide-react";
+import { BarChart3, CheckCircle2, FileText, Mic2, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
 import { PageHeader } from "@/components/page-header";
@@ -48,6 +48,15 @@ export function DashboardView({ progress }: DashboardViewProps) {
         eyebrow="Rokid 海外销售"
         title="今日练习"
         description="打开后先完成今天最值得练的一次会谈，再用复盘和表达库把它沉淀下来。"
+        actions={
+          <Link
+            href="/practice"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
+          >
+            <Mic2 className="h-4 w-4" aria-hidden="true" />
+            开始训练
+          </Link>
+        }
       />
 
       <TodayPracticeCard />

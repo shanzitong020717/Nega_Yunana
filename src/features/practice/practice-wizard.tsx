@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import {
   defaultScenarioPack,
+  type PracticeGoal,
   type PracticeGoalId,
 } from "@/data/scenario-packs";
 import { VoicePackSelector } from "@/features/practice/voice-pack-selector";
@@ -16,10 +17,20 @@ import {
 import type { MaterialMode } from "@/lib/validation/practice";
 
 type PracticeWizardProps = {
+  initialSelection?: PracticeWizardInitialSelection;
+  initialStep?: WizardStep;
   materialId?: string;
 };
 
 type WizardStep = 1 | 2 | 3;
+
+export type PracticeWizardInitialSelection = {
+  goalId?: string;
+  personaId?: string;
+  voicePackId?: string;
+  materialMode?: string;
+  materialId?: string;
+};
 
 const focusTags = [
   "商业价值",
@@ -63,7 +74,59 @@ function findPracticeGoal(goalId: PracticeGoalId) {
   );
 }
 
-export function PracticeWizard({ materialId }: PracticeWizardProps) {
+function resolveInitialGoalId(goalId?: string): PracticeGoalId {
+  return (
+    defaultScenarioPack.practiceGoals.find((goal) => goal.id === goalId)?.id ??
+    "customer_qa"
+  );
+}
+
+function resolveInitialPersonaId(
+  personaId: string | undefined,
+  goal: PracticeGoal,
+  fallbackPersonaId: string,
+) {
+  return (
+    defaultScenarioPack.personas.find((persona) => persona.id === personaId)?.id ??
+    goal.recommendedPersonaIds[0] ??
+    fallbackPersonaId
+  );
+}
+
+function resolveInitialVoicePackId(
+  voicePackId: string | undefined,
+  goal: PracticeGoal,
+  fallbackVoicePackId: string,
+) {
+  return (
+    defaultScenarioPack.voicePacks.find((voicePack) => voicePack.id === voicePackId)
+      ?.id ??
+    goal.recommendedVoicePackIds[0] ??
+    fallbackVoicePackId
+  );
+}
+
+function resolveInitialMaterialMode(
+  materialMode: string | undefined,
+  hasMaterialId: boolean,
+): MaterialMode {
+  if (
+    materialMode === "recent_material" ||
+    materialMode === "no_material" ||
+    materialMode === "memory_context" ||
+    materialMode === "specific_material"
+  ) {
+    return materialMode;
+  }
+
+  return hasMaterialId ? "specific_material" : "recent_material";
+}
+
+export function PracticeWizard({
+  initialSelection,
+  initialStep = 1,
+  materialId,
+}: PracticeWizardProps) {
   const router = useRouter();
   const defaultPersona =
     defaultScenarioPack.personas.find((persona) => persona.id === "technical_lead") ??
@@ -72,15 +135,33 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
     defaultScenarioPack.voicePacks.find(
       (voicePack) => voicePack.id === "kore-firm",
     ) ?? defaultScenarioPack.voicePacks[0];
-  const [step, setStep] = useState<WizardStep>(1);
-  const [goalId, setGoalId] = useState<PracticeGoalId>("customer_qa");
-  const [personaId, setPersonaId] = useState<string>(defaultPersona.id);
-  const [voicePackId, setVoicePackId] = useState<string>(defaultVoicePack.id);
+  const initialGoalId = resolveInitialGoalId(initialSelection?.goalId);
+  const initialGoal = findPracticeGoal(initialGoalId);
+  const resolvedMaterialId = initialSelection?.materialId ?? materialId;
+  const [step, setStep] = useState<WizardStep>(initialStep);
+  const [goalId, setGoalId] = useState<PracticeGoalId>(initialGoalId);
+  const [personaId, setPersonaId] = useState<string>(
+    resolveInitialPersonaId(
+      initialSelection?.personaId,
+      initialGoal,
+      defaultPersona.id,
+    ),
+  );
+  const [voicePackId, setVoicePackId] = useState<string>(
+    resolveInitialVoicePackId(
+      initialSelection?.voicePackId,
+      initialGoal,
+      defaultVoicePack.id,
+    ),
+  );
   const [selectedMaterialMode, setSelectedMaterialMode] = useState<MaterialMode>(
-    materialId ? "specific_material" : "recent_material",
+    resolveInitialMaterialMode(
+      initialSelection?.materialMode,
+      Boolean(resolvedMaterialId),
+    ),
   );
   const [selectedFocusTags, setSelectedFocusTags] = useState<string[]>(
-    findPracticeGoal("customer_qa").defaultFocusTags,
+    initialGoal.defaultFocusTags,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -138,7 +219,10 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
       personaId,
       voicePackId,
       materialMode: selectedMaterialMode,
-      materialId: selectedMaterialMode === "specific_material" ? materialId : undefined,
+      materialId:
+        selectedMaterialMode === "specific_material"
+          ? resolvedMaterialId
+          : undefined,
       focusTags: selectedFocusTags,
       trainingFocus: selectedFocusTags,
       difficulty: "normal",
