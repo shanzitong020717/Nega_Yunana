@@ -8,6 +8,7 @@ import {
   FileText,
   Lightbulb,
   ListChecks,
+  MessageSquareQuote,
   Trash2,
   Target,
 } from "lucide-react";
@@ -79,6 +80,7 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
     null,
   );
   const [privacyMessage, setPrivacyMessage] = useState<string | null>(null);
+  const suggestedAnswers = review.suggestedAnswers ?? [];
 
   async function deletePracticeData(
     action: string,
@@ -291,6 +293,44 @@ export function ReviewView({ reviewId, sessionId, review }: ReviewViewProps) {
       <Section title="句子升级" icon={Lightbulb}>
         <SentenceUpgradeTable upgrades={review.sentenceUpgrades} />
       </Section>
+
+      {suggestedAnswers.length > 0 ? (
+        <Section title="实时建议回答记录" icon={MessageSquareQuote}>
+          <div className="grid gap-3">
+            {suggestedAnswers.map((suggestion) => (
+              <article
+                key={suggestion.id}
+                className="rounded-md border border-[var(--border)] bg-white p-4"
+              >
+                <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+                  <div className="rounded-md bg-[var(--surface-subtle)] p-3">
+                    <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+                      AI 客户问题
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--foreground)]">
+                      {suggestion.aiQuestion.english}
+                    </p>
+                    <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+                      {suggestion.aiQuestion.translationZh}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+                      推荐回复
+                    </p>
+                    <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+                      {suggestion.suggestedReplies[0]?.english}
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                      {suggestion.suggestedReplies[0]?.reason}
+                    </p>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
       <Section title="材料覆盖情况" icon={FileText}>
         <div className="grid gap-3 md:grid-cols-3">

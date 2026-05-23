@@ -11,13 +11,12 @@ import { createRealtimeSession, type RealtimePersona } from "@/lib/ai/realtime";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
 import { getPrepCardRecord } from "@/lib/practice/prep-card-store";
+import { getPracticeSessionRecord } from "@/lib/practice/practice-session-store";
 import {
-  goalIdSchema,
   personaIdSchema,
   practiceModeSchema,
-  scenarioPackIdSchema,
-  voicePackIdSchema,
 } from "@/lib/validation/practice";
+import type { ResolvedPracticeContext } from "@/lib/validation/practice";
 import {
   nonEmptyString,
   optionalString,
@@ -25,44 +24,65 @@ import {
 } from "@/lib/validation/shared";
 
 const createRealtimeSessionInputSchema = z.object({
-  scenarioPackId: scenarioPackIdSchema.default(defaultScenarioPack.id),
-  goalId: goalIdSchema.default("customer_qa"),
+  scenarioPackId: z.string().trim().min(1, "场景包不能为空").optional(),
+  goalId: z.string().trim().min(1, "练习目标不能为空").optional(),
   practiceSessionId: nonEmptyString("练习会话不能为空"),
-  personaId: personaIdSchema,
-  voicePackId: voicePackIdSchema.default("ethan-technical-lead"),
+  personaId: personaIdSchema.optional(),
+  voicePackId: z.string().trim().min(1, "AI Studio 音色不能为空").optional(),
   materialId: optionalString,
   prepCardId: optionalString,
-  mode: practiceModeSchema,
+  mode: practiceModeSchema.optional(),
   trainingFocus: stringArraySchema,
   focusTags: stringArraySchema.default([]),
   memorySnippets: stringArraySchema.default([]),
+  resolvedContext: z.unknown().optional(),
 });
 
 function resolveRealtimePersona(
   personaId: string,
   scenarioPack: ScenarioPack,
 ): RealtimePersona | null {
+  const scenarioPersona = scenarioPack.personas.find(
+    (item) => item.id === personaId,
+  );
+
+  if (scenarioPersona) {
+    return {
+      id: scenarioPersona.id,
+      name: scenarioPersona.label,
+      focusAreas: scenarioPersona.focusAreas,
+      tone: scenarioPersona.communicationStyle,
+      sampleQuestions: scenarioPersona.likelyFollowUps,
+      rolePrompt: scenarioPersona.rolePrompt,
+    };
+  }
+
   const legacyPersona = personas.find((item) => item.id === personaId);
 
   if (legacyPersona) {
     return legacyPersona;
   }
 
-  const scenarioPersona = scenarioPack.personas.find(
-    (item) => item.id === personaId,
+  return null;
+}
+
+const legacyVoicePackIds: Record<string, string> = {
+  "ava-friendly-buyer": "zephyr-bright",
+  "serena-enterprise-decision-maker": "kore-firm",
+  "ethan-technical-lead": "charon-informative",
+  "marcus-executive-customer": "fenrir-excitable",
+  "vivian-critical-procurement": "leda-youthful",
+  "noah-channel-partner": "puck-upbeat",
+};
+
+function resolveVoicePack(voicePackId: string, scenarioPack: ScenarioPack) {
+  const normalizedVoicePackId = legacyVoicePackIds[voicePackId] ?? voicePackId;
+
+  return (
+    scenarioPack.voicePacks.find((item) => item.id === normalizedVoicePackId) ??
+    scenarioPack.voicePacks[0] ??
+    null
   );
-
-  if (!scenarioPersona) {
-    return null;
-  }
-
-  return {
-    id: scenarioPersona.id,
-    name: scenarioPersona.label,
-    focusAreas: scenarioPersona.focusAreas,
-    tone: scenarioPersona.communicationStyle,
-    sampleQuestions: scenarioPersona.likelyFollowUps,
-  };
 }
 
 export async function POST(request: Request) {
@@ -70,18 +90,61 @@ export async function POST(request: Request) {
     const input = createRealtimeSessionInputSchema.parse(
       await readJsonBody(request),
     );
+    const practiceSession = getPracticeSessionRecord(input.practiceSessionId);
+    const cachedResolvedContext =
+      input.resolvedContext as ResolvedPracticeContext | undefined;
+    const resolvedContext =
+      practiceSession?.resolvedContext ?? cachedResolvedContext;
+    const scenarioPackId =
+      input.scenarioPackId ??
+      practiceSession?.scenarioPackId ??
+      defaultScenarioPack.id;
     const scenarioPack =
-      scenarioPacks.find((item) => item.id === input.scenarioPackId) ??
+      scenarioPacks.find((item) => item.id === scenarioPackId) ??
       defaultScenarioPack;
-    const persona = resolveRealtimePersona(input.personaId, scenarioPack);
+    const personaId =
+      input.personaId ??
+      practiceSession?.personaId ??
+      resolvedContext?.persona.id ??
+      "technical_lead";
+    const goalId =
+      input.goalId ??
+      practiceSession?.goalId ??
+      resolvedContext?.goal.id ??
+      "customer_qa";
+    const voicePackId =
+      input.voicePackId ??
+      practiceSession?.voicePackId ??
+      resolvedContext?.voicePack.id ??
+      "kore-firm";
+    const mode =
+      input.mode ?? practiceSession?.mode ?? "customer_qa";
+    const trainingFocus =
+      input.trainingFocus.length > 0
+        ? input.trainingFocus
+        : (practiceSession?.trainingFocus ?? resolvedContext?.focus.tags ?? []);
+    const focusTags =
+      input.focusTags.length > 0
+        ? input.focusTags
+        : (practiceSession?.focusTags ?? resolvedContext?.focus.tags ?? []);
+    const materialId =
+      input.materialId ??
+      practiceSession?.materialId ??
+      resolvedContext?.material.materialId;
+    const prepCardId =
+      input.prepCardId ??
+      practiceSession?.prepCardId ??
+      resolvedContext?.material.prepCardId;
+    const memorySnippets =
+      input.memorySnippets.length > 0
+        ? input.memorySnippets
+        : (resolvedContext?.memorySnippets ?? []);
+    const persona = resolveRealtimePersona(personaId, scenarioPack);
     const practiceGoal =
-      scenarioPack.practiceGoals.find((item) => item.id === input.goalId) ??
+      scenarioPack.practiceGoals.find((item) => item.id === goalId) ??
       scenarioPack.practiceGoals[0] ??
       null;
-    const voicePack =
-      scenarioPack.voicePacks.find((item) => item.id === input.voicePackId) ??
-      scenarioPack.voicePacks[0] ??
-      null;
+    const voicePack = resolveVoicePack(voicePackId, scenarioPack);
 
     if (!persona) {
       return NextResponse.json(
@@ -95,11 +158,11 @@ export async function POST(request: Request) {
       );
     }
 
-    const materialBrief = input.materialId
-      ? getMaterialBriefRecord(input.materialId)
+    const materialBrief = materialId
+      ? getMaterialBriefRecord(materialId)
       : null;
-    const prepCard = input.prepCardId
-      ? getPrepCardRecord(input.prepCardId)
+    const prepCard = prepCardId
+      ? getPrepCardRecord(prepCardId)
       : null;
     const realtimeSession = await createRealtimeSession({
       practiceSessionId: input.practiceSessionId,
@@ -109,10 +172,10 @@ export async function POST(request: Request) {
       voicePack,
       materialBrief,
       prepCard,
-      mode: input.mode,
-      trainingFocus: input.trainingFocus,
-      focusTags: input.focusTags,
-      memorySnippets: input.memorySnippets,
+      mode,
+      trainingFocus,
+      focusTags,
+      memorySnippets,
     });
 
     return NextResponse.json(realtimeSession, { status: 201 });

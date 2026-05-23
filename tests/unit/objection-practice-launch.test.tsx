@@ -29,7 +29,7 @@ describe("ObjectionBankView practice launch", () => {
             goalId: "objection_handling",
             mode: "objection_challenge",
             personaId: "skeptical_executive",
-            voicePackId: "marcus-executive-customer",
+            voicePackId: "fenrir-excitable",
             difficulty: "normal",
             trainingFocus: ["objection_handling"],
             focusTags: ["异议处理", "竞品差异"],
@@ -60,13 +60,13 @@ describe("ObjectionBankView practice launch", () => {
         scenarioPackId: "rokid-overseas-sales",
         goalId: "objection_handling",
         mode: "objection_challenge",
-        voicePackId: "marcus-executive-customer",
+        voicePackId: "fenrir-excitable",
         focusTags: ["异议处理", "竞品差异"],
       });
       expect(pushMock).toHaveBeenCalledWith("/practice/session_objection_123");
       expect(readPracticeSessionSelection("session_objection_123")).toMatchObject({
         personaId: "skeptical_executive",
-        voicePackId: "marcus-executive-customer",
+        voicePackId: "fenrir-excitable",
       });
     });
   });

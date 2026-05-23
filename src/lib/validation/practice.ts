@@ -1,7 +1,10 @@
 import { z } from "zod";
 
 import { personas } from "@/data/personas";
-import { defaultScenarioPack } from "@/data/scenario-packs";
+import {
+  defaultScenarioPack,
+  type GeminiLiveAudioConfig,
+} from "@/data/scenario-packs";
 import { nonEmptyString, optionalString, stringArraySchema } from "./shared";
 
 const personaIds = Array.from(
@@ -46,14 +49,20 @@ export const goalIdSchema = z
 export const voicePackIdSchema = z
   .string()
   .trim()
-  .min(1, "声音包不能为空")
-  .default(defaultScenarioPack.voicePacks[0]?.id ?? "ava-friendly-buyer");
+  .min(1, "AI Studio 音色不能为空")
+  .default(defaultScenarioPack.voicePacks[0]?.id ?? "kore-firm");
 
 export const scenarioPackIdSchema = z
   .string()
   .trim()
   .min(1, "场景包不能为空")
   .default(defaultScenarioPack.id);
+
+export const materialModeSchema = z
+  .enum(["recent_material", "no_material", "memory_context", "specific_material"], {
+    error: "材料模式无效",
+  })
+  .default("no_material");
 
 export const createPrepCardInputSchema = z.object({
   materialId: optionalString,
@@ -71,6 +80,7 @@ export const createPracticeSessionInputSchema = z.object({
   mode: practiceModeSchema.default("customer_qa"),
   personaId: personaIdSchema,
   voicePackId: voicePackIdSchema,
+  materialMode: materialModeSchema,
   materialId: optionalString,
   prepCardId: optionalString,
   difficulty: difficultySchema.default("normal"),
@@ -94,5 +104,55 @@ export const saveTranscriptInputSchema = z.object({
 
 export type CreatePrepCardInput = z.infer<typeof createPrepCardInputSchema>;
 export type CreatePracticeSessionInput = z.infer<typeof createPracticeSessionInputSchema>;
+export type MaterialMode = z.infer<typeof materialModeSchema>;
 export type TranscriptTurnInput = z.infer<typeof transcriptTurnInputSchema>;
 export type SaveTranscriptInput = z.infer<typeof saveTranscriptInputSchema>;
+
+export type ResolvedPracticeContext = {
+  goal: {
+    id: string;
+    label: string;
+    description: string;
+  };
+  persona: {
+    id: string;
+    label: string;
+    englishName?: string;
+    communicationStyle: string;
+    focusAreas: string[];
+    openingQuestions: string[];
+    followUpPatterns: string[];
+    challengeRules: string[];
+    defaultFocusTags: string[];
+    rolePrompt: string;
+  };
+  voicePack: {
+    id: string;
+    name: string;
+    providerVoiceName: string;
+    gender: "female" | "male";
+    personality: string;
+    voiceStyle: string;
+    modelVoiceHint: string;
+    geminiLiveConfig: GeminiLiveAudioConfig;
+  };
+  material: {
+    mode: MaterialMode;
+    materialId?: string;
+    prepCardId?: string;
+    materialName?: string;
+    materialBriefSummary?: string;
+    prepCardSummary?: string;
+    resolutionStatus:
+      | "resolved"
+      | "not_found"
+      | "not_requested"
+      | "fallback_to_memory";
+  };
+  focus: {
+    tags: string[];
+    realtimeInstructions: string[];
+    reviewDimensions: string[];
+  };
+  memorySnippets: string[];
+};

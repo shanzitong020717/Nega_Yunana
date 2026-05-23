@@ -58,7 +58,7 @@ describe("objection handling framework review", () => {
         goalId: "objection_handling",
         mode: "objection_challenge",
         personaId: "skeptical_executive",
-        voicePackId: "marcus-executive-customer",
+        voicePackId: "fenrir-excitable",
         materialId: undefined,
         prepCardId: undefined,
         difficulty: "normal",

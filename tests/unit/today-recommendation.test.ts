@@ -13,6 +13,6 @@ describe("today practice recommendation", () => {
     expect(recommendation.href).toBe("/practice");
     expect(recommendation.materialLabel).toBeTruthy();
     expect(recommendation.personaLabel).toBe("技术负责人");
-    expect(recommendation.voicePackLabel).toBe("Ethan 技术负责人");
+    expect(recommendation.voicePackLabel).toBe("Kore 坚定专业");
   });
 });

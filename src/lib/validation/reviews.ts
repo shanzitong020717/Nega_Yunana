@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { createPhraseInputSchema } from "@/lib/validation/phrasebook";
+import { suggestedAnswerRecordSchema } from "@/lib/validation/suggested-answer";
 import { nonEmptyString, stringArraySchema } from "./shared";
 
 const sentenceUpgradeBaseSchema = z.object({
@@ -109,6 +110,7 @@ export const createReviewInputSchema = z.object({
     .max(3),
   bestMoments: stringArraySchema,
   sentenceUpgrades: z.array(sentenceUpgradeSchema).default([]),
+  suggestedAnswers: z.array(suggestedAnswerRecordSchema).default([]).optional(),
   materialCoverage: materialCoverageSchema,
   objectionFramework: objectionFrameworkReviewSchema.optional(),
   phrasebookSuggestions: z.array(createPhraseInputSchema).default([]),

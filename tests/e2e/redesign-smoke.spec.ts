@@ -56,12 +56,12 @@ test.describe("redesign smoke coverage", () => {
 
     await expect(page.getByText("第 2 步 / 共 3 步")).toBeVisible();
     await expect(page.getByRole("heading", { name: "让 AI 扮演谁？" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "声音包" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Ethan 技术负责人/ })).toHaveAttribute(
+    await expect(page.getByRole("heading", { name: "AI Studio 音色" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Kore 坚定专业/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    await expect(page.getByRole("button", { name: /Vivian 挑剔采购/ })).toHaveAttribute(
+    await expect(page.getByRole("button", { name: /Leda 年轻自然/ })).toHaveAttribute(
       "aria-pressed",
       "false",
     );
@@ -96,12 +96,13 @@ test.describe("redesign smoke coverage", () => {
     await page.goto("/practice/session_123");
 
     await expect(page.getByText("材料导航")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "打开提示" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "打开提示面板" })).toBeVisible();
     await expect(page.getByRole("button", { name: "换个更自然表达" })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "打开提示" }).click();
+    await page.getByRole("button", { name: "打开提示面板" }).click();
+    await expect(page.getByRole("complementary", { name: "提示" })).toBeVisible();
     await expect(page.getByRole("button", { name: "换个更自然表达" })).toBeVisible();
-    await page.getByRole("button", { name: "隐藏提示" }).click();
+    await page.getByRole("button", { name: "关闭提示面板" }).click();
     await expect(page.getByRole("button", { name: "换个更自然表达" })).toHaveCount(0);
 
     await page.getByRole("button", { name: "开始" }).click();
@@ -114,7 +115,32 @@ test.describe("redesign smoke coverage", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByRole("heading", { name: "完整字幕" })).toBeVisible();
-    await expect(page.getByText("你想用智能眼镜解决什么业务问题？")).toBeVisible();
+    await expect(
+      page.getByText("What business problem are you trying to solve with smart glasses?"),
+    ).toHaveCount(0);
+    await expect(page.getByText("你想用智能眼镜解决什么业务问题？")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "打开提示面板" }).click();
+    const transcriptBox = await page.locator("#complete-transcript-panel").boundingBox();
+    const supportBox = await page.locator("#smart-support-panel").boundingBox();
+    expect(transcriptBox).not.toBeNull();
+    expect(supportBox).not.toBeNull();
+
+    if (transcriptBox && supportBox) {
+      const overlapX = Math.max(
+        0,
+        Math.min(transcriptBox.x + transcriptBox.width, supportBox.x + supportBox.width) -
+          Math.max(transcriptBox.x, supportBox.x),
+      );
+      const overlapY = Math.max(
+        0,
+        Math.min(transcriptBox.y + transcriptBox.height, supportBox.y + supportBox.height) -
+          Math.max(transcriptBox.y, supportBox.y),
+      );
+
+      expect(overlapX * overlapY).toBe(0);
+    }
+    await page.getByRole("button", { name: "关闭提示面板" }).click();
 
     const collapseButton = page.getByRole("button", { name: /折叠/ });
     await expect(collapseButton).toHaveAttribute("aria-expanded", "true");

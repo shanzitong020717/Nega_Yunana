@@ -45,6 +45,49 @@ const turnsWithSystemMessages: TranscriptTurn[] = [
   },
 ];
 
+const longConversationTurns: TranscriptTurn[] = [
+  {
+    id: "turn_1",
+    speaker: "ai_customer",
+    text: "First question about the use case.",
+    timestamp: 0,
+  },
+  {
+    id: "turn_2",
+    speaker: "user",
+    text: "First learner answer.",
+    timestamp: 8,
+  },
+  {
+    id: "turn_3",
+    speaker: "ai_customer",
+    text: "Second question about deployment.",
+    timestamp: 16,
+  },
+  {
+    id: "turn_4",
+    speaker: "user",
+    text: "Second learner answer.",
+    timestamp: 24,
+  },
+  {
+    id: "turn_5",
+    speaker: "ai_customer",
+    text: "Third question about ROI.",
+    timestamp: 32,
+  },
+];
+
+const turnsWithMalformedTranslation: TranscriptTurn[] = [
+  {
+    id: "turn_1",
+    speaker: "ai_customer",
+    text: "I understand you might want to chat about something different.",
+    translationZh: '{ "translationZh":',
+    timestamp: 0,
+  },
+];
+
 describe("ConversationTranscriptPanel", () => {
   it("shows recent English transcript by default without Chinese translations", () => {
     render(<ConversationTranscriptPanel turns={turns} />);
@@ -109,5 +152,30 @@ describe("ConversationTranscriptPanel", () => {
       screen.getByText("Could you define the product use case first?"),
     ).toBeInTheDocument();
     expect(screen.queryByText("中文翻译生成中。")).not.toBeInTheDocument();
+  });
+
+  it("shows only the recent three conversation turns after the complete transcript is opened", () => {
+    render(<ConversationTranscriptPanel turns={longConversationTurns} />);
+
+    const collapsedPanel = screen.getByRole("button", { name: /实时字幕/ });
+    expect(within(collapsedPanel).queryByText("First question about the use case.")).not.toBeInTheDocument();
+
+    fireEvent.click(collapsedPanel);
+
+    expect(screen.getByText("最近 3 轮")).toBeInTheDocument();
+    expect(screen.queryByText("First question about the use case.")).not.toBeInTheDocument();
+    expect(screen.queryByText("First learner answer.")).not.toBeInTheDocument();
+    expect(screen.getByText("Second question about deployment.")).toBeInTheDocument();
+    expect(screen.getByText("Second learner answer.")).toBeInTheDocument();
+    expect(screen.getByText("Third question about ROI.")).toBeInTheDocument();
+  });
+
+  it("does not show malformed JSON fragments as Chinese translations", () => {
+    render(<ConversationTranscriptPanel turns={turnsWithMalformedTranslation} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /实时字幕/ }));
+
+    expect(screen.getByText("I understand you might want to chat about something different.")).toBeInTheDocument();
+    expect(screen.queryByText('{ "translationZh":')).not.toBeInTheDocument();
   });
 });

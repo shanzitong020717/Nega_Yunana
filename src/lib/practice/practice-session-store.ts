@@ -1,13 +1,20 @@
 import type {
   CreatePracticeSessionInput,
+  ResolvedPracticeContext,
   TranscriptTurnInput,
 } from "@/lib/validation/practice";
 import { upsertWeaknessUpdates } from "@/lib/progress/weakness-store";
 import type { PracticeReviewPayload } from "@/lib/validation/reviews";
+import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
 
-export type PracticeSessionRecord = CreatePracticeSessionInput & {
+export type PracticeSessionRecord = Omit<
+  CreatePracticeSessionInput,
+  "materialMode"
+> & {
   id: string;
+  materialMode?: CreatePracticeSessionInput["materialMode"];
   status: "created" | "active" | "completed" | "reviewed";
+  resolvedContext?: ResolvedPracticeContext;
   createdAt: string;
   updatedAt?: string;
 };
@@ -28,6 +35,7 @@ export type ReviewRecord = PracticeReviewPayload & {
 const practiceSessions = new Map<string, PracticeSessionRecord>();
 const transcriptTurns = new Map<string, TranscriptTurnRecord[]>();
 const reviewRecords = new Map<string, ReviewRecord>();
+const suggestedAnswerRecords = new Map<string, SuggestedAnswerRecord[]>();
 
 export function listPracticeSessionRecords() {
   return Array.from(practiceSessions.values()).sort((left, right) =>
@@ -39,7 +47,11 @@ export function getPracticeSessionRecord(sessionId: string) {
   return practiceSessions.get(sessionId) ?? null;
 }
 
-export function savePracticeSessionRecord(input: CreatePracticeSessionInput) {
+export function savePracticeSessionRecord(
+  input: CreatePracticeSessionInput & {
+    resolvedContext?: ResolvedPracticeContext;
+  },
+) {
   const now = new Date().toISOString();
   const practiceSession: PracticeSessionRecord = {
     id: `session_${crypto.randomUUID()}`,
@@ -70,7 +82,8 @@ export function ensurePracticeSessionRecord(
     goalId: fallback?.goalId ?? "customer_qa",
     mode: fallback?.mode ?? "customer_qa",
     personaId: fallback?.personaId ?? "technical_lead",
-    voicePackId: fallback?.voicePackId ?? "ethan-technical-lead",
+    voicePackId: fallback?.voicePackId ?? "kore-firm",
+    materialMode: fallback?.materialMode ?? "no_material",
     materialId: fallback?.materialId,
     prepCardId: fallback?.prepCardId,
     difficulty: fallback?.difficulty ?? "normal",
@@ -112,6 +125,26 @@ export function saveTranscriptTurns(
 
 export function getTranscriptTurns(sessionId: string) {
   return transcriptTurns.get(sessionId) ?? [];
+}
+
+export function saveSuggestedAnswerRecord(
+  sessionId: string,
+  suggestion: SuggestedAnswerRecord,
+) {
+  const currentSuggestions = suggestedAnswerRecords.get(sessionId) ?? [];
+  const nextSuggestions = [...currentSuggestions, suggestion];
+
+  suggestedAnswerRecords.set(sessionId, nextSuggestions);
+
+  return suggestion;
+}
+
+export function getSuggestedAnswerRecords(sessionId: string) {
+  return suggestedAnswerRecords.get(sessionId) ?? [];
+}
+
+export function deleteSuggestedAnswerRecords(sessionId: string) {
+  return suggestedAnswerRecords.delete(sessionId);
 }
 
 export function deleteTranscriptTurns(sessionId: string) {
@@ -177,11 +210,13 @@ export function deletePracticeSessionRecord(sessionId: string) {
 
   const review = deleteReviewBySessionId(sessionId);
   const transcriptDeleted = deleteTranscriptTurns(sessionId);
+  const suggestedAnswersDeleted = deleteSuggestedAnswerRecords(sessionId);
   practiceSessions.delete(sessionId);
 
   return {
     practiceSession,
     transcriptDeleted,
+    suggestedAnswersDeleted,
     reviewDeleted: Boolean(review),
   };
 }

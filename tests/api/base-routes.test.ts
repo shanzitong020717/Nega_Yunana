@@ -29,8 +29,8 @@ describe("base API route handlers", () => {
         goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
-        voicePackId: "ethan-technical-lead",
-        materialId: "recent_material",
+        voicePackId: "charon-informative",
+        materialMode: "recent_material",
         difficulty: "normal",
         trainingFocus: ["business_value"],
         focusTags: ["商业价值", "产品参数解释"],
@@ -38,18 +38,40 @@ describe("base API route handlers", () => {
     );
 
     expect(response.status).toBe(201);
-    await expect(readJson(response)).resolves.toMatchObject({
+    const payload = await readJson(response);
+    expect(payload).toMatchObject({
       practiceSession: {
         scenarioPackId: "rokid-overseas-sales",
         goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
-        voicePackId: "ethan-technical-lead",
-        materialId: "recent_material",
+        voicePackId: "charon-informative",
+        materialMode: "recent_material",
         focusTags: ["商业价值", "产品参数解释"],
         status: "created",
+        resolvedContext: expect.objectContaining({
+          persona: expect.objectContaining({
+            id: "technical_lead",
+            rolePrompt: expect.stringContaining("product parameters"),
+          }),
+          voicePack: expect.objectContaining({
+            id: "charon-informative",
+            providerVoiceName: "Charon",
+          }),
+          material: expect.objectContaining({
+            mode: "recent_material",
+          }),
+          focus: expect.objectContaining({
+            realtimeInstructions: expect.arrayContaining([
+              expect.stringContaining("business value"),
+            ]),
+          }),
+        }),
       },
     });
+    expect(
+      (payload.practiceSession as { materialId?: string }).materialId,
+    ).not.toBe("recent_material");
   });
 
   it("returns consistent validation errors", async () => {

@@ -11,6 +11,7 @@ import {
   deleteReviewBySessionId,
   ensurePracticeSessionRecord,
   getPracticeSessionRecord,
+  getSuggestedAnswerRecords,
   getTranscriptTurns,
   saveReviewRecord,
 } from "@/lib/practice/practice-session-store";
@@ -59,6 +60,7 @@ export async function POST(request: Request, context: ReviewRouteContext) {
           persona,
           materialBrief,
           prepCard,
+          suggestedAnswers: getSuggestedAnswerRecords(sessionId),
         });
     const reviewRecord = saveReviewRecord(sessionId, review);
 

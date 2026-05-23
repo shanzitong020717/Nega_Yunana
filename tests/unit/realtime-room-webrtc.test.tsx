@@ -298,6 +298,190 @@ describe("RealtimeRoom browser voice connection", () => {
     );
   });
 
+  it("starts relay roleplay with the selected persona and voice context", async () => {
+    const { sockets } = createMockWebSocketHarness();
+    createMockAudioContextHarness();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getAudioTracks: () => [{ enabled: true }],
+      getTracks: () => [{ stop: vi.fn() }],
+    });
+    const fetch = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          transport: "websocket_relay",
+          relayUrl: "wss://relay.example.com/realtime",
+          relayToken: "relay-token",
+          sessionId: "rt_session_456",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          model: "gemini-3.1-flash-live-preview",
+          instructionsPreview: "渠道合作伙伴",
+          voiceName: "Puck",
+        }),
+        { status: 201 },
+      ),
+    );
+
+    installGetUserMedia(getUserMedia);
+    vi.stubGlobal("fetch", fetch);
+
+    render(
+      <RealtimeRoom
+        sessionId="session_custom"
+        initialPracticeSession={{
+          id: "session_custom",
+          scenarioPackId: "rokid-overseas-sales",
+          goalId: "solution_meeting",
+          mode: "solution_meeting",
+          personaId: "channel_partner",
+          voicePackId: "puck-upbeat",
+          trainingFocus: ["channel partnership"],
+          focusTags: ["渠道合作"],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+
+    await waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    sockets[0]?.open();
+    sockets[0]?.message({
+      model: "gemini-3.1-flash-live-preview",
+      realtimeSessionId: "rt_session_456",
+      type: "relay.ready",
+    });
+
+    await screen.findByRole("heading", { name: "对话中" });
+
+    const startEvent = sockets[0]?.sent
+      .map((message) => JSON.parse(message))
+      .find((event) => event.type === "response.create");
+
+    expect(startEvent?.response.instructions).toContain("渠道合作伙伴");
+    expect(startEvent?.response.instructions).toContain("Puck 轻快外向");
+    expect(startEvent?.response.instructions).toContain(
+      "The spoken AI voice must sound clearly male.",
+    );
+    expect(startEvent?.response.instructions).not.toContain("Charon 清晰信息型");
+  });
+
+  it("sends cached resolved voice context when requesting a relay session", async () => {
+    createMockWebSocketHarness();
+    createMockAudioContextHarness();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getAudioTracks: () => [{ enabled: true }],
+      getTracks: () => [{ stop: vi.fn() }],
+    });
+    const fetch = vi.fn().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          transport: "websocket_relay",
+          relayUrl: "wss://relay.example.com/realtime",
+          relayToken: "relay-token",
+          sessionId: "rt_session_789",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          model: "gemini-3.1-flash-live-preview",
+          instructionsPreview: "Leda 年轻自然",
+          voiceName: "Leda",
+        }),
+        { status: 201 },
+      ),
+    );
+
+    installGetUserMedia(getUserMedia);
+    vi.stubGlobal("fetch", fetch);
+
+    render(
+      <RealtimeRoom
+        sessionId="session_voice_context"
+        initialPracticeSession={{
+          id: "session_voice_context",
+          scenarioPackId: "rokid-overseas-sales",
+          goalId: "demo_narration",
+          mode: "demo_narration",
+          personaId: "enterprise_buyer",
+          voicePackId: "leda-youthful",
+          trainingFocus: ["应用场景说明"],
+          focusTags: ["应用场景说明"],
+          resolvedContext: {
+            goal: {
+              id: "demo_narration",
+              label: "演示讲解",
+              description: "把产品功能讲成客户能理解的应用场景。",
+            },
+            persona: {
+              id: "enterprise_buyer",
+              label: "企业买家",
+              communicationStyle: "谨慎、结果导向，关注真实落地效果。",
+              focusAreas: ["业务价值"],
+              openingQuestions: [],
+              followUpPatterns: [],
+              challengeRules: [],
+              defaultFocusTags: ["商业价值"],
+              rolePrompt: "Act as an enterprise buyer.",
+            },
+            voicePack: {
+              id: "leda-youthful",
+              name: "Leda 年轻自然",
+              providerVoiceName: "Leda",
+              gender: "female",
+              personality: "Youthful",
+              voiceStyle: "适合应用场景讲解",
+              modelVoiceHint: "Gemini AI Studio voice_name=Leda",
+              geminiLiveConfig: {
+                response_modalities: ["AUDIO"],
+                speech_config: {
+                  voice_config: {
+                    prebuilt_voice_config: {
+                      voice_name: "Leda",
+                    },
+                  },
+                },
+              },
+            },
+            material: {
+              mode: "memory_context",
+              resolutionStatus: "fallback_to_memory",
+            },
+            focus: {
+              tags: ["应用场景说明"],
+              realtimeInstructions: [
+                "Ask for concrete application scenarios and who benefits from them.",
+              ],
+              reviewDimensions: ["Review application scenarios."],
+            },
+            memorySnippets: ["Prefers concise business-ready English."],
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/realtime/session",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
+
+    const requestBody = JSON.parse(fetch.mock.calls[0]?.[1]?.body as string);
+
+    expect(requestBody).toMatchObject({
+      practiceSessionId: "session_voice_context",
+      voicePackId: "leda-youthful",
+      resolvedContext: expect.objectContaining({
+        voicePack: expect.objectContaining({
+          providerVoiceName: "Leda",
+        }),
+      }),
+      memorySnippets: ["Prefers concise business-ready English."],
+    });
+  });
+
   it("surfaces realtime provider errors instead of silently staying connected", async () => {
     const { sockets } = createMockWebSocketHarness();
     createMockAudioContextHarness();

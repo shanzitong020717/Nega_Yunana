@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 
-import { handleApiError, readJsonBody } from "@/lib/errors";
+import { apiErrorResponse, handleApiError, readJsonBody } from "@/lib/errors";
+import {
+  createResolvedPracticeSession,
+  PracticeSessionCreationError,
+} from "@/lib/practice/create-practice-session";
 import {
   listPracticeSessionRecords,
-  savePracticeSessionRecord,
 } from "@/lib/practice/practice-session-store";
 import { createPracticeSessionInputSchema } from "@/lib/validation/practice";
 
@@ -18,7 +21,7 @@ export async function POST(request: Request) {
     const input = createPracticeSessionInputSchema.parse(
       await readJsonBody(request),
     );
-    const practiceSession = savePracticeSessionRecord(input);
+    const practiceSession = createResolvedPracticeSession(input);
 
     return NextResponse.json(
       {
@@ -27,6 +30,10 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof PracticeSessionCreationError) {
+      return apiErrorResponse("VALIDATION_ERROR", error.message, error.status);
+    }
+
     return handleApiError(error);
   }
 }

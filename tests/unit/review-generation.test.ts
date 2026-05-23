@@ -39,7 +39,7 @@ describe("generatePracticeReview", () => {
         goalId: "customer_qa",
         mode: "customer_qa",
         personaId: "technical_lead",
-        voicePackId: "ethan-technical-lead",
+        voicePackId: "charon-informative",
         materialId: "material_123",
         prepCardId: "prep_123",
         difficulty: "normal",

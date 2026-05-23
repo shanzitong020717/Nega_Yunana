@@ -17,6 +17,7 @@ import {
   type ObjectionFrameworkStep,
   type PracticeReviewPayload,
 } from "@/lib/validation/reviews";
+import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
 
 export type GeneratePracticeReviewInput = {
   practiceSession: PracticeSessionRecord;
@@ -25,6 +26,7 @@ export type GeneratePracticeReviewInput = {
   materialBrief?: MaterialBriefPayload | null;
   prepCard?: PrepCardPayload | null;
   mockMode?: boolean;
+  suggestedAnswers?: SuggestedAnswerRecord[];
 };
 
 export class ReviewGenerationRetryableError extends Error {
@@ -182,6 +184,10 @@ function generateMockReview(
     "business value and customer discovery",
   );
   const objectionFramework = detectObjectionFramework(input);
+  const suggestedAnswers = input.suggestedAnswers ?? [];
+  const suggestedAnswerPhrases = suggestedAnswers.map(
+    (suggestion) => suggestion.phrasebookEntry,
+  );
 
   return parseReviewPayload({
     meetingOutcome: {
@@ -267,6 +273,7 @@ function generateMockReview(
       missed: ["Pilot success metrics", "Stakeholder map for IT review"],
       unclear: ["How meeting data flow should be explained without overpromising"],
     },
+    suggestedAnswers,
     ...(objectionFramework ? { objectionFramework } : {}),
     phrasebookSuggestions: [
       {
@@ -284,6 +291,7 @@ function generateMockReview(
         source: "review",
         masteryStatus: "needs_practice",
       },
+      ...suggestedAnswerPhrases,
     ],
     weaknessUpdates: [
       {
@@ -342,13 +350,33 @@ function buildReviewPrompt(input: GeneratePracticeReviewInput) {
     "Generate memoryCandidates after each review. Each candidate must include type, title, summary, sensitivity, and confidence. sensitivity must be low, medium, or high. confidence must be a number from 0 to 1.",
     "Memory candidates should focus on durable user traits, recurring speaking patterns, useful customer context, material facts worth reusing, or next-session learning focus. Avoid storing secrets or confidential customer details.",
     "The nextSessionRecommendation must give one concrete next practice focus, drill, and prompt.",
+    "If suggestedAnswers are provided, keep them in the suggestedAnswers field and include their phrasebookEntry items in phrasebookSuggestions.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, or contract terms not provided in the material.",
     `Practice session: ${JSON.stringify(input.practiceSession)}`,
     `Persona: ${JSON.stringify(input.persona)}`,
     `Material brief: ${JSON.stringify(input.materialBrief ?? {})}`,
     `Prep card: ${JSON.stringify(input.prepCard ?? {})}`,
     `Transcript: ${JSON.stringify(input.transcriptTurns)}`,
+    `Suggested answers used during live practice: ${JSON.stringify(input.suggestedAnswers ?? [])}`,
   ].join("\n\n");
+}
+
+function attachSuggestedAnswers(
+  review: PracticeReviewPayload,
+  suggestedAnswers: SuggestedAnswerRecord[] | undefined,
+) {
+  if (!suggestedAnswers || suggestedAnswers.length === 0) {
+    return review;
+  }
+
+  return parseReviewPayload({
+    ...review,
+    suggestedAnswers,
+    phrasebookSuggestions: [
+      ...review.phrasebookSuggestions,
+      ...suggestedAnswers.map((suggestion) => suggestion.phrasebookEntry),
+    ],
+  });
 }
 
 export async function generatePracticeReview(
@@ -364,7 +392,10 @@ export async function generatePracticeReview(
   });
 
   try {
-    return parseReviewPayload(parsed);
+    return attachSuggestedAnswers(
+      parseReviewPayload(parsed),
+      input.suggestedAnswers,
+    );
   } catch (error) {
     if (error instanceof SyntaxError) {
       throw new ReviewGenerationRetryableError();

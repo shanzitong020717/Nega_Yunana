@@ -53,7 +53,7 @@ export function TodayPracticeCard({ recommendation }: TodayPracticeCardProps) {
         <div className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
           <dt className="flex items-center gap-2 text-xs text-[var(--muted)]">
             <Volume2 className="h-4 w-4" aria-hidden="true" />
-            声音包
+            AI Studio 音色
           </dt>
           <dd className="mt-2 text-sm font-semibold">
             {recommendation.voicePackLabel}

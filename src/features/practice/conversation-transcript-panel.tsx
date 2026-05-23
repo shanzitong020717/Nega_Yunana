@@ -27,8 +27,22 @@ function speakerLabel(speaker: TranscriptTurn["speaker"]) {
   return "系统";
 }
 
+function looksLikeMalformedTranslation(text: string) {
+  return (
+    text.startsWith("{") ||
+    text.startsWith("[") ||
+    /["“]?translationZh["”]?\s*:/.test(text)
+  );
+}
+
 function turnTranslation(turn: TranscriptTurn) {
-  return turn.translationZh?.trim() || undefined;
+  const translation = turn.translationZh?.trim();
+
+  if (!translation || looksLikeMalformedTranslation(translation)) {
+    return undefined;
+  }
+
+  return translation;
 }
 
 export function ConversationTranscriptPanel({
@@ -86,6 +100,9 @@ export function ConversationTranscriptPanel({
           <h2 className="text-base font-semibold text-[var(--foreground)]">
             完整字幕
           </h2>
+          <span className="rounded-md bg-[var(--surface-subtle)] px-2 py-1 text-xs font-medium text-[var(--muted)]">
+            最近 3 轮
+          </span>
         </div>
         <button
           type="button"
@@ -99,8 +116,8 @@ export function ConversationTranscriptPanel({
         </button>
       </div>
 
-      <div className="mt-4 max-h-[32rem] space-y-3 overflow-y-auto pr-1">
-        {conversationTurns.map((turn) => {
+      <div className="mt-4 space-y-3">
+        {visibleTurns.map((turn) => {
           const translation = turnTranslation(turn);
 
           return (

@@ -101,7 +101,7 @@ describe("prep card views", () => {
             id: "session_123",
             goalId: "customer_qa",
             personaId: "technical_lead",
-            voicePackId: "ethan-technical-lead",
+            voicePackId: "kore-firm",
             status: "created",
           },
         }),
@@ -137,7 +137,7 @@ describe("prep card views", () => {
     expect(JSON.parse(String(requestInit.body))).toMatchObject({
       goalId: "customer_qa",
       personaId: "technical_lead",
-      voicePackId: "ethan-technical-lead",
+      voicePackId: "kore-firm",
       materialId: "material_123",
       focusTags: expect.arrayContaining(["产品参数解释"]),
     });

@@ -1,10 +1,14 @@
-import type { CreatePracticeSessionInput } from "@/lib/validation/practice";
+import type {
+  CreatePracticeSessionInput,
+  ResolvedPracticeContext,
+} from "@/lib/validation/practice";
 
 export type StoredPracticeSessionSelection = {
   difficulty?: CreatePracticeSessionInput["difficulty"];
   focusTags: string[];
   goalId: string;
   id: string;
+  materialMode?: CreatePracticeSessionInput["materialMode"];
   materialId?: string;
   mode: CreatePracticeSessionInput["mode"];
   personaId: string;
@@ -13,6 +17,7 @@ export type StoredPracticeSessionSelection = {
   sourceObjectionId?: string;
   trainingFocus: string[];
   voicePackId: string;
+  resolvedContext?: ResolvedPracticeContext;
 };
 
 function storageKey(sessionId: string) {

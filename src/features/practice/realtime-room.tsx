@@ -1,9 +1,10 @@
 "use client";
 
-import { ChevronDown, ChevronUp, Lightbulb } from "lucide-react";
+import { BookOpenCheck, Lightbulb, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { PageHeader } from "@/components/page-header";
+import { personas as legacyPersonas } from "@/data/personas";
 import { defaultScenarioPack } from "@/data/scenario-packs";
 import {
   ConversationTranscriptPanel,
@@ -16,7 +17,13 @@ import {
 import {
   SmartSupportPanel,
   type SmartCue,
+  type SmartGuidanceState,
 } from "@/features/practice/smart-support-panel";
+import {
+  SupportResultWorkspace,
+  type SupportResultTabType,
+  type SupportResultTabView,
+} from "@/features/practice/support-result-workspace";
 import {
   decodePCM16Base64ToFloat32,
   encodeFloat32AudioToPCM16Base64,
@@ -25,9 +32,11 @@ import {
   readPracticeSessionSelection,
   type StoredPracticeSessionSelection,
 } from "@/lib/practice/practice-session-selection";
+import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
 
 type RealtimeRoomProps = {
   initialPracticeSession?: StoredPracticeSessionSelection | null;
+  initialTranscriptTurns?: TranscriptTurn[];
   sessionId: string;
 };
 
@@ -49,6 +58,7 @@ type RealtimeRelaySessionResponse = {
   sessionId: string;
   expiresAt: string;
   model: string;
+  voiceName?: string;
   inputAudioSampleRate?: number;
   outputAudioSampleRate?: number;
   instructionsPreview: string;
@@ -62,41 +72,99 @@ type SubtitleTranslationResponse = {
   translationZh?: string;
 };
 
-const initialTranscript: TranscriptTurn[] = [
-  {
-    id: "turn_1",
-    speaker: "ai_customer",
-    text: "What business problem are you trying to solve with smart glasses?",
-    translationZh: "你想用智能眼镜解决什么业务问题？",
-    timestamp: 0,
-  },
-  {
-    id: "turn_2",
-    speaker: "user",
-    text: "We want to help international teams communicate more smoothly during meetings.",
-    timestamp: 8,
-  },
-];
-
-const cueResponses: Record<SmartCue, string> = {
-  "Better Phrase":
-    "Try: The key value is reducing communication friction in real time.",
-  "Use Material Point":
-    "Use this point: Rokid supports real-time translated captions for multilingual conversations.",
-  "Ask a Discovery Question":
-    "Ask: What does a successful pilot look like for your team?",
-  "Shorten Answer": "Try a shorter structure: acknowledge, position, ask.",
-  "Translate This":
-    "Chinese meaning: 核心价值是实时降低跨语言会议中的沟通阻力。",
-  "Challenge Me":
-    "Challenge: Why should we choose Rokid instead of a phone translation app?",
+type SuggestedAnswerResponse = {
+  suggestion?: SuggestedAnswerRecord;
 };
+
+type SupportCueResponse = {
+  cueResult?: SupportCueResult;
+};
+
+type SmartGuidanceResponse = {
+  guidance?: SmartGuidanceState;
+};
+
+type SupportCue = Exclude<SmartCue, "Suggested Answer">;
+
+type SupportCueResultSection = {
+  label: string;
+  english?: string;
+  chinese?: string;
+  note?: string;
+};
+
+type SupportCueVocabularyItem = {
+  term: string;
+  phonetic: string;
+  chinese: string;
+  example: string;
+};
+
+type SupportCueResult = {
+  id: string;
+  title: string;
+  badge: string;
+  sections: SupportCueResultSection[];
+  vocabulary?: SupportCueVocabularyItem[];
+};
+
+type SupportResultTab = SupportResultTabView & {
+  payload?: SuggestedAnswerRecord | SupportCueResult;
+};
+
+type SupportCueResultTabType = Exclude<
+  SupportResultTabType,
+  "suggested-answer"
+>;
+
+const supportCueNotices: Record<SupportCue, string> = {
+  "Better Phrase": "更自然表达分析已生成。",
+  "Use Material Point": "材料要点建议已生成。",
+  "Ask a Discovery Question": "探索问题建议已生成。",
+  "Challenge Me": "挑战练习建议已生成。",
+};
+
+const cueToSupportResultTabType = {
+  "Better Phrase": "better-phrase",
+  "Use Material Point": "material-point",
+  "Ask a Discovery Question": "discovery-question",
+  "Challenge Me": "challenge-me",
+} satisfies Record<SupportCue, SupportCueResultTabType>;
+
+const supportResultTabTypeToCue = {
+  "better-phrase": "Better Phrase",
+  "material-point": "Use Material Point",
+  "discovery-question": "Ask a Discovery Question",
+  "challenge-me": "Challenge Me",
+} satisfies Record<SupportCueResultTabType, SupportCue>;
+
+const supportResultTabTitles = {
+  "suggested-answer": "建议回答",
+  "better-phrase": "更自然表达",
+  "discovery-question": "探索问题",
+  "material-point": "材料要点",
+  "challenge-me": "挑战我",
+} satisfies Record<SupportResultTabType, string>;
+
+function supportResultTabId(type: SupportResultTabType) {
+  return `support-result-${type}`;
+}
+
 const DEFAULT_INPUT_AUDIO_SAMPLE_RATE = 24_000;
 const DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
 const RELAY_READY_TIMEOUT_MS = 45_000;
 const DEFAULT_PERSONA_ID = "technical_lead";
-const DEFAULT_VOICE_PACK_ID = "ethan-technical-lead";
+const DEFAULT_VOICE_PACK_ID = "kore-firm";
+
+const legacyVoicePackIds: Record<string, string> = {
+  "ava-friendly-buyer": "zephyr-bright",
+  "serena-enterprise-decision-maker": "kore-firm",
+  "ethan-technical-lead": "charon-informative",
+  "marcus-executive-customer": "fenrir-excitable",
+  "vivian-critical-procurement": "leda-youthful",
+  "noah-channel-partner": "puck-upbeat",
+};
 
 function defaultPracticeSessionSelection(
   sessionId: string,
@@ -140,14 +208,56 @@ function normalizePracticeSessionSelection(
 }
 
 function resolveVoicePackLabel(voicePackId: string) {
+  const normalizedVoicePackId = legacyVoicePackIds[voicePackId] ?? voicePackId;
+
   return (
-    defaultScenarioPack.voicePacks.find((voicePack) => voicePack.id === voicePackId)
-      ?.name ??
+    defaultScenarioPack.voicePacks.find(
+      (voicePack) => voicePack.id === normalizedVoicePackId,
+    )?.name ??
     defaultScenarioPack.voicePacks.find(
       (voicePack) => voicePack.id === DEFAULT_VOICE_PACK_ID,
     )?.name ??
-    "Ethan 技术负责人"
+    "Kore 坚定专业"
   );
+}
+
+function resolveVoicePackGender(voicePackId: string) {
+  const normalizedVoicePackId = legacyVoicePackIds[voicePackId] ?? voicePackId;
+
+  return defaultScenarioPack.voicePacks.find(
+    (voicePack) => voicePack.id === normalizedVoicePackId,
+  )?.gender;
+}
+
+function resolvePersonaLabel(personaId: string) {
+  return (
+    defaultScenarioPack.personas.find((persona) => persona.id === personaId)
+      ?.label ??
+    legacyPersonas.find((persona) => persona.id === personaId)?.name ??
+    "技术负责人"
+  );
+}
+
+function resolveScenarioPersona(personaId: string) {
+  return defaultScenarioPack.personas.find((persona) => persona.id === personaId);
+}
+
+function buildStartRoleplayInstructions(
+  practiceSession: StoredPracticeSessionSelection,
+) {
+  const personaLabel = resolvePersonaLabel(practiceSession.personaId);
+  const voicePackLabel = resolveVoicePackLabel(practiceSession.voicePackId);
+  const voicePackGender = resolveVoicePackGender(practiceSession.voicePackId);
+
+  return [
+    `Start the roleplay as the selected AI customer persona: ${personaLabel}.`,
+    `Use the selected voice pack and speaking style: ${voicePackLabel}.`,
+    voicePackGender
+      ? `The spoken AI voice must sound clearly ${voicePackGender}.`
+      : "Use the selected provider voice.",
+    "Do not introduce yourself using any unselected voice persona name.",
+    "Ask one concise customer discovery question about Rokid smart glasses in an overseas business meeting.",
+  ].join(" ");
 }
 
 function nextTurnId() {
@@ -225,17 +335,664 @@ function userFacingRealtimeError(message: string) {
     : "实时连接异常，请稍后重试。";
 }
 
+function latestConversationTurn(turns: TranscriptTurn[]) {
+  return [...turns].reverse().find((turn) => turn.speaker !== "system");
+}
+
+function latestTurnBySpeaker(
+  turns: TranscriptTurn[],
+  speaker: TranscriptTurn["speaker"],
+) {
+  return [...turns].reverse().find((turn) => turn.speaker === speaker);
+}
+
+function buildSmartGuidance(turns: TranscriptTurn[]): SmartGuidanceState {
+  const latestTurn = latestConversationTurn(turns);
+
+  if (!latestTurn) {
+    return {
+      currentJudgment: "还没有真实对话内容，开始后会根据客户和你的发言生成智能建议。",
+      nextStep: "先进入对话，听清客户的第一轮关注点，再让 AI 给出下一步引导。",
+      sayThis:
+        "Could you share the main situation where your team would use smart glasses?",
+    };
+  }
+
+  const latestSpeaker = latestTurn.speaker === "ai_customer" ? "客户" : "你";
+
+  return {
+    currentJudgment: `正在根据${latestSpeaker}刚才的真实发言生成智能建议。`,
+    nextStep: "先保持对话节奏，等 AI 分析返回后再按照当前语境选择下一步。",
+    sayThis:
+      "Let me make sure I understand your point before I answer.",
+  };
+}
+
+function textIncludesAny(text: string, keywords: string[]) {
+  const normalizedText = text.toLowerCase();
+
+  return keywords.some((keyword) => normalizedText.includes(keyword));
+}
+
+function buildBetterPhraseContent(
+  latestAiText: string,
+  latestUserText: string,
+  practiceSession: StoredPracticeSessionSelection,
+) {
+  const persona = resolveScenarioPersona(practiceSession.personaId);
+  const personaLabel = resolvePersonaLabel(practiceSession.personaId);
+  const combinedContext = `${latestAiText} ${latestUserText}`;
+  const focusText =
+    practiceSession.focusTags.length > 0
+      ? practiceSession.focusTags.join("、")
+      : practiceSession.trainingFocus.join("、");
+  const focusContext = focusText ? `本轮练习重点是${focusText}。` : "";
+
+  if (
+    personaLabel === "技术负责人" ||
+    textIncludesAny(combinedContext, [
+      "deployment",
+      "cloud",
+      "on-premise",
+      "on premise",
+      "security",
+      "privacy",
+      "encrypted",
+      "integration",
+    ])
+  ) {
+    return {
+      personaLabel,
+      personaContext: `${personaLabel}通常会追问参数、集成、部署和安全边界。${focusContext}这里不要只说“翻译更好”，要把价值放进技术评审语境，并主动承认需要和 IT 团队确认。`,
+      logic:
+        "你的原句能表达大方向，但对技术负责人来说还不够具体。更自然的做法是先回应客户正在关心的部署或安全问题，再把实时字幕、免手持和会议连续性说成可评估的工作流价值。",
+      expression:
+        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
+      translation:
+        "在技术评审中，核心价值不只是翻译。Rokid 可以帮助多语言团队在会议中保持信息可见和免手持沟通，同时我们会和你们 IT 团队确认部署与安全要求。",
+      reason:
+        "这版更像真实商务会谈：它没有过度承诺部署能力，而是把产品价值、客户角色关注点和下一步技术确认放在同一个回答里。",
+      vocabulary: [
+        {
+          term: "technical review",
+          phonetic: "/ˈteknɪkəl rɪˈvjuː/",
+          chinese: "技术评审",
+          example: "For a technical review, we can first confirm the data flow.",
+        },
+        {
+          term: "meeting flow",
+          phonetic: "/ˈmiːtɪŋ floʊ/",
+          chinese: "会议流程、会议中的沟通连续性",
+          example: "Rokid helps keep the meeting flow visible and natural.",
+        },
+        {
+          term: "hands-free",
+          phonetic: "/ˌhændz ˈfriː/",
+          chinese: "免手持的",
+          example: "Hands-free captions help users stay engaged.",
+        },
+      ],
+    };
+  }
+
+  if (
+    personaLabel === "采购经理" ||
+    textIncludesAny(combinedContext, ["cost", "price", "budget", "competitor"])
+  ) {
+    return {
+      personaLabel,
+      personaContext: `${personaLabel}会关注采购风险、成本边界和竞品差异。${focusContext}表达时要减少形容词，多说可验证的使用价值和下一步评估方式。`,
+      logic:
+        "你的原句说明了产品方向，但还没有回应采购方最在意的投入产出和替代方案。更自然的表达应该承认需要评估，同时给出一个低风险的试点路径。",
+      expression:
+        "The value is not only better communication, but whether the pilot can prove a clear workflow fit before a larger purchase decision.",
+      translation:
+        "价值不只是沟通更顺畅，而是试点能否在更大规模采购前证明清晰的流程适配度。",
+      reason:
+        "这版能把销售表达从“产品很好”转成“先验证再采购”，更符合采购经理的决策方式。",
+      vocabulary: [
+        {
+          term: "workflow fit",
+          phonetic: "/ˈwɜːrkfloʊ fɪt/",
+          chinese: "流程适配度",
+          example: "We should confirm the workflow fit before scaling.",
+        },
+        {
+          term: "purchase decision",
+          phonetic: "/ˈpɜːrtʃəs dɪˈsɪʒən/",
+          chinese: "采购决策",
+          example: "A pilot can support the final purchase decision.",
+        },
+      ],
+    };
+  }
+
+  return {
+    personaLabel,
+    personaContext: persona
+      ? `${personaLabel}的沟通风格是${persona.communicationStyle} ${focusContext}当前回答需要把产品功能转成客户能判断的业务结果。`
+      : `${personaLabel}会先判断表达是否贴合真实场景。${focusContext}当前回答需要更具体地说明客户能获得什么改变。`,
+    logic:
+      "你的原句方向是对的，但偏泛。更自然的表达要先给客户一个清楚的业务结果，再用一个具体场景支撑，不要只停留在“沟通更好”。",
+    expression:
+      "The main value is that Rokid can reduce communication friction in real meetings, especially when teams need to follow multilingual discussions without breaking eye contact or switching devices.",
+    translation:
+      "主要价值在于 Rokid 能减少真实会议中的沟通摩擦，尤其适合团队需要跟上多语言讨论，同时不想打断眼神交流或频繁切换设备的场景。",
+    reason:
+      "这版更自然，因为它把抽象价值变成了具体会议场景，也更容易引出客户的真实使用方式。",
+    vocabulary: [
+      {
+        term: "communication friction",
+        phonetic: "/kəˌmjuːnɪˈkeɪʃən ˈfrɪkʃən/",
+        chinese: "沟通摩擦",
+        example: "Rokid can reduce communication friction in real meetings.",
+      },
+      {
+        term: "switching devices",
+        phonetic: "/ˈswɪtʃɪŋ dɪˈvaɪsɪz/",
+        chinese: "切换设备",
+        example: "Users can follow the meeting without switching devices.",
+      },
+    ],
+  };
+}
+
+function buildSupportCueResult(
+  cue: SupportCue,
+  turns: TranscriptTurn[],
+  practiceSession: StoredPracticeSessionSelection,
+): SupportCueResult {
+  const latestAiTurn = latestTurnBySpeaker(turns, "ai_customer");
+  const latestUserTurn = latestTurnBySpeaker(turns, "user");
+  const guidance = buildSmartGuidance(turns);
+  const latestAiText =
+    latestAiTurn?.text ??
+    "当前还没有客户问题，先用开场问题确认客户的真实使用场景。";
+  const latestUserText =
+    latestUserTurn?.text ??
+    "还没有捕捉到你的上一句英文。你可以先回答一句，再用这个功能优化表达。";
+
+  if (cue === "Better Phrase") {
+    const betterPhrase = buildBetterPhraseContent(
+      latestAiText,
+      latestUserText,
+      practiceSession,
+    );
+
+    return {
+      id: `support-${cue}`,
+      title: "更自然表达分析",
+      badge: "优化表达",
+      sections: [
+        {
+          label: "AI 客户上下文",
+          english: latestAiText,
+        },
+        {
+          label: "客户角色",
+          english: betterPhrase.personaLabel,
+          chinese: betterPhrase.personaContext,
+        },
+        {
+          label: "你的原句",
+          english: latestUserText,
+        },
+        {
+          label: "语句逻辑拆解",
+          chinese: betterPhrase.logic,
+        },
+        {
+          label: "更自然表达",
+          english: betterPhrase.expression,
+          chinese: betterPhrase.translation,
+        },
+        {
+          label: "为什么更好",
+          chinese: betterPhrase.reason,
+        },
+      ],
+      vocabulary: betterPhrase.vocabulary,
+    };
+  }
+
+  if (cue === "Ask a Discovery Question") {
+    return {
+      id: `support-${cue}`,
+      title: "探索问题建议",
+      badge: "推进会谈",
+      sections: [
+        {
+          label: "客户上一句",
+          english: latestAiText,
+        },
+        {
+          label: "上下文判断",
+          chinese: guidance.currentJudgment,
+        },
+        {
+          label: "推荐问题",
+          english: "What does a successful pilot look like for your team?",
+          chinese: "对你们团队来说，什么样的试点结果才算成功？",
+        },
+        {
+          label: "建议原因",
+          chinese:
+            "这个问题能把客户从泛泛了解拉回到试点目标、评估标准和下一步决策条件，方便你后续围绕 ROI、部署和场景价值继续沟通。",
+        },
+      ],
+    };
+  }
+
+  if (cue === "Use Material Point") {
+    return {
+      id: `support-${cue}`,
+      title: "材料要点建议",
+      badge: "引用材料",
+      sections: [
+        {
+          label: "客户上一句",
+          english: latestAiText,
+        },
+        {
+          label: "可引用要点",
+          english:
+            "Rokid supports real-time translated captions for multilingual conversations.",
+          chinese: "Rokid 支持面向多语言沟通的实时翻译字幕。",
+        },
+        {
+          label: "使用方式",
+          english:
+            "In this scenario, the translated captions can help both sides follow the meeting without switching devices.",
+          chinese:
+            "在这个场景中，实时字幕能帮助双方持续跟上会议内容，不需要频繁切换设备。",
+        },
+        {
+          label: "风险边界",
+          note: "不要补充材料中没有确认的价格、认证或部署承诺。",
+        },
+      ],
+    };
+  }
+
+  return {
+    id: `support-${cue}`,
+    title: "挑战练习建议",
+    badge: "进阶练习",
+    sections: [
+      {
+        label: "挑战问题",
+        english:
+          "Why should we choose Rokid instead of a phone translation app?",
+        chinese: "我们为什么应该选择 Rokid，而不是手机翻译应用？",
+      },
+      {
+        label: "训练目的",
+        chinese:
+          "这个挑战会逼你说明智能眼镜相对手机方案的差异：免手持、会议连续性、现场协作和企业场景适配。",
+      },
+      {
+        label: "作答抓手",
+        english:
+          "The difference is not only translation accuracy, but whether the user can stay engaged in the workflow.",
+        chinese:
+          "差异不只是翻译准确率，而是用户能否持续参与当前工作流程。",
+      },
+      {
+        label: "回答边界",
+        chinese:
+          "不要贬低竞品或做绝对化承诺，重点说清楚 Rokid 更适合哪些高频商务和现场协作场景。",
+      },
+    ],
+  };
+}
+
+function SuggestedAnswerPanel({
+  errorMessage,
+  isLoading,
+  suggestion,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  suggestion: SuggestedAnswerRecord | null;
+}) {
+  if (isLoading) {
+    return (
+      <section
+        aria-live="polite"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+      >
+        <div className="flex items-center gap-2">
+          <Loader2
+            className="h-5 w-5 animate-spin text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            建议回答
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+          正在结合当前情境、客户角色和最近问题生成建议回答。
+        </p>
+      </section>
+    );
+  }
+
+  if (!suggestion) {
+    return errorMessage ? (
+      <section
+        role="status"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+      >
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          建议回答
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+          {errorMessage}
+        </p>
+      </section>
+    ) : null;
+  }
+
+  return (
+    <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <BookOpenCheck
+            className="h-5 w-5 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            建议回答
+          </h2>
+        </div>
+        <span className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]">
+          已记录到表达库和复盘
+        </span>
+      </div>
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
+        <article className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
+          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+            AI 客户原句
+          </p>
+          <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+            {suggestion.aiQuestion.english}
+          </p>
+          <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+            {suggestion.aiQuestion.translationZh}
+          </p>
+        </article>
+
+        <article className="rounded-md border border-[var(--border)] p-3">
+          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+            如何回应
+          </p>
+          <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+            {suggestion.responseStrategy.english}
+          </p>
+          <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+            {suggestion.responseStrategy.chinese}
+          </p>
+        </article>
+      </div>
+
+      <article className="mt-3 rounded-md border border-[var(--border)] p-3">
+        <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+          上下文解析
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {[
+            ["当前对话", suggestion.contextBreakdown.conversationStateZh],
+            [
+              "客户为什么现在问",
+              suggestion.contextBreakdown.customerQuestionReasonZh,
+            ],
+            ["前文回答", suggestion.contextBreakdown.priorUserAnswerZh],
+            ["当前缺口", suggestion.contextBreakdown.missingInformationZh],
+            ["回答边界", suggestion.contextBreakdown.responseBoundaryZh],
+          ].map(([label, content]) => (
+            <div
+              key={label}
+              className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
+            >
+              <p className="text-xs font-semibold text-[var(--primary-strong)]">
+                {label}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                {content}
+              </p>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article className="mt-3 rounded-md border border-[var(--border)] p-3">
+        <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+          语句逻辑拆解
+        </p>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {[
+            ["表层语义", suggestion.logicBreakdown.surfaceMeaningZh],
+            ["客户目的", suggestion.logicBreakdown.customerIntentZh],
+            ["想确认的信息", suggestion.logicBreakdown.informationNeededZh],
+            ["回应重点", suggestion.logicBreakdown.responseFocusZh],
+          ].map(([label, content]) => (
+            <div
+              key={label}
+              className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
+            >
+              <p className="text-xs font-semibold text-[var(--primary-strong)]">
+                {label}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                {content}
+              </p>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <div className="mt-3 grid gap-3">
+        {suggestion.suggestedReplies.map((reply) => (
+          <article
+            key={reply.english}
+            className="rounded-md border border-[var(--border)] p-3"
+          >
+            <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+              推荐回复
+            </p>
+            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--foreground)]">
+              {reply.english}
+            </p>
+            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+              {reply.chinese}
+            </p>
+            <p className="mt-2 rounded-md bg-[var(--surface-subtle)] px-3 py-2 text-sm leading-6 text-[var(--muted)]">
+              {reply.reason}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      {suggestion.vocabulary.length > 0 ? (
+        <div className="mt-3 rounded-md border border-[var(--border)] p-3">
+          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+            高级词汇
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {suggestion.vocabulary.map((item) => (
+              <div
+                key={`${item.term}-${item.phonetic}`}
+                className="rounded-md bg-[var(--surface-subtle)] p-3"
+              >
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {item.term}
+                </p>
+                <p className="mt-1 text-sm text-[var(--primary-strong)]">
+                  {item.phonetic}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                  {item.chinese}
+                </p>
+                {item.example ? (
+                  <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                    {item.example}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SupportCueResultPanel({
+  errorMessage,
+  isLoading,
+  result,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  result: SupportCueResult | null;
+}) {
+  if (!result) {
+    return isLoading ? (
+      <section
+        aria-live="polite"
+        className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+      >
+        <div className="flex items-center gap-2">
+          <Loader2
+            className="h-5 w-5 animate-spin text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            正在生成提示分析
+          </h2>
+        </div>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
+          正在结合上下文、客户身份和商务表达规范生成建议。
+        </p>
+      </section>
+    ) : null;
+  }
+
+  return (
+    <section
+      aria-live="polite"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <BookOpenCheck
+            className="h-5 w-5 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            {result.title}
+          </h2>
+        </div>
+        <span className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]">
+          {isLoading ? "AI 生成中" : result.badge}
+        </span>
+      </div>
+
+      {errorMessage ? (
+        <p className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        {result.sections.map((section) => (
+          <article
+            key={`${result.id}-${section.label}`}
+            className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
+          >
+            <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+              {section.label}
+            </p>
+            {section.english ? (
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+                {section.english}
+              </p>
+            ) : null}
+            {section.chinese ? (
+              <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+                {section.chinese}
+              </p>
+            ) : null}
+            {section.note ? (
+              <p className="mt-2 rounded-md bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+                {section.note}
+              </p>
+            ) : null}
+          </article>
+        ))}
+      </div>
+
+      {result.vocabulary && result.vocabulary.length > 0 ? (
+        <div className="mt-3 rounded-md border border-[var(--border)] p-3">
+          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+            高级词汇
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {result.vocabulary.map((item) => (
+              <div
+                key={`${result.id}-${item.term}`}
+                className="rounded-md bg-[var(--surface-subtle)] p-3"
+              >
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {item.term}
+                </p>
+                <p className="mt-1 text-sm text-[var(--primary-strong)]">
+                  {item.phonetic}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                  {item.chinese}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  {item.example}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 export function RealtimeRoom({
   initialPracticeSession,
+  initialTranscriptTurns = [],
   sessionId,
 }: RealtimeRoomProps) {
   const [state, setState] = useState<RealtimeRoomState>("Ready");
-  const [transcriptTurns, setTranscriptTurns] = useState(initialTranscript);
+  const [transcriptTurns, setTranscriptTurns] = useState<TranscriptTurn[]>(
+    initialTranscriptTurns,
+  );
   const [practiceSessionSelection, setPracticeSessionSelection] = useState(() =>
     normalizePracticeSessionSelection(sessionId, initialPracticeSession),
   );
+  const [aiSmartGuidance, setAiSmartGuidance] = useState<{
+    guidance: SmartGuidanceState;
+    key: string;
+  } | null>(null);
+  const [smartGuidanceError, setSmartGuidanceError] = useState<{
+    key: string;
+    message: string;
+  } | null>(null);
   const [isSupportOpen, setIsSupportOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [supportResultTabs, setSupportResultTabs] = useState<
+    SupportResultTab[]
+  >([]);
+  const [activeSupportResultTabId, setActiveSupportResultTabId] = useState<
+    string | null
+  >(null);
   const [systemNotice, setSystemNotice] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const dataChannelRef = useRef<RTCDataChannel | null>(null);
@@ -252,7 +1009,38 @@ export function RealtimeRoom({
   const isMutedRef = useRef(false);
   const pendingAITranscriptRef = useRef("");
   const practiceSessionSelectionRef = useRef(practiceSessionSelection);
-  const transcriptTurnsRef = useRef(initialTranscript);
+  const transcriptTurnsRef = useRef<TranscriptTurn[]>(initialTranscriptTurns);
+  const smartGuidanceTranscriptPayload = transcriptTurns
+    .filter((turn) => turn.speaker !== "system")
+    .map((turn) => ({
+      speaker: turn.speaker,
+      text: turn.text,
+      timestamp: turn.timestamp,
+      metadata: {},
+    }));
+  const smartGuidanceRequestBody = JSON.stringify({
+    practiceSession: practiceSessionSelection,
+    transcriptTurns: smartGuidanceTranscriptPayload,
+  });
+  const hasSmartGuidanceTranscript = smartGuidanceTranscriptPayload.length > 0;
+  const fallbackSmartGuidance = buildSmartGuidance(transcriptTurns);
+  const hasCurrentAiSmartGuidance =
+    aiSmartGuidance?.key === smartGuidanceRequestBody;
+  const currentSmartGuidanceError =
+    smartGuidanceError?.key === smartGuidanceRequestBody
+      ? smartGuidanceError.message
+      : null;
+  const smartGuidance =
+    hasCurrentAiSmartGuidance
+      ? aiSmartGuidance.guidance
+      : fallbackSmartGuidance;
+  const smartGuidanceStatus = !hasSmartGuidanceTranscript
+    ? "idle"
+    : hasCurrentAiSmartGuidance
+      ? "ready"
+      : currentSmartGuidanceError
+        ? "error"
+        : "loading";
 
   useEffect(() => {
     return () => {
@@ -263,6 +1051,59 @@ export function RealtimeRoom({
   useEffect(() => {
     practiceSessionSelectionRef.current = practiceSessionSelection;
   }, [practiceSessionSelection]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") {
+      return;
+    }
+
+    if (!hasSmartGuidanceTranscript) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void fetch(`/api/practice-sessions/${sessionId}/smart-guidance`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        signal: controller.signal,
+        body: smartGuidanceRequestBody,
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            return null;
+          }
+
+          return (await response.json()) as SmartGuidanceResponse;
+        })
+        .then((payload) => {
+          if (payload?.guidance) {
+            setAiSmartGuidance({
+              guidance: payload.guidance,
+              key: smartGuidanceRequestBody,
+            });
+          }
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) {
+            return;
+          }
+
+          console.warn("Smart guidance request failed.", error);
+          setSmartGuidanceError({
+            key: smartGuidanceRequestBody,
+            message: "智能建议暂时无法生成，请稍后重试。",
+          });
+        });
+    }, 450);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [hasSmartGuidanceTranscript, sessionId, smartGuidanceRequestBody]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -420,6 +1261,9 @@ export function RealtimeRoom({
         prepCardId: currentPracticeSession.prepCardId,
         trainingFocus: currentPracticeSession.trainingFocus,
         focusTags: currentPracticeSession.focusTags,
+        memorySnippets:
+          currentPracticeSession.resolvedContext?.memorySnippets ?? [],
+        resolvedContext: currentPracticeSession.resolvedContext,
       }),
     });
 
@@ -672,6 +1516,8 @@ export function RealtimeRoom({
         callback();
       }
       const startRelaySession = () => {
+        const selectedPracticeSession = practiceSessionSelectionRef.current;
+
         setState("In Conversation");
         addSystemTurn(`实时 Relay 会话 ${realtimeSession.sessionId} 已连接。`);
         void startRelayMicrophoneStreaming(
@@ -684,8 +1530,7 @@ export function RealtimeRoom({
           type: "response.create",
           response: {
             modalities: ["audio", "text"],
-            instructions:
-              "Start the roleplay by asking one concise customer discovery question about smart glasses in an overseas business meeting.",
+            instructions: buildStartRoleplayInstructions(selectedPracticeSession),
           },
         });
       };
@@ -780,11 +1625,12 @@ export function RealtimeRoom({
     dataChannelRef.current = dataChannel;
     dataChannel.addEventListener("message", handleRealtimeEvent);
     dataChannel.addEventListener("open", () => {
+      const selectedPracticeSession = practiceSessionSelectionRef.current;
+
       sendRealtimeEvent({
         type: "response.create",
         response: {
-          instructions:
-            "Start the roleplay by asking one concise customer discovery question about smart glasses in an overseas business meeting.",
+          instructions: buildStartRoleplayInstructions(selectedPracticeSession),
         },
       });
     });
@@ -916,28 +1762,296 @@ export function RealtimeRoom({
     });
   }
 
-  function handleCue(cue: SmartCue) {
-    setState("In Conversation");
-    sendRealtimeEvent({
-      type: "conversation.item.create",
-      item: {
-        type: "message",
-        role: "user",
-        content: [
-          {
-            type: "input_text",
-            text: `Live coaching cue: ${cue}. ${cueResponses[cue]}`,
+  function latestAiCustomerTurn() {
+    return [...transcriptTurnsRef.current]
+      .reverse()
+      .find((turn) => turn.speaker === "ai_customer");
+  }
+
+  function conversationTranscriptPayload() {
+    return transcriptTurnsRef.current
+      .filter((turn) => turn.speaker !== "system")
+      .map((turn) => ({
+        speaker: turn.speaker,
+        text: turn.text,
+        timestamp: turn.timestamp,
+        metadata: {},
+      }));
+  }
+
+  function upsertSupportResultTab(tab: SupportResultTab) {
+    setSupportResultTabs((currentTabs) => {
+      const existingIndex = currentTabs.findIndex(
+        (currentTab) => currentTab.id === tab.id,
+      );
+
+      if (existingIndex === -1) {
+        return [...currentTabs, tab];
+      }
+
+      const nextTabs = [...currentTabs];
+      nextTabs[existingIndex] = {
+        ...currentTabs[existingIndex],
+        ...tab,
+      };
+
+      return nextTabs;
+    });
+    setActiveSupportResultTabId(tab.id);
+  }
+
+  function activateExistingSupportResultTab(type: SupportResultTabType) {
+    const existingTab = supportResultTabs.find((tab) => tab.type === type);
+
+    if (!existingTab) {
+      return false;
+    }
+
+    setActiveSupportResultTabId(existingTab.id);
+    return true;
+  }
+
+  function closeSupportResultTab(tabId: string) {
+    const closingIndex = supportResultTabs.findIndex((tab) => tab.id === tabId);
+
+    if (closingIndex === -1) {
+      return;
+    }
+
+    const nextTabs = supportResultTabs.filter((tab) => tab.id !== tabId);
+    setSupportResultTabs(nextTabs);
+
+    if (
+      activeSupportResultTabId === tabId ||
+      !nextTabs.some((tab) => tab.id === activeSupportResultTabId)
+    ) {
+      const nextActiveTab =
+        nextTabs[closingIndex - 1] ?? nextTabs[closingIndex] ?? null;
+      setActiveSupportResultTabId(nextActiveTab?.id ?? null);
+    }
+  }
+
+  function closeSupportPanelOnNarrowViewport() {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 1023px)").matches
+    ) {
+      setIsSupportOpen(false);
+    }
+  }
+
+  async function handleSuggestedAnswer(options?: { force?: boolean }) {
+    const tabId = supportResultTabId("suggested-answer");
+
+    if (!options?.force && activateExistingSupportResultTab("suggested-answer")) {
+      closeSupportPanelOnNarrowViewport();
+      return;
+    }
+
+    const latestAiTurn = latestAiCustomerTurn();
+
+    if (!latestAiTurn) {
+      upsertSupportResultTab({
+        id: tabId,
+        title: supportResultTabTitles["suggested-answer"],
+        type: "suggested-answer",
+        status: "error",
+        errorMessage: "等 AI 客户提出问题后，再使用建议回答。",
+      });
+      closeSupportPanelOnNarrowViewport();
+      return;
+    }
+
+    upsertSupportResultTab({
+      id: tabId,
+      title: supportResultTabTitles["suggested-answer"],
+      type: "suggested-answer",
+      status: "loading",
+    });
+    closeSupportPanelOnNarrowViewport();
+
+    try {
+      const response = await fetch(
+        `/api/practice-sessions/${sessionId}/suggested-answer`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
           },
-        ],
-      },
+          body: JSON.stringify({
+            practiceSession: practiceSessionSelectionRef.current,
+            latestAiTurn: {
+              speaker: latestAiTurn.speaker,
+              text: latestAiTurn.text,
+              translationZh: latestAiTurn.translationZh,
+              timestamp: latestAiTurn.timestamp,
+              metadata: {},
+            },
+            transcriptTurns: conversationTranscriptPayload(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("建议回答生成失败。");
+      }
+
+      const payload = (await response.json()) as SuggestedAnswerResponse;
+
+      if (!payload.suggestion) {
+        throw new Error("建议回答为空。");
+      }
+
+      upsertSupportResultTab({
+        id: tabId,
+        title: supportResultTabTitles["suggested-answer"],
+        type: "suggested-answer",
+        status: "ready",
+        payload: payload.suggestion,
+      });
+      setSystemNotice("建议回答已生成，并记录到表达库和复盘。");
+    } catch {
+      upsertSupportResultTab({
+        id: tabId,
+        title: supportResultTabTitles["suggested-answer"],
+        type: "suggested-answer",
+        status: "error",
+        errorMessage: "建议回答暂时无法生成，请稍后重试。",
+      });
+    }
+  }
+
+  async function handleCue(cue: SmartCue, options?: { force?: boolean }) {
+    if (cue === "Suggested Answer") {
+      void handleSuggestedAnswer(options);
+      return;
+    }
+
+    const tabType = cueToSupportResultTabType[cue];
+    const tabId = supportResultTabId(tabType);
+
+    if (!options?.force && activateExistingSupportResultTab(tabType)) {
+      closeSupportPanelOnNarrowViewport();
+      return;
+    }
+
+    const fallbackCueResult = buildSupportCueResult(
+      cue,
+      transcriptTurnsRef.current,
+      practiceSessionSelectionRef.current,
+    );
+
+    upsertSupportResultTab({
+      id: tabId,
+      title: supportResultTabTitles[tabType],
+      type: tabType,
+      status: "loading",
+      payload: fallbackCueResult,
     });
-    sendRealtimeEvent({
-      type: "response.create",
-      response: {
-        modalities: ["audio", "text"],
-      },
-    });
-    addSystemTurn(cueResponses[cue]);
+    closeSupportPanelOnNarrowViewport();
+    setSystemNotice(supportCueNotices[cue]);
+
+    try {
+      const response = await fetch(
+        `/api/practice-sessions/${sessionId}/support-cue`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            cue,
+            practiceSession: practiceSessionSelectionRef.current,
+            transcriptTurns: conversationTranscriptPayload(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("提示分析生成失败。");
+      }
+
+      const payload = (await response.json()) as SupportCueResponse;
+
+      if (!payload.cueResult) {
+        throw new Error("提示分析为空。");
+      }
+
+      upsertSupportResultTab({
+        id: tabId,
+        title: supportResultTabTitles[tabType],
+        type: tabType,
+        status: "ready",
+        payload: payload.cueResult,
+      });
+      setSystemNotice(`${supportCueNotices[cue]}已由 AI 结合上下文生成。`);
+    } catch {
+      upsertSupportResultTab({
+        id: tabId,
+        title: supportResultTabTitles[tabType],
+        type: tabType,
+        status: "error",
+        errorMessage: "AI 分析暂时不可用，已展示本地兜底建议。",
+        payload: fallbackCueResult,
+      });
+    }
+  }
+
+  function retrySupportResultTab(tabId: string) {
+    const tab = supportResultTabs.find((supportTab) => supportTab.id === tabId);
+
+    if (!tab) {
+      return;
+    }
+
+    if (tab.type === "suggested-answer") {
+      void handleSuggestedAnswer({ force: true });
+      return;
+    }
+
+    void handleCue(supportResultTabTypeToCue[tab.type], { force: true });
+  }
+
+  function activeSupportResultTab() {
+    if (supportResultTabs.length === 0) {
+      return null;
+    }
+
+    return (
+      supportResultTabs.find((tab) => tab.id === activeSupportResultTabId) ??
+      supportResultTabs[supportResultTabs.length - 1]
+    );
+  }
+
+  function renderActiveSupportResult() {
+    const activeTab = activeSupportResultTab();
+
+    if (!activeTab) {
+      return null;
+    }
+
+    if (activeTab.type === "suggested-answer") {
+      return (
+        <SuggestedAnswerPanel
+          errorMessage={activeTab.errorMessage ?? null}
+          isLoading={activeTab.status === "loading"}
+          suggestion={
+            activeTab.status === "ready"
+              ? (activeTab.payload as SuggestedAnswerRecord | undefined) ?? null
+              : null
+          }
+        />
+      );
+    }
+
+    return (
+      <SupportCueResultPanel
+        errorMessage={activeTab.errorMessage ?? null}
+        isLoading={activeTab.status === "loading"}
+        result={(activeTab.payload as SupportCueResult | undefined) ?? null}
+      />
+    );
   }
 
   return (
@@ -948,56 +2062,94 @@ export function RealtimeRoom({
         title="实时会议练习"
         description="Practice a customer conversation with material guidance, live transcript, and smart support controls."
       />
-      <section className="mx-auto grid w-full max-w-5xl gap-4">
-        <LiveMeetingPanel
-          state={state}
-          onStart={handleStart}
-          onMute={handleMute}
-          onEnd={handleEnd}
-          isMuted={isMuted}
-          voicePackLabel={resolveVoicePackLabel(
-            practiceSessionSelection.voicePackId,
-          )}
-        />
-        {systemNotice ? (
-          <p
-            role="status"
-            className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm leading-6 text-[var(--muted)]"
+      <div className="mx-auto w-full max-w-7xl">
+        {!isSupportOpen ? (
+          <button
+            type="button"
+            aria-label="打开提示面板"
+            aria-controls="smart-support-panel"
+            aria-expanded={false}
+            onClick={() => setIsSupportOpen(true)}
+            className="fixed right-5 top-5 z-30 inline-flex h-12 w-12 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--warning)] shadow-sm transition hover:border-[var(--warning)] hover:bg-[#fff8ed] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
           >
-            {systemNotice}
-          </p>
+            <Lightbulb className="h-5 w-5" aria-hidden="true" />
+          </button>
         ) : null}
-        <ConversationTranscriptPanel turns={transcriptTurns} />
-        <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-[var(--warning)]" aria-hidden="true" />
-              <h2 className="text-base font-semibold text-[var(--foreground)]">
-                提示
-              </h2>
-            </div>
-            <button
-              type="button"
-              aria-expanded={isSupportOpen}
-              aria-controls="smart-support-panel"
-              onClick={() => setIsSupportOpen((current) => !current)}
-              className="inline-flex min-h-11 items-center gap-2 rounded-md border border-[var(--border)] px-3 text-sm font-medium transition hover:border-[var(--primary)]"
-            >
-              {isSupportOpen ? (
-                <ChevronUp className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <ChevronDown className="h-4 w-4" aria-hidden="true" />
+
+        <section
+          className={
+            isSupportOpen
+              ? "grid w-full gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(20rem,1fr)]"
+              : "mx-auto grid w-full max-w-5xl gap-4"
+          }
+        >
+          <div className="grid min-w-0 gap-4">
+            <LiveMeetingPanel
+              state={state}
+              onStart={handleStart}
+              onMute={handleMute}
+              onEnd={handleEnd}
+              isMuted={isMuted}
+              voicePackLabel={resolveVoicePackLabel(
+                practiceSessionSelection.voicePackId,
               )}
-              {isSupportOpen ? "隐藏提示" : "打开提示"}
-            </button>
+            />
+            {systemNotice ? (
+              <p
+                role="status"
+                className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm leading-6 text-[var(--muted)]"
+              >
+                {systemNotice}
+              </p>
+            ) : null}
+            <ConversationTranscriptPanel turns={transcriptTurns} />
+            <SupportResultWorkspace
+              activeTabId={activeSupportResultTabId}
+              onCloseTab={closeSupportResultTab}
+              onRetryTab={retrySupportResultTab}
+              onSelectTab={setActiveSupportResultTabId}
+              tabs={supportResultTabs}
+            >
+              {renderActiveSupportResult()}
+            </SupportResultWorkspace>
           </div>
+
           {isSupportOpen ? (
-            <div id="smart-support-panel" className="mt-4">
-              <SmartSupportPanel embedded onCue={handleCue} />
-            </div>
+            <aside
+              id="smart-support-panel"
+              aria-label="提示"
+              className="fixed inset-x-0 bottom-0 z-40 max-h-[58dvh] min-w-0 overflow-y-auto rounded-t-md border border-[var(--border)] bg-[var(--surface)] p-4 shadow-lg lg:sticky lg:inset-x-auto lg:bottom-auto lg:top-5 lg:z-auto lg:max-h-[calc(100dvh-2.5rem)] lg:self-start lg:rounded-md lg:shadow-none"
+            >
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Lightbulb
+                    className="h-5 w-5 text-[var(--warning)]"
+                    aria-hidden="true"
+                  />
+                  <h2 className="text-base font-semibold text-[var(--foreground)]">
+                    提示
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  aria-label="关闭提示面板"
+                  onClick={() => setIsSupportOpen(false)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-[var(--border)] transition hover:border-[var(--primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <SmartSupportPanel
+                embedded
+                guidance={smartGuidance}
+                guidanceError={currentSmartGuidanceError}
+                guidanceStatus={smartGuidanceStatus}
+                onCue={handleCue}
+              />
+            </aside>
           ) : null}
         </section>
-      </section>
+      </div>
     </>
   );
 }

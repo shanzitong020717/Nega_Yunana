@@ -1,8 +1,11 @@
 import { normalizeOpenAIApiKey, normalizeOpenAIBaseURL } from "@/lib/ai/openai-client";
 
 type GenerateTextJSONInput = {
+  maxTokens?: number;
+  model?: string;
   prompt: string;
   schemaName: string;
+  timeoutMs?: number;
 };
 
 const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
@@ -60,50 +63,71 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
     throw new Error("DEEPSEEK_API_KEY or OPENAI_API_KEY is required.");
   }
 
-  const response = await fetch(`${getTextAIBaseURL()}/chat/completions`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: getTextAIModel(),
-      messages: [
-        {
-          role: "system",
-          content:
-            "You return valid JSON only. Do not include Markdown fences or explanatory text.",
-        },
-        {
-          role: "user",
-          content: input.prompt,
-        },
-      ],
-      response_format: {
-        type: "json_object",
+  const controller =
+    input.timeoutMs && input.timeoutMs > 0 ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), input.timeoutMs)
+    : null;
+
+  try {
+    const response = await fetch(`${getTextAIBaseURL()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
       },
-      max_tokens: DEFAULT_MAX_TOKENS,
-      temperature: 0.2,
-    }),
-  });
+      signal: controller?.signal,
+      body: JSON.stringify({
+        model: input.model ?? getTextAIModel(),
+        messages: [
+          {
+            role: "system",
+            content:
+              "You return valid JSON only. Do not include Markdown fences or explanatory text.",
+          },
+          {
+            role: "user",
+            content: input.prompt,
+          },
+        ],
+        response_format: {
+          type: "json_object",
+        },
+        max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
+        temperature: 0.2,
+      }),
+    });
 
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    error?: { message?: string };
-  };
+    const payload = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string };
+    };
 
-  if (!response.ok) {
-    throw new Error(
-      payload.error?.message ??
-        `${input.schemaName} generation failed with status ${response.status}.`,
-    );
+    if (!response.ok) {
+      throw new Error(
+        payload.error?.message ??
+          `${input.schemaName} generation failed with status ${response.status}.`,
+      );
+    }
+
+    const content = payload.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error(`${input.schemaName} generation returned no content.`);
+    }
+
+    return JSON.parse(extractJSONContent(content)) as unknown;
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error(
+        `${input.schemaName} generation timed out after ${input.timeoutMs}ms.`,
+      );
+    }
+
+    throw error;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
-
-  const content = payload.choices?.[0]?.message?.content;
-
-  if (!content) {
-    throw new Error(`${input.schemaName} generation returned no content.`);
-  }
-
-  return JSON.parse(extractJSONContent(content)) as unknown;
 }

@@ -35,6 +35,10 @@ These AI variables are configured in Vercel Production, Preview for `feature/app
 Recommended optional variables:
 
 - `AI_MOCK_MODE=false`
+- `SUBTITLE_TRANSLATION_PROVIDER=deepseek`
+- `SUBTITLE_DEEPSEEK_MODEL=deepseek-v4-flash`
+- `GEMINI_FLASH_TEXT_MODEL=gemini-2.5-flash` if Gemini Flash subtitles are enabled later
+- `GEMINI_API_KEY=<same Gemini key, also configured on Vercel if Gemini Flash subtitles are enabled later>`
 
 For Realtime voice practice, use Gemini Live through the Render relay:
 
@@ -57,6 +61,10 @@ npx vercel env ls
 npx vercel env add DEEPSEEK_API_KEY production --sensitive
 npx vercel env add DEEPSEEK_BASE_URL production
 npx vercel env add DEEPSEEK_TEXT_MODEL production
+npx vercel env add SUBTITLE_TRANSLATION_PROVIDER production
+npx vercel env add SUBTITLE_DEEPSEEK_MODEL production
+npx vercel env add GEMINI_FLASH_TEXT_MODEL production
+npx vercel env add GEMINI_API_KEY production --sensitive
 npx vercel env add REALTIME_RELAY_URL production
 npx vercel env add DATABASE_URL production --sensitive
 npx vercel env pull .env.local --yes
@@ -68,6 +76,10 @@ For branch-specific Preview values:
 npx vercel env add DEEPSEEK_API_KEY preview --sensitive
 npx vercel env add DEEPSEEK_BASE_URL preview
 npx vercel env add DEEPSEEK_TEXT_MODEL preview
+npx vercel env add SUBTITLE_TRANSLATION_PROVIDER preview
+npx vercel env add SUBTITLE_DEEPSEEK_MODEL preview
+npx vercel env add GEMINI_FLASH_TEXT_MODEL preview
+npx vercel env add GEMINI_API_KEY preview --sensitive
 npx vercel env add REALTIME_RELAY_URL preview feature/app-foundation
 npx vercel env add DATABASE_URL preview --sensitive
 npx vercel env add APP_BASE_URL preview

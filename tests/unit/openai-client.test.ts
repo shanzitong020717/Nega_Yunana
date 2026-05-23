@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   normalizeOpenAIApiKey,
   normalizeOpenAIBaseURL,
 } from "@/lib/ai/openai-client";
-import { getTextAIBaseURL, getTextAIModel } from "@/lib/ai/text-client";
+import {
+  generateTextJSON,
+  getTextAIBaseURL,
+  getTextAIModel,
+} from "@/lib/ai/text-client";
 
 describe("openai client environment helpers", () => {
   it("normalizes empty and quoted API keys", () => {
@@ -24,5 +28,36 @@ describe("openai client environment helpers", () => {
   it("defaults text analysis to DeepSeek v4 pro", () => {
     expect(getTextAIBaseURL()).toBe("https://api.deepseek.com");
     expect(getTextAIModel()).toBe("deepseek-v4-pro");
+  });
+
+  it("aborts slow text generation requests after the configured timeout", async () => {
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-test");
+    vi.useFakeTimers();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string | URL | Request, init?: RequestInit) => {
+        return new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            reject(new Error("request aborted"));
+          });
+        });
+      }),
+    );
+
+    const generation = generateTextJSON({
+      prompt: "Return JSON.",
+      schemaName: "suggested answer",
+      timeoutMs: 10,
+    });
+    const expectation = expect(generation).rejects.toThrow(
+      "suggested answer generation timed out after 10ms.",
+    );
+
+    await vi.advanceTimersByTimeAsync(10);
+    await expectation;
+
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 });

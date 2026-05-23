@@ -1,87 +1,38 @@
 import { NextResponse } from "next/server";
 
-import { seedPhrases } from "@/data/seed-phrases";
+import {
+  listPhraseRecords,
+  savePhraseRecord,
+} from "@/lib/phrasebook/phrasebook-store";
 import {
   createPhraseInputSchema,
-  type CreatePhraseInput,
 } from "@/lib/validation/phrasebook";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 
-type MockPhrase = CreatePhraseInput & {
-  id: string;
-  createdAt: string;
-};
-
-const savedPhrases: MockPhrase[] = [];
-
-function normalizeEnglish(english: string) {
-  return english.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function findExistingPhrase(english: string) {
-  const normalizedEnglish = normalizeEnglish(english);
-  const builtInPhrase = seedPhrases.find(
-    (phrase) => normalizeEnglish(phrase.english) === normalizedEnglish,
-  );
-
-  if (builtInPhrase) {
-    return {
-      id: `built_in_${seedPhrases.indexOf(builtInPhrase) + 1}`,
-      source: "built_in",
-      masteryStatus: "needs_practice",
-      createdAt: null,
-      ...builtInPhrase,
-    };
-  }
-
-  return (
-    savedPhrases.find(
-      (phrase) => normalizeEnglish(phrase.english) === normalizedEnglish,
-    ) ?? null
-  );
-}
-
 export function GET() {
   return NextResponse.json({
-    phrases: [
-      ...seedPhrases.map((phrase, index) => ({
-        id: `built_in_${index + 1}`,
-        source: "built_in",
-        masteryStatus: "needs_practice",
-        createdAt: null,
-        ...phrase,
-      })),
-      ...savedPhrases,
-    ],
+    phrases: listPhraseRecords(),
   });
 }
 
 export async function POST(request: Request) {
   try {
     const input = createPhraseInputSchema.parse(await readJsonBody(request));
-    const existingPhrase = findExistingPhrase(input.english);
+    const result = savePhraseRecord(input);
 
-    if (existingPhrase) {
+    if (result.status === "duplicate") {
       return NextResponse.json(
         {
           status: "duplicate",
-          phrase: existingPhrase,
+          phrase: result.phrase,
         },
         { status: 200 },
       );
     }
 
-    const phrase: MockPhrase = {
-      id: `phrase_${crypto.randomUUID()}`,
-      createdAt: new Date().toISOString(),
-      ...input,
-    };
-
-    savedPhrases.push(phrase);
-
     return NextResponse.json(
       {
-        phrase,
+        phrase: result.phrase,
       },
       { status: 201 },
     );

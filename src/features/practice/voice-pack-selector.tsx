@@ -49,6 +49,9 @@ export function VoicePackSelector({
                   {voicePack.name}
                 </span>
                 <span className="mt-1 block text-xs text-[var(--muted)]">
+                  Gemini voice_name: {voicePack.providerVoiceName}
+                </span>
+                <span className="mt-1 block text-xs text-[var(--muted)]">
                   {voicePack.gender === "female" ? "女声" : "男声"} ·{" "}
                   {speedLabels[voicePack.speed]}
                 </span>

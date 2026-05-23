@@ -5,6 +5,10 @@ import {
   type VoicePack,
 } from "@/data/scenario-packs";
 import {
+  resolveConversationOpeningStrategy,
+  resolveVoiceTemperamentModifier,
+} from "@/config/scenarios/rokid-overseas-sales/conversation-opening-strategies";
+import {
   DEFAULT_GEMINI_LIVE_MODEL,
   GEMINI_LIVE_INPUT_SAMPLE_RATE,
   GEMINI_LIVE_OUTPUT_SAMPLE_RATE,
@@ -22,6 +26,7 @@ export type RealtimePersona = {
   focusAreas: string[];
   tone: string;
   sampleQuestions: string[];
+  rolePrompt?: string;
 };
 
 export type BuildRealtimeInstructionsInput = {
@@ -58,6 +63,7 @@ export type RealtimeRelaySessionCredential = {
   sessionId: string;
   expiresAt: string;
   model: string;
+  voiceName: string;
   inputAudioSampleRate: number;
   outputAudioSampleRate: number;
   instructionsPreview: string;
@@ -75,22 +81,22 @@ const OPENAI_REALTIME_OUTPUT_SAMPLE_RATE = 24_000;
 const DEFAULT_GEMINI_LIVE_VOICE = "Puck";
 const DEFAULT_OPENAI_REALTIME_VOICE = "marin";
 
-const GEMINI_LIVE_VOICE_BY_PACK_ID: Record<VoicePack["id"], string> = {
-  "ava-friendly-buyer": "Aoede",
+const LEGACY_GEMINI_LIVE_VOICE_BY_PACK_ID: Record<string, string> = {
+  "ava-friendly-buyer": "Zephyr",
   "serena-enterprise-decision-maker": "Kore",
   "ethan-technical-lead": "Charon",
-  "marcus-executive-customer": "Orus",
-  "vivian-critical-procurement": "Kore",
+  "marcus-executive-customer": "Fenrir",
+  "vivian-critical-procurement": "Leda",
   "noah-channel-partner": "Puck",
 };
 
 const OPENAI_REALTIME_VOICE_BY_PACK_ID: Record<VoicePack["id"], string> = {
-  "ava-friendly-buyer": "shimmer",
-  "serena-enterprise-decision-maker": "sage",
-  "ethan-technical-lead": "cedar",
-  "marcus-executive-customer": "marin",
-  "vivian-critical-procurement": "ash",
-  "noah-channel-partner": "verse",
+  "kore-firm": "sage",
+  "zephyr-bright": "shimmer",
+  "puck-upbeat": "verse",
+  "charon-informative": "cedar",
+  "fenrir-excitable": "marin",
+  "leda-youthful": "ash",
 };
 
 function getErrorField(
@@ -189,12 +195,27 @@ function realtimeRelayAudioRates(provider: string | undefined) {
   };
 }
 
+function resolveRealtimeRelayVoiceName(
+  provider: string | undefined,
+  voicePack?: VoicePack | null,
+) {
+  if (provider === "gemini_live") {
+    return resolveGeminiLiveVoiceName(voicePack);
+  }
+
+  return resolveOpenAIRealtimeVoice(voicePack);
+}
+
 export function resolveGeminiLiveVoiceName(voicePack?: VoicePack | null) {
   if (!voicePack) {
     return DEFAULT_GEMINI_LIVE_VOICE;
   }
 
-  return GEMINI_LIVE_VOICE_BY_PACK_ID[voicePack.id] ?? DEFAULT_GEMINI_LIVE_VOICE;
+  return (
+    voicePack.providerVoiceName ??
+    LEGACY_GEMINI_LIVE_VOICE_BY_PACK_ID[voicePack.id] ??
+    DEFAULT_GEMINI_LIVE_VOICE
+  );
 }
 
 function resolveOpenAIRealtimeVoice(voicePack?: VoicePack | null) {
@@ -218,6 +239,44 @@ function formatList(title: string, items?: string[] | null) {
   return [`${title}:`, ...usefulItems.map((item) => `- ${item}`)].join("\n");
 }
 
+function formatConversationOpeningStrategy({
+  goalId,
+  roleId,
+  voicePackId,
+}: {
+  goalId?: string;
+  roleId: string;
+  voicePackId?: string;
+}) {
+  const strategy = resolveConversationOpeningStrategy({
+    goalId,
+    roleId,
+    voicePackId,
+  });
+  const voiceModifier = resolveVoiceTemperamentModifier(voicePackId);
+
+  return [
+    "Conversation opening strategy:",
+    `Opening mode mix: ${strategy.defaultModeMix.join(" + ")}`,
+    `Voice temperament modifier: ${voiceModifier.openingTone}; pressure ramp: ${voiceModifier.pressureRamp}; wording style: ${voiceModifier.wordingStyle}.`,
+    "First three turns:",
+    `- Turn 1 goal: ${strategy.firstTurnGoal}`,
+    `- Turn 2 goal: ${strategy.secondTurnGoal}`,
+    `- Turn 3 goal: ${strategy.thirdTurnGoal}`,
+    `Escalation rules: Only after context is established should you escalate into persona-specific detailed questions. Escalate after turn ${strategy.escalationAfterTurn}.`,
+    "Do-not-start-with list:",
+    ...strategy.doNotStartWith.map((item) => `- ${item}`),
+    "Preferred opening moves:",
+    ...strategy.preferredOpeningMoves.map((item) => `- ${item}`),
+    "Start like a real business meeting, not a product audit.",
+    "Do not begin with detailed objections, technical audit, pricing, ROI, security, or deployment questions.",
+    "Turn 1 should be a natural greeting, meeting-context check, or invitation for the learner to introduce the topic.",
+    "Turn 2 should clarify customer context, meeting goal, evaluation stage, or the learner's preferred starting point.",
+    "Turn 3 may enter application scenarios, customer pain points, business value, or demo framing.",
+    "Keep each customer turn concise and natural for spoken practice.",
+  ].join("\n");
+}
+
 export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput) {
   const scenarioPack = input.scenarioPack ?? defaultScenarioPack;
   const practiceGoal = input.practiceGoal;
@@ -234,7 +293,12 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     `Scenario primary goal: ${scenarioPack.primaryGoal}`,
     `Practice goal: ${practiceGoal?.label ?? input.mode}`,
     `Practice goal description: ${practiceGoal?.description ?? "Run the selected practice scenario."}`,
+    `Practice opening hint: ${practiceGoal?.openingStrategyHint ?? "Use the selected practice mode to choose a realistic business opening."}`,
+    formatList("Scenario question guidance", practiceGoal?.questionGuidance),
+    formatList("Scenario review dimensions", practiceGoal?.reviewDimensions),
+    formatList("Scenario phrasebook tags", practiceGoal?.phrasebookTags),
     `Voice pack: ${voicePack?.name ?? "Default business customer voice"}`,
+    `Voice gender: ${voicePack?.gender ?? "unspecified"}`,
     `Voice intent: ${voicePack?.modelVoiceHint ?? "natural_business_voice"}`,
     `Voice personality: ${voicePack?.personality ?? "professional and realistic"}`,
     `Voice style: ${voicePack?.voiceStyle ?? "clear spoken English"}`,
@@ -243,15 +307,23 @@ export function buildRealtimeInstructions(input: BuildRealtimeInstructionsInput)
     "",
     "Model responsibilities:",
     "- Realtime voice provider: Gemini Live handles the active live-audio conversation when the WebSocket relay is configured for gemini_live.",
-    "- Do not call DeepSeek during the active realtime audio loop; DeepSeek is reserved for offline text analysis such as material briefs, prep cards, reviews, phrase extraction, memory candidates, and subtitle translation after a turn or session.",
+    "- Do not call DeepSeek during the active realtime audio loop; DeepSeek is reserved for offline text analysis such as material briefs, prep cards, reviews, phrase extraction, and memory candidates.",
+    "- Subtitle translation may use a fast text model after a turn is finalized; it must not block or join the live microphone/audio loop.",
     "- Memory snippets are loaded before the live session starts; use them as static context only during the live audio loop.",
     "",
     `Practice mode: ${input.mode}`,
     `AI customer role: ${input.persona.name}`,
     `Customer persona: ${input.persona.name}`,
     `Customer tone: ${input.persona.tone}`,
+    `Customer role prompt: ${input.persona.rolePrompt ?? "Act as the selected realistic customer persona and ask relevant business questions."}`,
     formatList("Customer focus areas", input.persona.focusAreas),
     formatList("Sample customer questions", input.persona.sampleQuestions),
+    "",
+    formatConversationOpeningStrategy({
+      goalId: practiceGoal?.id ?? input.mode,
+      roleId: input.persona.id,
+      voicePackId: voicePack?.id,
+    }),
     "",
     "Material brief:",
     `Key message: ${materialBrief?.keyMessage ?? "No uploaded material brief is available for this session."}`,
@@ -305,6 +377,10 @@ export async function createRealtimeSession(
 
   if (relayConfig && input.mockMode !== true) {
     const audioRates = realtimeRelayAudioRates(relayConfig.provider);
+    const voiceName = resolveRealtimeRelayVoiceName(
+      relayConfig.provider,
+      input.voicePack,
+    );
 
     return {
       transport: "websocket_relay",
@@ -315,7 +391,7 @@ export async function createRealtimeSession(
           realtimeSessionId: sessionId,
           model,
           instructions,
-          voiceName: resolveGeminiLiveVoiceName(input.voicePack),
+          voiceName,
         },
         {
           secret: relayConfig.sharedSecret,
@@ -325,6 +401,7 @@ export async function createRealtimeSession(
       sessionId,
       expiresAt,
       model,
+      voiceName,
       ...audioRates,
       instructionsPreview,
     };

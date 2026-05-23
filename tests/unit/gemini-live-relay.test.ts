@@ -35,6 +35,28 @@ describe("Gemini Live relay helpers", () => {
     });
   });
 
+  it("builds Gemini Live setup with the selected AI Studio voice", () => {
+    expect(
+      buildGeminiLiveSetupMessage({
+        instructions: "Act as a customer.",
+        model: "gemini-3.1-flash-live-preview",
+        voiceName: "Kore",
+      }),
+    ).toMatchObject({
+      setup: {
+        generationConfig: {
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: "Kore",
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
   it("translates browser PCM chunks into Gemini realtime input", () => {
     expect(
       browserRealtimeEventToGeminiLiveMessages({

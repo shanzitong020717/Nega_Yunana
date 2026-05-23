@@ -1,8 +1,132 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RealtimeRoom } from "@/features/practice/realtime-room";
+import type { TranscriptTurn } from "@/features/practice/conversation-transcript-panel";
 import { savePracticeSessionSelection } from "@/lib/practice/practice-session-selection";
+
+const mockSuggestedAnswerPayload = {
+  suggestion: {
+    id: "suggestion_123",
+    aiQuestion: {
+      english: "Can you detail how data is encrypted both at rest and in transit?",
+      translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+    },
+    analysis:
+      "This technical buyer is asking for a precise security answer, so respond with scope, safeguards, and a review next step.",
+    responseStrategy: {
+      english:
+        "Acknowledge the security concern first, then give a bounded deployment answer and propose a technical review.",
+      chinese: "先承认客户的安全顾虑，再给出有边界的部署回答，并建议进行技术评审。",
+    },
+    logicBreakdown: {
+      surfaceMeaningZh: "客户在询问云端部署和本地部署的选择。",
+      customerIntentZh: "客户想确认 Rokid 是否能满足企业安全要求。",
+      informationNeededZh: "客户需要了解部署方式、数据流、加密边界和 IT 审查路径。",
+      responseFocusZh: "回答时先聚焦安全边界，再说明可以与 IT 团队共同确认细节。",
+    },
+    contextBreakdown: {
+      conversationStateZh: "当前对话正在围绕部署方式和安全要求展开。",
+      customerQuestionReasonZh: "客户前面已经进入技术评估阶段，所以现在追问部署边界。",
+      priorUserAnswerZh: "用户前面还没有给出具体部署方案，只说明需要进一步确认。",
+      missingInformationZh: "还缺少客户 IT 政策、系统环境和允许的数据处理边界。",
+      responseBoundaryZh: "不要直接承诺所有云端或本地部署方式，只能先提出和 IT 团队确认。",
+    },
+    suggestedReplies: [
+      {
+        english:
+          "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
+        chinese:
+          "这是一个很重要的安全问题。试点阶段我们可以先和你们 IT 团队梳理数据流，并在部署前确认加密要求。",
+        reason:
+          "It acknowledges the concern, avoids unsupported claims, and moves the conversation to a technical review.",
+      },
+    ],
+    vocabulary: [
+      {
+        term: "at rest",
+        phonetic: "/æt rest/",
+        chinese: "静态存储时",
+        example: "data encrypted at rest",
+      },
+    ],
+    phrasebookEntry: {
+      category: "Objection Handling",
+      english:
+        "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
+      chinese:
+        "这是一个很重要的安全问题。试点阶段我们可以先和你们 IT 团队梳理数据流，并在部署前确认加密要求。",
+      useCase: "Answer a technical buyer's security question.",
+      tags: ["suggested-answer", "live-coaching"],
+      source: "review",
+      masteryStatus: "needs_practice",
+    },
+    createdAt: "2026-05-19T00:00:00.000Z",
+  },
+};
+
+const mockBetterPhrasePayload = {
+  cueResult: {
+    id: "support_better_phrase",
+    title: "更自然表达分析",
+    badge: "AI 分析",
+    sections: [
+      {
+        label: "AI 客户上下文",
+        english: "Can you detail how data is encrypted both at rest and in transit?",
+      },
+      {
+        label: "你的原句",
+        english: "We can help translate meetings and make communication better.",
+      },
+      {
+        label: "更自然表达",
+        english:
+          "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
+        chinese:
+          "在技术评审中，我们可以先梳理数据流，并和你们 IT 团队确认安全要求。",
+      },
+    ],
+    vocabulary: [
+      {
+        term: "technical review",
+        phonetic: "/ˈteknɪkəl rɪˈvjuː/",
+        chinese: "技术评审",
+        example: "For a technical review, we can first confirm the data flow.",
+      },
+      {
+        term: "security requirements",
+        phonetic: "/sɪˈkjʊrəti rɪˈkwaɪərmənts/",
+        chinese: "安全要求",
+        example: "We should confirm security requirements with your IT team.",
+      },
+    ],
+  },
+};
+
+function installSupportResultFetchMock() {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+
+    if (url.includes("/suggested-answer")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(mockSuggestedAnswerPayload), { status: 201 }),
+      );
+    }
+
+    if (url.includes("/support-cue")) {
+      return Promise.resolve(
+        new Response(JSON.stringify(mockBetterPhrasePayload), { status: 201 }),
+      );
+    }
+
+    return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+  });
+
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
 
 function installMockVoiceSession() {
   Object.defineProperty(navigator, "mediaDevices", {
@@ -48,7 +172,7 @@ describe("RealtimeRoom mock UI", () => {
     window.sessionStorage.clear();
   });
 
-  it("renders the live room status, controls, and mock transcript turns", () => {
+  it("renders the live room status and controls without default transcript turns", () => {
     render(<RealtimeRoom sessionId="session_123" />);
 
     expect(screen.getByRole("heading", { name: "准备开始" })).toBeInTheDocument();
@@ -59,32 +183,94 @@ describe("RealtimeRoom mock UI", () => {
     ).not.toBeInTheDocument();
 
     expect(
-      screen.getByText("What business problem are you trying to solve with smart glasses?"),
-    ).toBeInTheDocument();
+      screen.queryByText("What business problem are you trying to solve with smart glasses?"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "We want to help international teams communicate more smoothly during meetings.",
+      ),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("材料导航")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "打开提示" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "打开提示面板" })).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "换个更自然表达" }),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "打开提示" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+
+    expect(screen.getByRole("complementary", { name: "提示" })).toHaveClass(
+      "lg:sticky",
+    );
+    expect(screen.queryByText("隐藏提示")).not.toBeInTheDocument();
+
+    expect(screen.getByText("智能建议")).toBeInTheDocument();
+    expect(screen.getByText("当前判断")).toBeInTheDocument();
+    expect(screen.getByText("下一步")).toBeInTheDocument();
+    expect(screen.getByText("可直接说")).toBeInTheDocument();
+
+    ["核心救场", "优化表达", "推进会谈", "进阶练习"].forEach((section) => {
+      expect(screen.getByText(section)).toBeInTheDocument();
+    });
 
     [
+      "建议回答",
       "换个更自然表达",
       "使用材料要点",
       "问一个探索问题",
-      "缩短回答",
-      "翻译这句话",
       "挑战我",
     ].forEach((control) => {
       expect(screen.getByRole("button", { name: control })).toBeInTheDocument();
     });
+    expect(
+      screen.queryByRole("button", { name: "缩短回答" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "翻译这句话" }),
+    ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "隐藏提示" }));
+    fireEvent.click(screen.getByRole("button", { name: "关闭提示面板" }));
 
     expect(
       screen.queryByRole("button", { name: "换个更自然表达" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows a neutral smart guidance state while waiting for model analysis", () => {
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_deployment",
+        speaker: "ai_customer",
+        text: "Can you clarify the deployment options? Cloud or on-premise?",
+        translationZh: "你能解释一下部署选项吗？云部署还是本地部署？",
+        timestamp: 0,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_smart_guidance"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+
+    expect(screen.getByText("分析中")).toBeInTheDocument();
+    expect(
+      screen.getByText("正在根据客户刚才的真实发言生成智能建议。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("先保持对话节奏，等 AI 分析返回后再按照当前语境选择下一步。"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Let me make sure I understand your point before I answer."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("客户正在确认部署方式和安全边界。")).not.toBeInTheDocument();
   });
 
   it("updates mock room state and transcript when controls are used", async () => {
@@ -101,14 +287,286 @@ describe("RealtimeRoom mock UI", () => {
     expect(screen.getByRole("heading", { name: "对话中" })).toBeInTheDocument();
     expect(screen.getByText("麦克风已静音")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "打开提示" }));
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
     fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+    expect(screen.getByText("更自然表达分析")).toBeInTheDocument();
+    expect(screen.getByText("你的原句")).toBeInTheDocument();
     expect(
-      screen.getByText("Try: The key value is reducing communication friction in real time."),
+      screen.getByText(
+        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
+      ),
     ).toBeInTheDocument();
+    expect(screen.getByText("高级词汇")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Live coaching cue: Better Phrase"),
+    ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
     expect(screen.getByRole("heading", { name: "会话已结束" })).toBeInTheDocument();
+  });
+
+  it("opens local coaching panels for manual cues without asking the AI customer to continue", () => {
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_need",
+        speaker: "ai_customer",
+        text: "What workflow are you trying to improve?",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_need",
+        speaker: "user",
+        text: "We want improve meeting communication.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_manual_cue_panel"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "问一个探索问题" }));
+
+    expect(screen.getByText("探索问题建议")).toBeInTheDocument();
+    expect(screen.getByText("推荐问题")).toBeInTheDocument();
+    expect(
+      screen.getByText("What does a successful pilot look like for your team?"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Live coaching cue/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "使用材料要点" }));
+
+    expect(screen.getByText("材料要点建议")).toBeInTheDocument();
+    expect(screen.getByText("可引用要点")).toBeInTheDocument();
+    expect(
+      screen.getByText("不要补充材料中没有确认的价格、认证或部署承诺。"),
+    ).toBeInTheDocument();
+  });
+
+  it("tailors the better phrase analysis to the conversation context and shows vocabulary", () => {
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_deployment_context",
+        speaker: "ai_customer",
+        text: "Can you clarify the deployment options? Cloud or on-premise?",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_value_context",
+        speaker: "user",
+        text: "We can help translate meetings and make communication better.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_better_phrase_context"
+        initialTranscriptTurns={initialTranscriptTurns}
+        initialPracticeSession={{
+          id: "session_better_phrase_context",
+          scenarioPackId: "rokid-overseas-sales",
+          goalId: "customer_qa",
+          mode: "customer_qa",
+          personaId: "technical_lead",
+          voicePackId: "charon-informative",
+          difficulty: "normal",
+          trainingFocus: ["deployment options", "security review"],
+          focusTags: ["技术与部署", "隐私安全"],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+
+    expect(screen.getByText("AI 客户上下文")).toBeInTheDocument();
+    expect(screen.getByText("客户角色")).toBeInTheDocument();
+    expect(screen.getByText("技术负责人")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("高级词汇")).toBeInTheDocument();
+    expect(screen.getByText("technical review")).toBeInTheDocument();
+    expect(screen.getByText("hands-free")).toBeInTheDocument();
+  });
+
+  it("shows support results in switchable tabs instead of stacking panels", async () => {
+    installSupportResultFetchMock();
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_security_tabs",
+        speaker: "ai_customer",
+        text: "Can you detail how data is encrypted both at rest and in transit?",
+        translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_security_tabs",
+        speaker: "user",
+        text: "We can help translate meetings and make communication better.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_support_result_tabs"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "建议回答" }));
+    expect(await screen.findByText("上下文解析")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+    expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
+
+    const workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    expect(
+      within(workspace).getByRole("tab", { name: /建议回答/ }),
+    ).toHaveAttribute("aria-selected", "false");
+    expect(
+      within(workspace).getByRole("tab", { name: /更自然表达/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(within(workspace).getAllByRole("tab")).toHaveLength(2);
+
+    fireEvent.click(within(workspace).getByRole("tab", { name: /建议回答/ }));
+
+    expect(screen.getByText("上下文解析")).toBeInTheDocument();
+    expect(screen.queryByText("更自然表达分析")).not.toBeInTheDocument();
+  });
+
+  it("collapses and expands the support result workspace", async () => {
+    installSupportResultFetchMock();
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_security_collapse",
+        speaker: "ai_customer",
+        text: "Can you detail how data is encrypted both at rest and in transit?",
+        translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_security_collapse",
+        speaker: "user",
+        text: "We can help translate meetings and make communication better.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_support_result_collapse"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+    expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
+
+    const workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    fireEvent.click(
+      within(workspace).getByRole("button", { name: "折叠辅助结果工作区" }),
+    );
+
+    expect(
+      within(workspace).queryByRole("tablist", { name: "辅助结果模块" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("更自然表达分析")).not.toBeInTheDocument();
+    expect(
+      within(workspace).getByRole("button", { name: "展开辅助结果工作区" }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(workspace).getByRole("button", { name: "展开辅助结果工作区" }),
+    );
+
+    expect(
+      within(workspace).getByRole("tablist", { name: "辅助结果模块" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("更自然表达分析")).toBeInTheDocument();
+  });
+
+  it("closes individual support result tabs and hides the workspace after the last close", async () => {
+    installSupportResultFetchMock();
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_security_close",
+        speaker: "ai_customer",
+        text: "Can you detail how data is encrypted both at rest and in transit?",
+        translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_security_close",
+        speaker: "user",
+        text: "We can help translate meetings and make communication better.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_support_result_close"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "建议回答" }));
+    expect(await screen.findByText("上下文解析")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+    expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
+
+    let workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    fireEvent.click(within(workspace).getByRole("button", { name: "关闭更自然表达" }));
+
+    workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    expect(
+      within(workspace).getByRole("tab", { name: /建议回答/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("上下文解析")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /更自然表达/ })).not.toBeInTheDocument();
+
+    fireEvent.click(within(workspace).getByRole("button", { name: "关闭建议回答" }));
+
+    expect(
+      screen.queryByRole("region", { name: "辅助结果工作区" }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses the learner-selected persona and voice pack for realtime session creation", async () => {
@@ -141,7 +599,7 @@ describe("RealtimeRoom mock UI", () => {
       goalId: "solution_meeting",
       mode: "solution_meeting",
       personaId: "channel_partner",
-      voicePackId: "noah-channel-partner",
+      voicePackId: "puck-upbeat",
       difficulty: "normal",
       trainingFocus: ["channel partnership"],
       focusTags: ["渠道合作"],
@@ -149,7 +607,7 @@ describe("RealtimeRoom mock UI", () => {
 
     render(<RealtimeRoom sessionId="session_custom" />);
 
-    expect(await screen.findByText("AI 声音：Noah 渠道伙伴")).toBeInTheDocument();
+    expect(await screen.findByText("AI 声音：Puck 轻快外向")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "开始" }));
     expect(await screen.findByRole("heading", { name: "对话中" })).toBeInTheDocument();
@@ -160,9 +618,159 @@ describe("RealtimeRoom mock UI", () => {
       goalId: "solution_meeting",
       mode: "solution_meeting",
       personaId: "channel_partner",
-      voicePackId: "noah-channel-partner",
+      voicePackId: "puck-upbeat",
       trainingFocus: ["channel partnership"],
       focusTags: ["渠道合作"],
     });
+  });
+
+  it("shows a suggested answer module under the transcript and sends the selected context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          suggestion: {
+            id: "suggestion_123",
+            aiQuestion: {
+              english:
+                "Can you detail how data is encrypted both at rest and in transit?",
+              translationZh:
+                "你能详细说明数据在静态和传输过程中如何加密吗？",
+            },
+            analysis:
+              "This technical buyer is asking for a precise security answer, so respond with scope, safeguards, and a review next step.",
+            responseStrategy: {
+              english:
+                "Acknowledge the security concern first, then give a bounded deployment answer and propose a technical review.",
+              chinese:
+                "先承认客户的安全顾虑，再给出有边界的部署回答，并建议进行技术评审。",
+            },
+            logicBreakdown: {
+              surfaceMeaningZh: "客户在询问云端部署和本地部署的选择。",
+              customerIntentZh: "客户想确认 Rokid 是否能满足企业安全要求。",
+              informationNeededZh:
+                "客户需要了解部署方式、数据流、加密边界和 IT 审查路径。",
+              responseFocusZh:
+                "回答时先聚焦安全边界，再说明可以与 IT 团队共同确认细节。",
+            },
+            contextBreakdown: {
+              conversationStateZh: "当前对话正在围绕部署方式和安全要求展开。",
+              customerQuestionReasonZh:
+                "客户前面已经进入技术评估阶段，所以现在追问部署边界。",
+              priorUserAnswerZh:
+                "用户前面还没有给出具体部署方案，只说明需要进一步确认。",
+              missingInformationZh:
+                "还缺少客户 IT 政策、系统环境和允许的数据处理边界。",
+              responseBoundaryZh:
+                "不要直接承诺所有云端或本地部署方式，只能先提出和 IT 团队确认。",
+            },
+            suggestedReplies: [
+              {
+                english:
+                  "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
+                chinese:
+                  "这是一个很重要的安全问题。试点阶段我们可以先和你们 IT 团队梳理数据流，并在部署前确认加密要求。",
+                reason:
+                  "It acknowledges the concern, avoids unsupported claims, and moves the conversation to a technical review.",
+              },
+            ],
+            vocabulary: [
+              {
+                term: "at rest",
+                phonetic: "/æt rest/",
+                chinese: "静态存储时",
+                example: "data encrypted at rest",
+              },
+            ],
+            phrasebookEntry: {
+              category: "Objection Handling",
+              english:
+                "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
+              chinese:
+                "这是一个很重要的安全问题。试点阶段我们可以先和你们 IT 团队梳理数据流，并在部署前确认加密要求。",
+              useCase: "Answer a technical buyer's security question.",
+              tags: ["suggested-answer", "live-coaching"],
+              source: "review",
+              masteryStatus: "needs_practice",
+            },
+            createdAt: "2026-05-19T00:00:00.000Z",
+          },
+        }),
+        { status: 201 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_security",
+        speaker: "ai_customer",
+        text: "Can you detail how data is encrypted both at rest and in transit?",
+        translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+        timestamp: 0,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_suggested_answer"
+        initialTranscriptTurns={initialTranscriptTurns}
+        initialPracticeSession={{
+          id: "session_suggested_answer",
+          scenarioPackId: "rokid-overseas-sales",
+          goalId: "customer_qa",
+          mode: "customer_qa",
+          personaId: "technical_lead",
+          voicePackId: "charon-informative",
+          difficulty: "normal",
+          trainingFocus: ["security objections"],
+          focusTags: ["隐私安全"],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "建议回答" }));
+
+    expect(
+      await screen.findByText(
+        "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "建议回答" })).toBeInTheDocument();
+    expect(screen.getByText("上下文解析")).toBeInTheDocument();
+    expect(screen.getByText("当前对话正在围绕部署方式和安全要求展开。")).toBeInTheDocument();
+    expect(
+      screen.getByText("客户前面已经进入技术评估阶段，所以现在追问部署边界。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("语句逻辑拆解")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Acknowledge the security concern first, then give a bounded deployment answer and propose a technical review.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("先承认客户的安全顾虑，再给出有边界的部署回答，并建议进行技术评审。"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("客户想确认 Rokid 是否能满足企业安全要求。")).toBeInTheDocument();
+    expect(
+      screen.getAllByText(
+        "Can you detail how data is encrypted both at rest and in transit?",
+      ).length,
+    ).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("你能详细说明数据在静态和传输过程中如何加密吗？")).toBeInTheDocument();
+    expect(screen.getByText("/æt rest/")).toBeInTheDocument();
+    expect(screen.queryByText("技术负责人")).not.toBeInTheDocument();
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/practice-sessions/session_suggested_answer/suggested-answer",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining("technical_lead"),
+      }),
+    );
   });
 });

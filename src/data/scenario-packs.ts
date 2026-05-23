@@ -1,19 +1,31 @@
+import {
+  rokidRoleVoiceRules,
+  rokidRoles,
+  rokidVoicePacks,
+} from "@/config/scenarios/rokid-overseas-sales";
+
 export type ScenarioPackId = "rokid-overseas-sales";
 
 export type PracticeGoalId =
   | "customer_qa"
   | "demo_narration"
+  | "application_scenarios"
+  | "pros_cons"
+  | "competitive_differences"
+  | "product_parameters"
+  | "privacy_security"
+  | "deployment_integration"
   | "objection_handling"
   | "solution_meeting"
   | "quick_pitch";
 
 export type VoicePackId =
-  | "ava-friendly-buyer"
-  | "serena-enterprise-decision-maker"
-  | "ethan-technical-lead"
-  | "marcus-executive-customer"
-  | "vivian-critical-procurement"
-  | "noah-channel-partner";
+  | "kore-firm"
+  | "zephyr-bright"
+  | "puck-upbeat"
+  | "charon-informative"
+  | "fenrir-excitable"
+  | "leda-youthful";
 
 export type NavigationItem = {
   label: string;
@@ -21,29 +33,85 @@ export type NavigationItem = {
   description: string;
 };
 
+export type PracticeMode =
+  | "customer_qa"
+  | "demo_narration"
+  | "objection_handling"
+  | "solution_meeting"
+  | "quick_pitch";
+
+export type PracticeOpeningMode =
+  | "formal_business"
+  | "learner_led_intro"
+  | "efficient_warm_start";
+
+export type PracticeEscalationBias =
+  | "slow"
+  | "standard"
+  | "faster_after_context";
+
 export type PracticeGoal = {
   id: PracticeGoalId;
   label: string;
   description: string;
+  mode: PracticeMode;
+  defaultFocusTags: string[];
+  recommendedPersonaIds: string[];
+  recommendedVoicePackIds: VoicePackId[];
+  openingStrategyHint: string;
+  conversationStrategyModifiers: {
+    preferredOpeningModes: PracticeOpeningMode[];
+    escalationBias: PracticeEscalationBias;
+    firstTurnIntent: string;
+  };
+  questionGuidance: string[];
+  reviewDimensions: string[];
+  phrasebookTags: string[];
 };
 
 export type ScenarioPersona = {
   id: string;
   label: string;
+  englishName: string;
+  pressureLevel: "low" | "medium" | "medium_high" | "high";
   focusAreas: string[];
   communicationStyle: string;
   likelyFollowUps: string[];
+  openingQuestions: string[];
+  followUpPatterns: string[];
+  challengeRules: string[];
+  defaultFocusTags: string[];
+  rolePrompt: string;
+};
+
+export type GeminiLiveAudioConfig = {
+  response_modalities: ["AUDIO"];
+  speech_config: {
+    voice_config: {
+      prebuilt_voice_config: {
+        voice_name: string;
+      };
+    };
+  };
 };
 
 export type VoicePack = {
   id: VoicePackId;
   name: string;
+  providerVoiceName: string;
   gender: "female" | "male";
   personality: string;
   voiceStyle: string;
   speed: "medium_slow" | "medium" | "medium_fast" | "fast";
   bestFor: string[];
   modelVoiceHint: string;
+  geminiLiveConfig: GeminiLiveAudioConfig;
+};
+
+export type RoleVoiceRule = {
+  roleId: string;
+  defaultVoicePackId: VoicePackId;
+  recommendedVoicePackIds: VoicePackId[];
 };
 
 export type PhraseCategoryConfig = {
@@ -90,6 +158,7 @@ export type ScenarioPack = {
   practiceGoals: PracticeGoal[];
   personas: ScenarioPersona[];
   voicePacks: VoicePack[];
+  roleVoiceRules: RoleVoiceRule[];
   promptTemplates: PromptTemplates;
   phraseCategories: PhraseCategoryConfig[];
   objectionCategories: PhraseCategoryConfig[];
@@ -141,142 +210,261 @@ const practiceGoals: PracticeGoal[] = [
     id: "customer_qa",
     label: "客户问答",
     description: "练习客户连续提问下的清晰回答。",
+    mode: "customer_qa",
+    defaultFocusTags: ["商业价值", "应用场景说明", "探索式提问"],
+    recommendedPersonaIds: [
+      "enterprise_buyer",
+      "technical_lead",
+      "procurement_manager",
+    ],
+    recommendedVoicePackIds: ["kore-firm", "charon-informative", "leda-youthful"],
+    openingStrategyHint: "正式商务开场，先确认客户场景，再逐步提问。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["formal_business", "efficient_warm_start"],
+      escalationBias: "standard",
+      firstTurnIntent: "Confirm which customer scenario or business problem the learner wants to discuss.",
+    },
+    questionGuidance: [
+      "Ask what business problem the customer wants to solve first.",
+      "Ask the learner to answer with structure before adding detail.",
+      "Follow up on unclear value, missing use case, or unsupported claims.",
+    ],
+    reviewDimensions: ["回答清晰度", "是否先确认需求", "边界感"],
+    phrasebookTags: ["客户问答", "探索式提问", "商务回应"],
   },
   {
     id: "demo_narration",
-    label: "演示讲解",
+    label: "产品演示讲解",
     description: "把产品功能讲成客户能理解的应用场景。",
+    mode: "demo_narration",
+    defaultFocusTags: ["产品演示表达", "应用场景说明", "商业价值"],
+    recommendedPersonaIds: [
+      "channel_partner",
+      "enterprise_buyer",
+      "technical_lead",
+    ],
+    recommendedVoicePackIds: ["zephyr-bright", "puck-upbeat", "leda-youthful"],
+    openingStrategyHint: "用户先介绍产品或 demo flow，AI 客户再追问客户能否听懂。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["learner_led_intro", "formal_business"],
+      escalationBias: "slow",
+      firstTurnIntent: "Invite the learner to introduce Rokid through a simple demo story first.",
+    },
+    questionGuidance: [
+      "Ask for a simple demo sequence instead of a feature list.",
+      "Ask how each feature connects to a customer workflow.",
+      "Check whether a non-technical customer would understand the demo.",
+    ],
+    reviewDimensions: ["演示结构", "场景化表达", "避免功能堆砌"],
+    phrasebookTags: ["产品演示", "场景讲解", "功能转价值"],
   },
   {
-    id: "objection_handling",
-    label: "异议处理",
-    description: "练习隐私、价格、竞品和落地边界等高压问题。",
+    id: "application_scenarios",
+    label: "应用场景说明",
+    description: "练习说明产品适合哪些客户、哪些场景，以及为什么适合。",
+    mode: "customer_qa",
+    defaultFocusTags: ["应用场景说明", "商业价值", "探索式提问"],
+    recommendedPersonaIds: [
+      "enterprise_buyer",
+      "channel_partner",
+      "executive_decision_maker",
+    ],
+    recommendedVoicePackIds: ["kore-firm", "zephyr-bright", "leda-youthful"],
+    openingStrategyHint: "轻量商务开场，从客户业务问题和目标用户切入。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["efficient_warm_start", "formal_business"],
+      escalationBias: "standard",
+      firstTurnIntent: "Confirm the customer's business scenario and target users before explaining fit.",
+    },
+    questionGuidance: [
+      "Ask which users, meeting types, or multilingual workflows matter most.",
+      "Ask the learner to match Rokid value to one concrete department or workflow.",
+      "Push for a practical example instead of a generic scenario list.",
+    ],
+    reviewDimensions: ["场景具体度", "客户匹配度", "价值连接"],
+    phrasebookTags: ["应用场景", "客户画像", "业务痛点"],
+  },
+  {
+    id: "pros_cons",
+    label: "优缺点对比",
+    description: "练习诚实说明产品优势、限制和适配边界。",
+    mode: "objection_handling",
+    defaultFocusTags: ["优缺点对比", "竞品差异", "隐私安全"],
+    recommendedPersonaIds: [
+      "procurement_manager",
+      "enterprise_buyer",
+      "executive_decision_maker",
+    ],
+    recommendedVoicePackIds: ["kore-firm", "fenrir-excitable", "leda-youthful"],
+    openingStrategyHint: "先确认客户评估标准，再进入优势、限制和适配边界。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["formal_business", "efficient_warm_start"],
+      escalationBias: "faster_after_context",
+      firstTurnIntent: "Confirm the customer's evaluation criteria before discussing pros and cons.",
+    },
+    questionGuidance: [
+      "Ask what the customer values most: workflow fit, adoption, security, or cost.",
+      "Ask for a balanced view of strengths and limitations.",
+      "Challenge one-sided claims by asking when Rokid may not be the right fit.",
+    ],
+    reviewDimensions: ["平衡表达", "可信度", "是否过度承诺"],
+    phrasebookTags: ["优缺点", "适配边界", "风险回应"],
+  },
+  {
+    id: "competitive_differences",
+    label: "竞品差异说明",
+    description: "回答与手机翻译、会议软件或其他智能眼镜方案的差异。",
+    mode: "objection_handling",
+    defaultFocusTags: ["竞品差异", "商业价值", "优缺点对比"],
+    recommendedPersonaIds: [
+      "procurement_manager",
+      "executive_decision_maker",
+      "channel_partner",
+    ],
+    recommendedVoicePackIds: ["fenrir-excitable", "kore-firm", "puck-upbeat"],
+    openingStrategyHint: "先确认客户正在比较什么，再说明差异化价值。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["efficient_warm_start", "formal_business"],
+      escalationBias: "faster_after_context",
+      firstTurnIntent: "Ask which alternatives the customer is comparing before giving differentiation.",
+    },
+    questionGuidance: [
+      "Ask why the customer is considering phones, meeting software, or other devices.",
+      "Ask for safe differentiation connected to workflow and hands-free value.",
+      "Challenge unsupported competitor claims or absolute statements.",
+    ],
+    reviewDimensions: ["差异是否清楚", "是否尊重竞品", "是否连接客户场景"],
+    phrasebookTags: ["竞品差异", "替代方案", "差异化表达"],
+  },
+  {
+    id: "product_parameters",
+    label: "产品参数解释",
+    description: "练习硬件、软件、续航、显示、音频和翻译能力等参数表达。",
+    mode: "customer_qa",
+    defaultFocusTags: ["产品参数解释", "隐私安全", "商业价值"],
+    recommendedPersonaIds: [
+      "technical_lead",
+      "enterprise_buyer",
+      "procurement_manager",
+    ],
+    recommendedVoicePackIds: ["charon-informative", "kore-firm", "fenrir-excitable"],
+    openingStrategyHint: "先确认 use case，再进入参数细节和确认路径。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["efficient_warm_start", "formal_business"],
+      escalationBias: "standard",
+      firstTurnIntent: "Confirm the application context before asking which product parameters matter.",
+    },
+    questionGuidance: [
+      "Ask which parameters matter for the customer's use case.",
+      "Ask the learner to explain limits safely without inventing facts.",
+      "Ask how a parameter changes customer workflow, not only what the parameter is.",
+    ],
+    reviewDimensions: ["参数解释清晰度", "是否避免编造", "参数到价值转换"],
+    phrasebookTags: ["产品参数", "技术解释", "边界说明"],
+  },
+  {
+    id: "privacy_security",
+    label: "隐私安全沟通",
+    description: "回答数据流、权限、合规、安全边界和 IT 审查问题。",
+    mode: "objection_handling",
+    defaultFocusTags: ["隐私安全", "产品参数解释", "试点推进"],
+    recommendedPersonaIds: [
+      "technical_lead",
+      "enterprise_buyer",
+      "procurement_manager",
+    ],
+    recommendedVoicePackIds: ["charon-informative", "kore-firm", "fenrir-excitable"],
+    openingStrategyHint: "先确认客户安全关注点，再进入安全审查路径。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["formal_business", "efficient_warm_start"],
+      escalationBias: "faster_after_context",
+      firstTurnIntent: "Confirm the customer's security review goal before asking detailed audit questions.",
+    },
+    questionGuidance: [
+      "Ask what security concern the customer wants to review first.",
+      "Ask how data flow, access, and customer IT review should be confirmed.",
+      "Push the learner to state boundaries and confirmation paths instead of guessing.",
+    ],
+    reviewDimensions: ["安全边界", "可信表达", "确认路径"],
+    phrasebookTags: ["隐私安全", "数据治理", "IT 审查"],
+  },
+  {
+    id: "deployment_integration",
+    label: "部署与集成沟通",
+    description: "练习云端、本地、系统集成、试点部署和客户 IT 配合方式。",
+    mode: "solution_meeting",
+    defaultFocusTags: ["试点推进", "产品参数解释", "隐私安全"],
+    recommendedPersonaIds: [
+      "technical_lead",
+      "enterprise_buyer",
+      "channel_partner",
+    ],
+    recommendedVoicePackIds: ["charon-informative", "kore-firm", "puck-upbeat"],
+    openingStrategyHint: "先确认客户现有流程和 IT 环境，再讨论部署方式。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["formal_business", "efficient_warm_start"],
+      escalationBias: "standard",
+      firstTurnIntent: "Confirm the customer's current workflow and IT environment before deployment details.",
+    },
+    questionGuidance: [
+      "Ask what workflow or system the customer wants Rokid to fit into.",
+      "Ask for pilot scope, IT stakeholders, and integration constraints.",
+      "Keep unsupported deployment claims framed as items to confirm with technical teams.",
+    ],
+    reviewDimensions: ["流程化表达", "边界说明", "下一步明确度"],
+    phrasebookTags: ["部署", "集成", "试点范围"],
   },
   {
     id: "solution_meeting",
-    label: "方案会议",
+    label: "方案会议推进",
     description: "围绕客户业务目标推进方案和下一步。",
+    mode: "solution_meeting",
+    defaultFocusTags: ["试点推进", "商业价值", "探索式提问"],
+    recommendedPersonaIds: [
+      "enterprise_buyer",
+      "executive_decision_maker",
+      "channel_partner",
+    ],
+    recommendedVoicePackIds: ["kore-firm", "fenrir-excitable", "puck-upbeat"],
+    openingStrategyHint: "确认会议目标、决策人、成功标准和下一步行动。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["formal_business", "efficient_warm_start"],
+      escalationBias: "standard",
+      firstTurnIntent: "Confirm the meeting goal, success criteria, and what next step the customer wants to align on.",
+    },
+    questionGuidance: [
+      "Ask for the customer's business target and decision process.",
+      "Ask how a pilot should be scoped and measured.",
+      "Push toward a clear owner, timeline, and next action.",
+    ],
+    reviewDimensions: ["推进力", "下一步清晰度", "客户目标连接"],
+    phrasebookTags: ["方案会议", "试点推进", "下一步"],
   },
   {
     id: "quick_pitch",
     label: "60 秒快速表达",
     description: "在短时间内讲清价值、场景和下一步。",
-  },
-];
-
-const personas: ScenarioPersona[] = [
-  {
-    id: "enterprise_buyer",
-    label: "企业买家",
-    focusAreas: ["业务价值", "应用场景", "ROI", "试点风险"],
-    communicationStyle: "谨慎、结果导向，关注真实落地效果。",
-    likelyFollowUps: [
-      "这个产品最适合哪些业务场景？",
-      "它相比手机翻译或会议软件有什么差异？",
+    mode: "quick_pitch",
+    defaultFocusTags: ["简短回答", "商业价值", "竞品差异"],
+    recommendedPersonaIds: [
+      "executive_decision_maker",
+      "enterprise_buyer",
+      "procurement_manager",
     ],
-  },
-  {
-    id: "technical_lead",
-    label: "技术负责人",
-    focusAreas: ["产品参数", "集成方式", "隐私安全", "部署边界"],
-    communicationStyle: "理性、细节导向，会持续追问技术限制。",
-    likelyFollowUps: [
-      "关键参数和设备限制是什么？",
-      "数据处理和系统集成怎么做？",
+    recommendedVoicePackIds: ["fenrir-excitable", "kore-firm", "leda-youthful"],
+    openingStrategyHint: "短寒暄后直接邀请用户做 30-60 秒价值表达。",
+    conversationStrategyModifiers: {
+      preferredOpeningModes: ["efficient_warm_start", "learner_led_intro"],
+      escalationBias: "faster_after_context",
+      firstTurnIntent: "Invite the learner to give a concise 30-60 second value explanation.",
+    },
+    questionGuidance: [
+      "Ask for the shortest version of value, scenario, differentiation, and next step.",
+      "Interrupt rambling answers by asking for one sentence first.",
+      "Ask how the customer can validate the value quickly.",
     ],
-  },
-  {
-    id: "procurement_manager",
-    label: "采购经理",
-    focusAreas: ["价格", "合同", "交付周期", "竞品差异"],
-    communicationStyle: "成本敏感、谈判导向，关注供应风险。",
-    likelyFollowUps: [
-      "为什么我们应该选择 Rokid 而不是其他方案？",
-      "优缺点和采购风险分别是什么？",
-    ],
-  },
-  {
-    id: "channel_partner",
-    label: "渠道合作伙伴",
-    focusAreas: ["市场支持", "售后", "渠道利润", "客户教育"],
-    communicationStyle: "务实、合作型，关注如何卖出去和服务好。",
-    likelyFollowUps: [
-      "这个产品最容易打动哪些客户？",
-      "Rokid 能提供哪些销售和售后支持？",
-    ],
-  },
-  {
-    id: "executive_decision_maker",
-    label: "高管决策者",
-    focusAreas: ["战略价值", "差异化", "效率提升", "下一步"],
-    communicationStyle: "直接、高压、时间敏感，只听关键结论。",
-    likelyFollowUps: [
-      "一句话说清楚，为什么这值得我们投入时间？",
-      "下一步怎么验证它真的有价值？",
-    ],
-  },
-];
-
-const voicePacks: VoicePack[] = [
-  {
-    id: "ava-friendly-buyer",
-    name: "Ava 友好买家",
-    gender: "female",
-    personality: "友好、耐心、愿意配合",
-    voiceStyle: "清晰温和，压力较低",
-    speed: "medium",
-    bestFor: ["新手练习", "客户问答", "产品介绍"],
-    modelVoiceHint: "warm_clear_female",
-  },
-  {
-    id: "serena-enterprise-decision-maker",
-    name: "Serena 企业决策者",
-    gender: "female",
-    personality: "专业、克制、结果导向",
-    voiceStyle: "冷静商务，表达简洁",
-    speed: "medium_slow",
-    bestFor: ["企业采购", "方案会议", "ROI 讨论"],
-    modelVoiceHint: "calm_business_female",
-  },
-  {
-    id: "ethan-technical-lead",
-    name: "Ethan 技术负责人",
-    gender: "male",
-    personality: "理性、细节导向、追问较多",
-    voiceStyle: "稳重清晰，技术感强",
-    speed: "medium",
-    bestFor: ["技术参数", "集成", "部署", "安全问题"],
-    modelVoiceHint: "steady_technical_male",
-  },
-  {
-    id: "marcus-executive-customer",
-    name: "Marcus 高管客户",
-    gender: "male",
-    personality: "直接、高压、时间敏感",
-    voiceStyle: "低沉坚定，节奏较快",
-    speed: "medium_fast",
-    bestFor: ["高管简报", "价值陈述", "快速推进"],
-    modelVoiceHint: "firm_executive_male",
-  },
-  {
-    id: "vivian-critical-procurement",
-    name: "Vivian 挑剔采购",
-    gender: "female",
-    personality: "谨慎、怀疑、关注成本",
-    voiceStyle: "犀利干练，追问强",
-    speed: "fast",
-    bestFor: ["价格", "竞品差异", "优缺点", "谈判"],
-    modelVoiceHint: "sharp_procurement_female",
-  },
-  {
-    id: "noah-channel-partner",
-    name: "Noah 渠道伙伴",
-    gender: "male",
-    personality: "开放、务实、合作型",
-    voiceStyle: "亲和自然，商务轻松",
-    speed: "medium",
-    bestFor: ["渠道合作", "市场支持", "售后政策"],
-    modelVoiceHint: "friendly_partner_male",
+    reviewDimensions: ["简洁度", "重点突出", "是否有行动建议"],
+    phrasebookTags: ["快速表达", "电梯演讲", "价值总结"],
   },
 ];
 
@@ -397,8 +585,9 @@ export const defaultScenarioPack: ScenarioPack = {
     primaryCta: "开始今日练习",
   },
   practiceGoals,
-  personas,
-  voicePacks,
+  personas: rokidRoles,
+  voicePacks: rokidVoicePacks,
+  roleVoiceRules: rokidRoleVoiceRules,
   promptTemplates: {
     realtimeRole:
       "You are an overseas customer in a Rokid business meeting. Ask realistic questions about scenarios, pros and cons, differentiation, parameters, deployment, privacy, pricing, and next steps.",

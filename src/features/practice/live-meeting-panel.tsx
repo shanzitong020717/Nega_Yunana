@@ -72,7 +72,7 @@ export function LiveMeetingPanel({
   onMute,
   onEnd,
   isMuted,
-  voicePackLabel = "Ethan 技术负责人",
+  voicePackLabel = "Kore 坚定专业",
 }: LiveMeetingPanelProps) {
   const isLiveSession = canControlLiveSession(state);
 

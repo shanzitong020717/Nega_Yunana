@@ -4,12 +4,16 @@ import { CheckCircle2, FileText, Mic2, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { defaultScenarioPack, type PracticeGoalId } from "@/data/scenario-packs";
+import {
+  defaultScenarioPack,
+  type PracticeGoalId,
+} from "@/data/scenario-packs";
 import { VoicePackSelector } from "@/features/practice/voice-pack-selector";
 import {
   savePracticeSessionSelection,
   type StoredPracticeSessionSelection,
 } from "@/lib/practice/practice-session-selection";
+import type { MaterialMode } from "@/lib/validation/practice";
 
 type PracticeWizardProps = {
   materialId?: string;
@@ -48,13 +52,16 @@ const materialChoices = [
   },
 ] as const;
 
-const modeByGoalId: Record<PracticeGoalId, StoredPracticeSessionSelection["mode"]> = {
-  customer_qa: "customer_qa",
-  demo_narration: "demo_narration",
-  objection_handling: "objection_handling",
-  solution_meeting: "solution_meeting",
-  quick_pitch: "quick_pitch",
-};
+const modeByGoalId = Object.fromEntries(
+  defaultScenarioPack.practiceGoals.map((goal) => [goal.id, goal.mode]),
+) as Record<string, StoredPracticeSessionSelection["mode"]>;
+
+function findPracticeGoal(goalId: PracticeGoalId) {
+  return (
+    defaultScenarioPack.practiceGoals.find((goal) => goal.id === goalId) ??
+    defaultScenarioPack.practiceGoals[0]!
+  );
+}
 
 export function PracticeWizard({ materialId }: PracticeWizardProps) {
   const router = useRouter();
@@ -63,19 +70,18 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
     defaultScenarioPack.personas[0];
   const defaultVoicePack =
     defaultScenarioPack.voicePacks.find(
-      (voicePack) => voicePack.id === "ethan-technical-lead",
+      (voicePack) => voicePack.id === "kore-firm",
     ) ?? defaultScenarioPack.voicePacks[0];
   const [step, setStep] = useState<WizardStep>(1);
   const [goalId, setGoalId] = useState<PracticeGoalId>("customer_qa");
   const [personaId, setPersonaId] = useState<string>(defaultPersona.id);
   const [voicePackId, setVoicePackId] = useState<string>(defaultVoicePack.id);
-  const [selectedMaterialId, setSelectedMaterialId] = useState(
-    materialId ?? "recent_material",
+  const [selectedMaterialMode, setSelectedMaterialMode] = useState<MaterialMode>(
+    materialId ? "specific_material" : "recent_material",
   );
-  const [selectedFocusTags, setSelectedFocusTags] = useState<string[]>([
-    "商业价值",
-    "隐私安全",
-  ]);
+  const [selectedFocusTags, setSelectedFocusTags] = useState<string[]>(
+    findPracticeGoal("customer_qa").defaultFocusTags,
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +91,40 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
         ? currentTags.filter((currentTag) => currentTag !== tag)
         : [...currentTags, tag],
     );
+  }
+
+  function selectPersona(nextPersonaId: string) {
+    setPersonaId(nextPersonaId);
+
+    const roleVoiceRule = defaultScenarioPack.roleVoiceRules.find(
+      (rule) => rule.roleId === nextPersonaId,
+    );
+
+    if (
+      roleVoiceRule &&
+      !roleVoiceRule.recommendedVoicePackIds.includes(
+        voicePackId as (typeof roleVoiceRule.recommendedVoicePackIds)[number],
+      )
+    ) {
+      setVoicePackId(roleVoiceRule.defaultVoicePackId);
+    }
+  }
+
+  function selectGoal(nextGoalId: PracticeGoalId) {
+    const nextGoal = findPracticeGoal(nextGoalId);
+    const recommendedPersonaId = nextGoal.recommendedPersonaIds[0];
+    const recommendedVoicePackId = nextGoal.recommendedVoicePackIds[0];
+
+    setGoalId(nextGoalId);
+    setSelectedFocusTags(nextGoal.defaultFocusTags);
+
+    if (recommendedPersonaId) {
+      setPersonaId(recommendedPersonaId);
+    }
+
+    if (recommendedVoicePackId) {
+      setVoicePackId(recommendedVoicePackId);
+    }
   }
 
   async function createPracticeSession() {
@@ -97,8 +137,8 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
       mode: modeByGoalId[goalId],
       personaId,
       voicePackId,
-      materialId:
-        selectedMaterialId === "no_material" ? undefined : selectedMaterialId,
+      materialMode: selectedMaterialMode,
+      materialId: selectedMaterialMode === "specific_material" ? materialId : undefined,
       focusTags: selectedFocusTags,
       trainingFocus: selectedFocusTags,
       difficulty: "normal",
@@ -179,7 +219,7 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
                 key={goal.id}
                 type="button"
                 aria-pressed={isSelected}
-                onClick={() => setGoalId(goal.id)}
+                onClick={() => selectGoal(goal.id)}
                 className={[
                   "min-h-36 rounded-md border bg-[var(--surface)] p-4 text-left transition",
                   isSelected
@@ -211,7 +251,7 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
                     key={persona.id}
                     type="button"
                     aria-pressed={isSelected}
-                    onClick={() => setPersonaId(persona.id)}
+                    onClick={() => selectPersona(persona.id)}
                     className={[
                       "min-h-36 rounded-md border bg-[var(--surface)] p-4 text-left transition",
                       isSelected
@@ -233,7 +273,7 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold">声音包</h3>
+            <h3 className="text-sm font-semibold">AI Studio 音色</h3>
             <div className="mt-3">
               <VoicePackSelector
                 voicePacks={defaultScenarioPack.voicePacks}
@@ -251,14 +291,19 @@ export function PracticeWizard({ materialId }: PracticeWizardProps) {
             <h3 className="text-sm font-semibold">材料与记忆</h3>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {materialChoices.map((choice) => {
-                const isSelected = selectedMaterialId === choice.id;
+                const isSelected =
+                  selectedMaterialMode === choice.id ||
+                  (choice.id === "recent_material" &&
+                    selectedMaterialMode === "specific_material");
 
                 return (
                   <button
                     key={choice.id}
                     type="button"
                     aria-pressed={isSelected}
-                    onClick={() => setSelectedMaterialId(choice.id)}
+                    onClick={() =>
+                      setSelectedMaterialMode(choice.id as MaterialMode)
+                    }
                     className={[
                       "min-h-28 rounded-md border bg-[var(--surface)] p-4 text-left transition",
                       isSelected

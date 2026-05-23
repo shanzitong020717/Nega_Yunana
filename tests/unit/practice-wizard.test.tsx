@@ -19,20 +19,30 @@ describe("PracticeWizard", () => {
     window.sessionStorage.clear();
   });
 
-  it("shows the five practice goals in the first step", () => {
+  it("shows ten configured practice scenarios in the first step", () => {
     render(<PracticeWizard />);
 
     expect(screen.getByRole("heading", { name: "这次想练什么？" })).toBeInTheDocument();
-    ["客户问答", "演示讲解", "异议处理", "方案会议", "60 秒快速表达"].forEach(
-      (goal) => {
-        expect(screen.getByRole("button", { name: new RegExp(goal) })).toBeInTheDocument();
-      },
-    );
+    [
+      "客户问答",
+      "产品演示讲解",
+      "应用场景说明",
+      "优缺点对比",
+      "竞品差异说明",
+      "产品参数解释",
+      "隐私安全沟通",
+      "部署与集成沟通",
+      "方案会议推进",
+      "60 秒快速表达",
+    ].forEach((goal) => {
+      expect(screen.getByRole("button", { name: new RegExp(goal) })).toBeInTheDocument();
+    });
   });
 
   it("shows customer roles and selectable voice packs in the second step", () => {
     render(<PracticeWizard />);
 
+    fireEvent.click(screen.getByRole("button", { name: /产品参数解释/ }));
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
 
     expect(screen.getByRole("heading", { name: "让 AI 扮演谁？" })).toBeInTheDocument();
@@ -41,14 +51,18 @@ describe("PracticeWizard", () => {
         expect(screen.getByRole("button", { name: new RegExp(`^${persona}`) })).toBeInTheDocument();
       },
     );
-    ["Ava 友好买家", "Serena 企业决策者", "Ethan 技术负责人", "Marcus 高管客户", "Vivian 挑剔采购", "Noah 渠道伙伴"].forEach(
+    ["Kore 坚定专业", "Zephyr 明亮友好", "Puck 轻快外向", "Charon 清晰信息型", "Fenrir 高能追问", "Leda 年轻自然"].forEach(
       (voicePack) => {
         expect(screen.getByRole("button", { name: new RegExp(voicePack) })).toBeInTheDocument();
       },
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Vivian 挑剔采购/ }));
-    expect(screen.getByText("犀利干练，追问强")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Charon 清晰信息型/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Leda 年轻自然/ }));
+    expect(screen.getByText("Gemini voice_name: Leda")).toBeInTheDocument();
   });
 
   it("shows material choices and product-focused tags in the third step", () => {
@@ -72,10 +86,23 @@ describe("PracticeWizard", () => {
         JSON.stringify({
           practiceSession: {
             id: "session_123",
-            goalId: "customer_qa",
+            goalId: "product_parameters",
             personaId: "technical_lead",
-            voicePackId: "vivian-critical-procurement",
-            materialId: "recent_material",
+            voicePackId: "leda-youthful",
+            materialMode: "memory_context",
+            resolvedContext: {
+              persona: {
+                id: "technical_lead",
+                label: "技术负责人",
+              },
+              voicePack: {
+                id: "leda-youthful",
+                providerVoiceName: "Leda",
+              },
+              memorySnippets: [
+                "Feature-first answering pattern: The learner often starts with functions.",
+              ],
+            },
             status: "created",
           },
         }),
@@ -86,12 +113,13 @@ describe("PracticeWizard", () => {
 
     render(<PracticeWizard />);
 
+    fireEvent.click(screen.getByRole("button", { name: /产品参数解释/ }));
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
     fireEvent.click(screen.getByRole("button", { name: /^技术负责人/ }));
-    fireEvent.click(screen.getByRole("button", { name: /Vivian 挑剔采购/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Leda 年轻自然/ }));
     fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    fireEvent.click(screen.getByRole("button", { name: /使用系统记忆/ }));
     fireEvent.click(screen.getByRole("button", { name: /应用场景说明/ }));
-    fireEvent.click(screen.getByRole("button", { name: /产品参数解释/ }));
     fireEvent.click(screen.getByRole("button", { name: /开始练习/ }));
 
     await waitFor(() => {
@@ -106,17 +134,28 @@ describe("PracticeWizard", () => {
     const [, requestInit] = fetchMock.mock.calls[0];
     expect(JSON.parse(String(requestInit.body))).toMatchObject({
       scenarioPackId: "rokid-overseas-sales",
-      goalId: "customer_qa",
+      goalId: "product_parameters",
+      mode: "customer_qa",
       personaId: "technical_lead",
-      voicePackId: "vivian-critical-procurement",
-      materialId: "recent_material",
-      focusTags: expect.arrayContaining(["应用场景说明", "产品参数解释"]),
+      voicePackId: "leda-youthful",
+      materialMode: "memory_context",
+      focusTags: expect.arrayContaining(["产品参数解释"]),
     });
+    expect(JSON.parse(String(requestInit.body))).not.toHaveProperty(
+      "materialId",
+      "memory_context",
+    );
     expect(pushMock).toHaveBeenCalledWith("/practice/session_123");
     expect(readPracticeSessionSelection("session_123")).toMatchObject({
       id: "session_123",
       personaId: "technical_lead",
-      voicePackId: "vivian-critical-procurement",
+      voicePackId: "leda-youthful",
+      materialMode: "memory_context",
+      resolvedContext: expect.objectContaining({
+        voicePack: expect.objectContaining({
+          providerVoiceName: "Leda",
+        }),
+      }),
     });
   });
 });

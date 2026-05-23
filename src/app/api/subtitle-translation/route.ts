@@ -4,6 +4,9 @@ import { z } from "zod";
 import { generateSubtitleTranslation } from "@/lib/ai/subtitle-translation";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 
+export const runtime = "edge";
+export const preferredRegion = ["hkg1", "sin1"];
+
 const subtitleTranslationInputSchema = z.object({
   speaker: z.enum(["ai_customer", "user"], {
     error: "字幕说话人无效",

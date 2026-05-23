@@ -94,7 +94,7 @@ export function ObjectionBankView() {
       goalId: "objection_handling",
       mode: "objection_challenge",
       personaId: "skeptical_executive",
-      voicePackId: "marcus-executive-customer",
+      voicePackId: "fenrir-excitable",
       difficulty: "normal",
       trainingFocus: ["objection_handling"],
       focusTags,

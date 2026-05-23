@@ -18,6 +18,7 @@ src/generated/prisma/
 uploads/
 storage/
 .worktrees/
+.superpowers/
 
 # Logs
 *.log

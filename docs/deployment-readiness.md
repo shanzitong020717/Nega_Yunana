@@ -11,8 +11,11 @@ Configure these variables in the deployment provider before enabling real AI cal
 - `REALTIME_RELAY_PROVIDER`: `gemini_live` for Gemini Live realtime voice.
 - `REALTIME_RELAY_URL`: Render relay WebSocket URL when `OPENAI_REALTIME_TRANSPORT=websocket_relay`; production uses `wss://nega-yunana-realtime-relay-oregon.onrender.com/realtime`.
 - `REALTIME_RELAY_SHARED_SECRET`: shared HMAC secret used by Vercel and Render to sign and verify relay tokens.
-- `GEMINI_API_KEY`: Gemini key configured on the Render relay service only.
+- `GEMINI_API_KEY`: Gemini key configured on the Render relay service for Live voice; also configure it on Vercel only if `SUBTITLE_TRANSLATION_PROVIDER=gemini_flash`.
 - `GEMINI_LIVE_MODEL`: `gemini-3.1-flash-live-preview`.
+- `SUBTITLE_TRANSLATION_PROVIDER`: `deepseek` to use DeepSeek for Chinese subtitles, or `gemini_flash` to use Gemini Flash.
+- `SUBTITLE_DEEPSEEK_MODEL`: fast DeepSeek model used only for subtitle translation, for example `deepseek-v4-flash`.
+- `GEMINI_FLASH_TEXT_MODEL`: fast Gemini text model used only when `SUBTITLE_TRANSLATION_PROVIDER=gemini_flash`, for example `gemini-2.5-flash`.
 - `DATABASE_URL`: PostgreSQL connection string.
 - `APP_BASE_URL`: public app URL, such as `https://your-domain.com`.
 - `UPLOAD_DIR`: local upload directory for the current filesystem storage adapter.
@@ -33,7 +36,7 @@ See `docs/render-realtime-relay.md` for the Render WebSocket relay setup.
 ## AI Key Safety
 
 - `DEEPSEEK_API_KEY` is read in server-side AI modules only.
-- `GEMINI_API_KEY` is used by the Render relay only, not by browser code.
+- `GEMINI_API_KEY` is used by the Render relay and, when Flash subtitles are enabled, by Vercel server routes only; it is never sent to browser code.
 - `REALTIME_RELAY_SHARED_SECRET` is server-side only and must match between Vercel and Render.
 - Client components never read provider API keys or any `NEXT_PUBLIC_*` AI key variable.
 - The Realtime route returns a short-lived relay token, not a provider API key.
