@@ -20,10 +20,7 @@ export function PracticeView({ searchParams = {} }: PracticeViewProps) {
     materialId: firstSearchValue(searchParams.materialId),
   };
   const initialStep =
-    firstSearchValue(searchParams.initialStep) === "confirm" ||
-    firstSearchValue(searchParams.source) === "today-recommendation"
-      ? 3
-      : 1;
+    firstSearchValue(searchParams.initialStep) === "confirm" ? 3 : 1;
 
   return (
     <>

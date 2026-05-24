@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PracticeView } from "@/features/practice/practice-view";
 import { PracticeWizard } from "@/features/practice/practice-wizard";
 import { readPracticeSessionSelection } from "@/lib/practice/practice-session-selection";
 
@@ -80,7 +81,7 @@ describe("PracticeWizard", () => {
     });
   });
 
-  it("preselects the daily recommendation and opens on the confirmation step", () => {
+  it("preselects the daily recommendation while walking through every step", () => {
     render(
       <PracticeWizard
         initialSelection={{
@@ -89,21 +90,17 @@ describe("PracticeWizard", () => {
           voicePackId: "fenrir-excitable",
           materialMode: "memory_context",
         }}
-        initialStep={3}
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "要使用什么材料或记忆？" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /使用系统记忆/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: /竞品差异/ })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "这次想练什么？" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /竞品差异说明/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(screen.getByRole("heading", { name: "让 AI 扮演谁？" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^采购经理/ })).toHaveAttribute(
       "aria-pressed",
       "true",
@@ -113,8 +110,33 @@ describe("PracticeWizard", () => {
       "true",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
-    expect(screen.getByRole("button", { name: /竞品差异说明/ })).toHaveAttribute(
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    expect(screen.getByRole("heading", { name: "要使用什么材料或记忆？" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /使用系统记忆/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: /竞品差异/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+  });
+
+  it("keeps the quick practice recommendation on the first step when opened from the dashboard", () => {
+    render(
+      <PracticeView
+        searchParams={{
+          source: "today-recommendation",
+          goalId: "application_scenarios",
+          personaId: "enterprise_buyer",
+          voicePackId: "kore-firm",
+          materialMode: "memory_context",
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "这次想练什么？" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /应用场景说明/ })).toHaveAttribute(
       "aria-pressed",
       "true",
     );

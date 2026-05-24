@@ -164,7 +164,6 @@ export function buildPracticeHrefFromRecommendation(
 ) {
   const params = new URLSearchParams({
     source: "today-recommendation",
-    initialStep: "confirm",
     goalId: recommendation.goalId,
     personaId: recommendation.personaId,
     voicePackId: recommendation.voicePackId,

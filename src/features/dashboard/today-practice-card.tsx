@@ -101,7 +101,7 @@ export function TodayPracticeCard({
 
         <Link
           href={practiceHref}
-          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--primary)] px-4 text-sm font-medium text-white transition hover:bg-[var(--primary-strong)]"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-[#9ccfca] bg-[#dff3f0] px-4 text-sm font-semibold text-[var(--primary-strong)] transition hover:border-[var(--primary)] hover:bg-[#c9ebe6]"
         >
           <Mic2 className="h-4 w-4" aria-hidden="true" />
           快速训练

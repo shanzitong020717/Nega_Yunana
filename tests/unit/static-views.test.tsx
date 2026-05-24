@@ -70,11 +70,18 @@ describe("static product views", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("今日建议你练")).toBeInTheDocument();
     expect(await screen.findByText("采购经理 · 竞品差异说明")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "开始训练" })).toHaveAttribute(
+    const startPracticeLink = screen.getByRole("link", { name: "开始训练" });
+    expect(startPracticeLink).toHaveAttribute(
       "href",
       "/practice",
     );
+    expect(startPracticeLink).toHaveClass("bg-[#dff3f0]");
+    expect(startPracticeLink).toHaveClass("text-[var(--primary-strong)]");
+    expect(startPracticeLink).not.toHaveClass("bg-[var(--primary)]");
     const quickPracticeLink = screen.getByRole("link", { name: /快速训练/ });
+    expect(quickPracticeLink).toHaveClass("bg-[#dff3f0]");
+    expect(quickPracticeLink).toHaveClass("text-[var(--primary-strong)]");
+    expect(quickPracticeLink).not.toHaveClass("bg-[var(--primary)]");
     expect(quickPracticeLink).toHaveAttribute(
       "href",
       expect.stringContaining("/practice?"),
@@ -90,6 +97,9 @@ describe("static product views", () => {
     expect(quickPracticeLink).toHaveAttribute(
       "href",
       expect.stringContaining("voicePackId=fenrir-excitable"),
+    );
+    expect(quickPracticeLink.getAttribute("href")).not.toContain(
+      "initialStep=confirm",
     );
     expect(screen.getByRole("link", { name: /上传客户材料/ })).toHaveAttribute(
       "href",
