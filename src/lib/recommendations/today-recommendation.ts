@@ -128,6 +128,30 @@ function findVoicePack(voicePackId: string, fallbackVoicePackIds: VoicePackId[])
   );
 }
 
+function getConfiguredRecommendationPackages() {
+  return defaultScenarioPack.practiceGoals.map((goal) => {
+    const persona = findPersona(goal.recommendedPersonaIds[0], goal.recommendedPersonaIds);
+    const voicePack = findVoicePack(
+      goal.recommendedVoicePackIds[0],
+      goal.recommendedVoicePackIds,
+    );
+    const materialMode: TodayRecommendationMaterialMode = "memory_context";
+
+    return {
+      id: buildRecommendationId({
+        goalId: goal.id,
+        personaId: persona.id,
+        voicePackId: voicePack.id,
+        materialMode,
+      }),
+      goal,
+      materialMode,
+      persona,
+      voicePack,
+    };
+  });
+}
+
 function normalizeRecommendation(
   payload: z.infer<typeof recommendationPayloadSchema>,
   source: TodayRecommendation["source"],
@@ -278,8 +302,14 @@ function formatScenarioOptions() {
         `- ${voicePack.id}: ${voicePack.name}; providerVoice=${voicePack.providerVoiceName}; style=${voicePack.voiceStyle}; bestFor=${voicePack.bestFor.join(", ")}`,
     )
     .join("\n");
+  const configuredPackages = getConfiguredRecommendationPackages()
+    .map(
+      (recommendationPackage) =>
+        `- ${recommendationPackage.id}: ${recommendationPackage.persona.label} · ${recommendationPackage.goal.label}; goalId=${recommendationPackage.goal.id}; personaId=${recommendationPackage.persona.id}; voicePackId=${recommendationPackage.voicePack.id}; materialMode=${recommendationPackage.materialMode}`,
+    )
+    .join("\n");
 
-  return `Practice goals:\n${goals}\n\nCustomer roles:\n${personas}\n\nAI Studio voice packs:\n${voices}`;
+  return `Practice goals:\n${goals}\n\nCustomer roles:\n${personas}\n\nAI Studio voice packs:\n${voices}\n\nConfigured recommendation packages:\n${configuredPackages}`;
 }
 
 function buildRecommendationPrompt(input: GenerateTodayRecommendationInput) {
@@ -295,6 +325,7 @@ Decision rules:
 - Do not invent unavailable product facts, pricing, certifications, or customer cases.
 - The reason must be Chinese, concise, and explain why this is recommended today based on evidence.
 - Pick IDs only from the options below.
+- Prefer one of the configured recommendation packages below. If this is a refresh and excluded package ids are provided, do not return the same configured package id again today.
 
 ${formatScenarioOptions()}
 

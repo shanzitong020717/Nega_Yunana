@@ -98,6 +98,10 @@ describe("today practice recommendation", () => {
     expect(prompt).toContain("Rokid competitor comparison deck");
     expect(prompt).toContain("Weak competitor positioning");
     expect(prompt).toContain("competitive_differences");
+    expect(prompt).toContain("Configured recommendation packages");
+    expect(prompt).toContain(
+      "application_scenarios:enterprise_buyer:kore-firm:memory_context",
+    );
     expect(recommendation).toMatchObject({
       title: "采购经理 · 竞品差异说明",
       goalId: "competitive_differences",
@@ -139,5 +143,36 @@ describe("today practice recommendation", () => {
       "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
     );
     expect(recommendation.title).not.toBe("采购经理 · 竞品差异说明");
+  });
+
+  it("keeps rotating fallback packages when several shown packages are excluded", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "false");
+    generateTextJSONMock.mockResolvedValueOnce({
+      title: "采购经理 · 竞品差异说明",
+      reason:
+        "基于最近复盘，用户在说明 Rokid 与手机翻译的差异时缺少 workflow 角度，今天适合练习更清晰的竞品差异表达。",
+      goalId: "competitive_differences",
+      personaId: "procurement_manager",
+      voicePackId: "fenrir-excitable",
+      materialMode: "memory_context",
+      materialLabel: "系统记忆",
+      durationMinutes: 12,
+      evidence: ["unclear positioning"],
+    });
+
+    const recommendation = await generateTodayRecommendation({
+      progress,
+      recentMaterials: [],
+      memories: [],
+      excludedRecommendationIds: [
+        "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
+        "customer_qa:enterprise_buyer:kore-firm:memory_context",
+      ],
+    });
+
+    expect(recommendation.id).toBe(
+      "demo_narration:channel_partner:zephyr-bright:memory_context",
+    );
+    expect(recommendation.title).toBe("渠道合作伙伴 · 产品演示讲解");
   });
 });

@@ -102,6 +102,58 @@ describe("today recommendation daily cache", () => {
     );
   });
 
+  it("excludes every recommendation already shown today when refreshing again", async () => {
+    const thirdRecommendation: TodayRecommendation = {
+      id: "demo_narration:channel_partner:zephyr-bright:memory_context",
+      title: "渠道合作伙伴 · 产品演示讲解",
+      reason: "第二次刷新后重新计算出的推荐。",
+      goalId: "demo_narration",
+      goalLabel: "产品演示讲解",
+      personaId: "channel_partner",
+      personaLabel: "渠道合作伙伴",
+      voicePackId: "zephyr-bright",
+      voicePackLabel: "Zephyr 明亮友好",
+      materialMode: "memory_context",
+      materialLabel: "系统记忆",
+      durationMinutes: 10,
+      href: "/practice",
+      source: "ai",
+      evidence: ["third evidence"],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(recommendationResponse(refreshedRecommendation))
+      .mockResolvedValueOnce(recommendationResponse(thirdRecommendation));
+    vi.stubGlobal("fetch", fetchMock);
+    writeTodayRecommendationCache(cachedRecommendation);
+
+    render(<TodayPracticeCard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新今日建议" }));
+    expect(
+      await screen.findByText("企业买家 · 应用场景说明"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新今日建议" }));
+    expect(
+      await screen.findByText("渠道合作伙伴 · 产品演示讲解"),
+    ).toBeInTheDocument();
+
+    const secondRefreshUrl = String(fetchMock.mock.calls[1]?.[0]);
+
+    expect(secondRefreshUrl).toContain(
+      `exclude=${encodeURIComponent(cachedRecommendation.id)}`,
+    );
+    expect(secondRefreshUrl).toContain(
+      `exclude=${encodeURIComponent(refreshedRecommendation.id)}`,
+    );
+    expect(readTodayRecommendationCache()?.shownRecommendationIds).toEqual([
+      cachedRecommendation.id,
+      refreshedRecommendation.id,
+      thirdRecommendation.id,
+    ]);
+  });
+
   it("marks the completed quick practice package and preloads the next one", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       recommendationResponse(refreshedRecommendation),

@@ -1,11 +1,10 @@
-import type {
-  TodayRecommendation,
-} from "@/lib/recommendations/today-recommendation";
+import type { TodayRecommendation } from "@/lib/recommendations/today-recommendation";
 
 export type TodayRecommendationCacheRecord = {
   completedRecommendationIds: string[];
   date: string;
   recommendation: TodayRecommendation;
+  shownRecommendationIds: string[];
   updatedAt: string;
 };
 
@@ -48,6 +47,16 @@ function isCacheRecord(value: unknown): value is TodayRecommendationCacheRecord 
   );
 }
 
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
+    : [];
+}
+
+function unique(values: string[]) {
+  return Array.from(new Set(values));
+}
+
 export function readTodayRecommendationCache(date = new Date()) {
   if (!canUseLocalStorage()) {
     return null;
@@ -67,7 +76,19 @@ export function readTodayRecommendationCache(date = new Date()) {
       return null;
     }
 
-    return parsedCache;
+    return {
+      ...parsedCache,
+      completedRecommendationIds: unique(
+        stringArray(parsedCache.completedRecommendationIds),
+      ),
+      shownRecommendationIds: unique([
+        ...stringArray(
+          (parsedCache as Partial<TodayRecommendationCacheRecord>)
+            .shownRecommendationIds,
+        ),
+        parsedCache.recommendation.id,
+      ]),
+    };
   } catch {
     return null;
   }
@@ -78,6 +99,7 @@ export function writeTodayRecommendationCache(
   options: {
     completedRecommendationIds?: string[];
     date?: Date;
+    shownRecommendationIds?: string[];
   } = {},
 ) {
   if (!canUseLocalStorage()) {
@@ -86,17 +108,22 @@ export function writeTodayRecommendationCache(
 
   const date = options.date ?? new Date();
   const currentCache = readTodayRecommendationCache(date);
-  const completedRecommendationIds = Array.from(
-    new Set(
-      options.completedRecommendationIds ??
-        currentCache?.completedRecommendationIds ??
-        [],
-    ),
+  const completedRecommendationIds = unique(
+    options.completedRecommendationIds ??
+      currentCache?.completedRecommendationIds ??
+      [],
   );
+  const shownRecommendationIds = unique([
+    ...(options.shownRecommendationIds ??
+      currentCache?.shownRecommendationIds ??
+      []),
+    recommendation.id,
+  ]);
   const cacheRecord: TodayRecommendationCacheRecord = {
     date: localDateKey(date),
     recommendation,
     completedRecommendationIds,
+    shownRecommendationIds,
     updatedAt: new Date().toISOString(),
   };
 

@@ -99,6 +99,7 @@ export function TodayPracticeCard({
     return Array.from(
       new Set(
         [
+          ...(cache?.shownRecommendationIds ?? []),
           ...(cache?.completedRecommendationIds ?? []),
           recommendation?.id,
         ].filter((recommendationId): recommendationId is string =>
