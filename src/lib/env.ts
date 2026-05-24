@@ -25,6 +25,13 @@ const serverEnvSchema = z.object({
     "APP_BASE_URL must be a valid URL",
   ),
   UPLOAD_DIR: requiredString("UPLOAD_DIR is required"),
+  NEXT_PUBLIC_SUPABASE_URL: requiredUrl(
+    "NEXT_PUBLIC_SUPABASE_URL is required",
+    "NEXT_PUBLIC_SUPABASE_URL must be a valid URL",
+  ),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: requiredString(
+    "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required",
+  ),
   CONFIDENTIAL_MODE_DEFAULT: z
     .preprocess(
       (value) => (value === undefined || value === null ? "true" : value),

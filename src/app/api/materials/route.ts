@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAuthContext } from "@/lib/auth/require-user";
 import {
   createMaterialInputSchema,
   getSupportedFileTypeFromName,
@@ -12,10 +13,16 @@ import {
   saveMaterialRecord,
 } from "@/lib/materials/material-store";
 
-export function GET() {
-  return NextResponse.json({
-    materials: listMaterialRecords(),
-  });
+export async function GET() {
+  try {
+    const authContext = await requireAuthContext();
+
+    return NextResponse.json({
+      materials: listMaterialRecords({ userId: authContext.profileId }),
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
 function getFormString(formData: FormData, key: string) {
@@ -47,6 +54,7 @@ function isUploadedFile(value: FormDataEntryValue | null): value is File {
 
 export async function POST(request: Request) {
   try {
+    const authContext = await requireAuthContext();
     const formData = await request.formData();
     const file = formData.get("file");
 
@@ -75,6 +83,7 @@ export async function POST(request: Request) {
     const extraction = await extractTextFromStoredFile(input);
     const material = saveMaterialRecord({
       ...input,
+      userId: authContext.profileId,
       extractionStatus: extraction.status,
       extractedText: extraction.text ?? undefined,
       processingStatus:

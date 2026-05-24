@@ -1,4 +1,5 @@
 import { generateLongTermReviewSnapshot } from "@/lib/ai/long-term-review";
+import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 import { listMemories } from "@/lib/memory/memory-store";
 import {
   listPracticeSessionRecords,
@@ -18,12 +19,16 @@ type CacheEntry = {
 type GetOrGenerateReviewAnalyticsInput = {
   force?: boolean;
   range: ReviewAnalyticsRange;
-};
+} & UserScope;
 
-const cache = new Map<ReviewAnalyticsRange, CacheEntry>();
+const cache = new Map<string, CacheEntry>();
 
-function buildSourceSignature() {
-  return listReviewRecords()
+function cacheKey(range: ReviewAnalyticsRange, scope?: UserScope) {
+  return `${scope?.userId ?? LOCAL_DEMO_PROFILE_ID}:${range}`;
+}
+
+function buildSourceSignature(scope?: UserScope) {
+  return listReviewRecords(scope)
     .map((review) => `${review.id}:${review.updatedAt}`)
     .sort()
     .join("|");
@@ -59,15 +64,18 @@ function buildWeaknessSummaries(reviews = listReviewRecords()) {
   );
 }
 
-function buildMemorySummaries() {
-  return listMemories({ enabledForAi: true }).map((memory) => ({
+function buildMemorySummaries(scope?: UserScope) {
+  return listMemories({ enabledForAi: true, userId: scope?.userId }).map((memory) => ({
     title: memory.title,
     summary: memory.summary,
   }));
 }
 
-export function getCachedReviewAnalytics(range: ReviewAnalyticsRange) {
-  return cache.get(range)?.snapshot ?? null;
+export function getCachedReviewAnalytics(
+  range: ReviewAnalyticsRange,
+  scope?: UserScope,
+) {
+  return cache.get(cacheKey(range, scope))?.snapshot ?? null;
 }
 
 export function clearReviewAnalyticsCache() {
@@ -77,8 +85,10 @@ export function clearReviewAnalyticsCache() {
 export async function getOrGenerateReviewAnalytics(
   input: GetOrGenerateReviewAnalyticsInput,
 ) {
-  const signature = buildSourceSignature();
-  const cached = cache.get(input.range);
+  const scope = { userId: input.userId };
+  const key = cacheKey(input.range, scope);
+  const signature = buildSourceSignature(scope);
+  const cached = cache.get(key);
 
   if (
     cached &&
@@ -89,12 +99,12 @@ export async function getOrGenerateReviewAnalytics(
     return cached.snapshot;
   }
 
-  const reviews = listReviewRecords();
+  const reviews = listReviewRecords(scope);
   const draft = buildReviewAnalyticsDraft({
     range: input.range,
     reviews,
-    sessions: listPracticeSessionRecords(),
-    memories: listMemories({ enabledForAi: true }),
+    sessions: listPracticeSessionRecords(scope),
+    memories: listMemories({ enabledForAi: true, userId: scope.userId }),
   });
   const snapshot =
     draft.trainingCount >= 2
@@ -102,11 +112,11 @@ export async function getOrGenerateReviewAnalytics(
           draft,
           sentenceReviewSummaries: buildSentenceReviewSummaries(reviews),
           weaknessSummaries: buildWeaknessSummaries(reviews),
-          memorySummaries: buildMemorySummaries(),
+          memorySummaries: buildMemorySummaries(scope),
         })
       : draft;
 
-  cache.set(input.range, {
+  cache.set(key, {
     signature,
     snapshot,
   });

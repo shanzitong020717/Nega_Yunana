@@ -3,6 +3,7 @@ import {
   type ReviewMemoryUpsertResult,
 } from "@/lib/memory/memory-store";
 import type { ReviewRecord } from "@/lib/practice/practice-session-store";
+import type { UserScope } from "@/lib/auth/user-scope";
 import type { MemoryCandidate } from "@/lib/validation/reviews";
 
 type SkippedMemoryCandidate = {
@@ -18,6 +19,7 @@ export type ReviewMemoryConsolidationResult = {
 
 export function consolidateReviewMemoryCandidates(
   review: ReviewRecord,
+  scope?: UserScope,
 ): ReviewMemoryConsolidationResult {
   const result: ReviewMemoryConsolidationResult = {
     created: [],
@@ -54,6 +56,7 @@ export function consolidateReviewMemoryCandidates(
       reviewId: review.id,
       sessionId: review.sessionId,
       sourceCreatedAt: review.createdAt,
+      userId: scope?.userId,
     });
 
     if (upsertResult.action === "created") {

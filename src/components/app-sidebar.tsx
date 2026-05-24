@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  LogOut,
   Settings,
 } from "lucide-react";
 import Link from "next/link";
@@ -46,6 +47,13 @@ const auxiliaryNavItems: NavItem[] = defaultScenarioPack.navigation.auxiliary
 
 export function AppSidebar() {
   const pathname = usePathname();
+
+  async function handleLogout() {
+    await fetch("/api/auth/logout", {
+      method: "POST",
+    });
+    window.location.href = "/login";
+  }
 
   return (
     <aside className="min-w-0 border-b border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-0 lg:h-dvh lg:border-b-0 lg:border-r">
@@ -121,6 +129,14 @@ export function AppSidebar() {
               </Link>
             );
           })}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex min-h-11 items-center gap-3 rounded-md border border-transparent px-3 py-3 text-left text-sm text-[var(--muted)] transition hover:border-[var(--border)] hover:bg-[var(--surface-subtle)] hover:text-[var(--foreground)]"
+          >
+            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="font-medium">退出登录</span>
+          </button>
         </nav>
       </div>
     </aside>

@@ -5,24 +5,30 @@ import {
   type UpdateMemoryInput,
 } from "@/lib/validation/memory";
 import type { MemoryCandidate } from "@/lib/validation/reviews";
+import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 
 type ListMemoriesInput = {
   type?: MemoryType | "all";
   enabledForAi?: boolean;
-};
+} & UserScope;
 
 type RankMemoriesInput = {
   focusTags?: string[];
   limit?: number;
+} & UserScope;
+
+type StoredMemoryItem = MemoryItem & {
+  userId?: string;
 };
 
 const now = new Date().toISOString();
 
-const memoryItems = new Map<string, MemoryItem>([
+const memoryItems = new Map<string, StoredMemoryItem>([
   [
     "memory_default_speaking_habit",
     {
       id: "memory_default_speaking_habit",
+      userId: LOCAL_DEMO_PROFILE_ID,
       scenarioPackId: "rokid-overseas-sales",
       type: "speaking_habit",
       title: "Feature-first answering pattern",
@@ -45,6 +51,7 @@ const memoryItems = new Map<string, MemoryItem>([
     "memory_default_learning_preference",
     {
       id: "memory_default_learning_preference",
+      userId: LOCAL_DEMO_PROFILE_ID,
       scenarioPackId: "rokid-overseas-sales",
       type: "learning_preference",
       title: "Prefers business-ready English",
@@ -75,11 +82,15 @@ const candidateTypeMap: Record<string, MemoryType> = {
   strength: "learning_preference",
 };
 
-export type ReviewMemoryUpsertResult = MemoryItem & {
+export type ReviewMemoryUpsertResult = StoredMemoryItem & {
   action: "created" | "merged";
 };
 
-function sortByUpdatedAt(memories: MemoryItem[]) {
+function getRecordUserId(record: { userId?: string }) {
+  return record.userId ?? LOCAL_DEMO_PROFILE_ID;
+}
+
+function sortByUpdatedAt(memories: StoredMemoryItem[]) {
   return [...memories].sort(
     (a, b) =>
       new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
@@ -88,26 +99,36 @@ function sortByUpdatedAt(memories: MemoryItem[]) {
 
 export function listMemories(input: ListMemoriesInput = {}) {
   const memories = Array.from(memoryItems.values()).filter((memory) => {
+    const matchesUser = input.userId
+      ? getRecordUserId(memory) === input.userId
+      : true;
     const matchesType =
       !input.type || input.type === "all" || memory.type === input.type;
     const matchesEnabled =
       input.enabledForAi === undefined ||
       memory.enabledForAi === input.enabledForAi;
 
-    return matchesType && matchesEnabled;
+    return matchesUser && matchesType && matchesEnabled;
   });
 
   return sortByUpdatedAt(memories);
 }
 
-export function getMemory(memoryId: string) {
-  return memoryItems.get(memoryId) ?? null;
+export function getMemory(memoryId: string, scope?: UserScope) {
+  const memory = memoryItems.get(memoryId) ?? null;
+
+  if (!memory || (scope?.userId && getRecordUserId(memory) !== scope.userId)) {
+    return null;
+  }
+
+  return memory;
 }
 
-export function createMemory(input: CreateMemoryInput) {
+export function createMemory(input: CreateMemoryInput & UserScope) {
   const createdAt = new Date().toISOString();
-  const memory: MemoryItem = {
+  const memory: StoredMemoryItem = {
     id: `memory_${crypto.randomUUID()}`,
+    userId: input.userId ?? LOCAL_DEMO_PROFILE_ID,
     scenarioPackId: input.scenarioPackId,
     type: input.type,
     title: input.title,
@@ -138,10 +159,10 @@ function normalizeMemoryText(value: string) {
     .trim();
 }
 
-function findSimilarMemory(type: MemoryType, title: string) {
+function findSimilarMemory(type: MemoryType, title: string, scope?: UserScope) {
   const normalizedTitle = normalizeMemoryText(title);
 
-  return listMemories().find((memory) => {
+  return listMemories(scope).find((memory) => {
     if (memory.type !== type) {
       return false;
     }
@@ -171,10 +192,12 @@ export function upsertMemoryFromReviewCandidate(
     reviewId: string;
     sessionId: string;
     sourceCreatedAt: string;
+    userId?: string;
   },
 ): ReviewMemoryUpsertResult {
   const type = candidateTypeMap[candidate.type] ?? "learning_preference";
-  const existing = findSimilarMemory(type, candidate.title);
+  const scope = { userId: source.userId };
+  const existing = findSimilarMemory(type, candidate.title, scope);
 
   if (!existing) {
     return {
@@ -189,6 +212,7 @@ export function upsertMemoryFromReviewCandidate(
         importance: candidate.importance,
         enabledForAi: candidate.enabledForAi,
         sensitive: candidate.sensitivity !== "low",
+        userId: source.userId,
       }),
       action: "created",
     };
@@ -212,8 +236,12 @@ export function upsertMemoryFromReviewCandidate(
   };
 }
 
-export function updateMemory(memoryId: string, input: UpdateMemoryInput) {
-  const memory = getMemory(memoryId);
+export function updateMemory(
+  memoryId: string,
+  input: UpdateMemoryInput,
+  scope?: UserScope,
+) {
+  const memory = getMemory(memoryId, scope);
 
   if (!memory) {
     return null;
@@ -230,8 +258,8 @@ export function updateMemory(memoryId: string, input: UpdateMemoryInput) {
   return updated;
 }
 
-export function deleteMemory(memoryId: string) {
-  const memory = getMemory(memoryId);
+export function deleteMemory(memoryId: string, scope?: UserScope) {
+  const memory = getMemory(memoryId, scope);
 
   if (!memory) {
     return null;
@@ -272,7 +300,7 @@ export function rankMemoriesForPractice(input: RankMemoriesInput = {}) {
   const focusTags = input.focusTags ?? [];
   const limit = input.limit ?? 5;
 
-  return listMemories({ enabledForAi: true })
+  return listMemories({ enabledForAi: true, userId: input.userId })
     .map((memory) => {
       const score =
         textMatchesFocus(memory, focusTags) * 0.45 +

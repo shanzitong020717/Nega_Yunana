@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { personas } from "@/data/personas";
+import { requireAuthContext } from "@/lib/auth/require-user";
 import {
   generatePracticeReview,
   ReviewGenerationRetryableError,
@@ -40,9 +41,11 @@ async function readOptionalJsonBody(request: Request) {
 
 export async function POST(request: Request, context: ReviewRouteContext) {
   try {
+    const authContext = await requireAuthContext();
+    const scope = { userId: authContext.profileId };
     const { sessionId } = await context.params;
     const requestBody = await readOptionalJsonBody(request);
-    const practiceSession = ensurePracticeSessionRecord(sessionId);
+    const practiceSession = ensurePracticeSessionRecord(sessionId, scope);
     const persona =
       personas.find((item) => item.id === practiceSession.personaId) ??
       personas[0];
@@ -50,19 +53,19 @@ export async function POST(request: Request, context: ReviewRouteContext) {
       ? getMaterialBriefRecord(practiceSession.materialId)
       : null;
     const prepCard = practiceSession.prepCardId
-      ? getPrepCardRecord(practiceSession.prepCardId)
+      ? getPrepCardRecord(practiceSession.prepCardId, scope)
       : null;
     const review = requestBody
       ? createReviewInputSchema.parse(requestBody)
       : await generatePracticeReview({
           practiceSession,
-          transcriptTurns: getTranscriptTurns(sessionId),
+          transcriptTurns: getTranscriptTurns(sessionId, scope),
           persona,
           materialBrief,
           prepCard,
-          suggestedAnswers: getSuggestedAnswerRecords(sessionId),
+          suggestedAnswers: getSuggestedAnswerRecords(sessionId, scope),
         });
-    const reviewRecord = saveReviewRecord(sessionId, review);
+    const reviewRecord = saveReviewRecord(sessionId, review, scope);
 
     return NextResponse.json(
       {
@@ -84,13 +87,16 @@ export async function POST(request: Request, context: ReviewRouteContext) {
 
 export async function DELETE(_request: Request, context: ReviewRouteContext) {
   try {
+    const authContext = await requireAuthContext();
     const { sessionId } = await context.params;
 
-    if (!getPracticeSessionRecord(sessionId)) {
+    if (!getPracticeSessionRecord(sessionId, { userId: authContext.profileId })) {
       return apiErrorResponse("NOT_FOUND", "未找到练习会话", 404);
     }
 
-    const deletedReview = deleteReviewBySessionId(sessionId);
+    const deletedReview = deleteReviewBySessionId(sessionId, {
+      userId: authContext.profileId,
+    });
 
     return NextResponse.json({
       sessionId,

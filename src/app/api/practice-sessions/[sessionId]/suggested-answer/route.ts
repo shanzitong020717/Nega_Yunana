@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { defaultScenarioPack } from "@/data/scenario-packs";
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { generateSuggestedAnswer } from "@/lib/ai/suggested-answer";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
@@ -23,13 +24,15 @@ export async function POST(
   context: SuggestedAnswerRouteContext,
 ) {
   try {
+    const authContext = await requireAuthContext();
+    const scope = { userId: authContext.profileId };
     const { sessionId } = await context.params;
     const input = createSuggestedAnswerInputSchema.parse(
       await readJsonBody(request),
     );
     const practiceSession = ensurePracticeSessionRecord(
       sessionId,
-      input.practiceSession,
+      { ...input.practiceSession, ...scope },
     );
     const persona =
       defaultScenarioPack.personas.find(
@@ -39,7 +42,7 @@ export async function POST(
       ? getMaterialBriefRecord(practiceSession.materialId)
       : null;
     const prepCard = practiceSession.prepCardId
-      ? getPrepCardRecord(practiceSession.prepCardId)
+      ? getPrepCardRecord(practiceSession.prepCardId, scope)
       : null;
     const suggestion = await generateSuggestedAnswer({
       latestAiTurn: input.latestAiTurn,
@@ -49,9 +52,9 @@ export async function POST(
       materialBrief,
       prepCard,
     });
-    const phrasebookResult = savePhraseRecord(suggestion.phrasebookEntry);
+    const phrasebookResult = savePhraseRecord(suggestion.phrasebookEntry, scope);
 
-    saveSuggestedAnswerRecord(sessionId, suggestion);
+    saveSuggestedAnswerRecord(sessionId, suggestion, scope);
 
     return NextResponse.json(
       {

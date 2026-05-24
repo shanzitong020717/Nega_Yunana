@@ -17,11 +17,14 @@ import {
   listPrepCardRecords,
 } from "@/lib/practice/prep-card-store";
 import { savePracticeSessionRecord } from "@/lib/practice/practice-session-store";
+import type { UserScope } from "@/lib/auth/user-scope";
 import type {
   CreatePracticeSessionInput,
   MaterialMode,
   ResolvedPracticeContext,
 } from "@/lib/validation/practice";
+
+type CreateResolvedPracticeSessionInput = CreatePracticeSessionInput & UserScope;
 
 const legacyVoicePackIds: Record<string, VoicePack["id"]> = {
   "ava-friendly-buyer": "zephyr-bright",
@@ -153,14 +156,18 @@ function normalizeMaterialMode(input: CreatePracticeSessionInput): MaterialMode 
   return input.materialMode;
 }
 
-function memorySnippetsForFocus(focusTags: string[]) {
-  return rankMemoriesForPractice({ focusTags, limit: 5 }).map(
+function memorySnippetsForFocus(focusTags: string[], scope?: UserScope) {
+  return rankMemoriesForPractice({
+    focusTags,
+    limit: 5,
+    userId: scope?.userId,
+  }).map(
     (memory) => `${memory.title}: ${memory.summary}`,
   );
 }
 
 function resolveMaterialContext(
-  input: CreatePracticeSessionInput,
+  input: CreateResolvedPracticeSessionInput,
   materialMode: MaterialMode,
   focusTags: string[],
 ): Pick<ResolvedPracticeContext, "material" | "memorySnippets"> & {
@@ -183,17 +190,19 @@ function resolveMaterialContext(
         mode: materialMode,
         resolutionStatus: "fallback_to_memory",
       },
-      memorySnippets: memorySnippetsForFocus(focusTags),
+      memorySnippets: memorySnippetsForFocus(focusTags, {
+        userId: input.userId,
+      }),
     };
   }
 
   const material =
     materialMode === "recent_material"
-      ? listMaterialRecords().find(
+      ? listMaterialRecords({ userId: input.userId }).find(
           (record) => record.processingStatus === "ready" || record.extractedText,
         )
       : input.materialId
-        ? getMaterialRecord(input.materialId)
+        ? getMaterialRecord(input.materialId, { userId: input.userId })
         : null;
 
   if (!material) {
@@ -206,14 +215,20 @@ function resolveMaterialContext(
         mode: materialMode,
         resolutionStatus: "fallback_to_memory",
       },
-      memorySnippets: memorySnippetsForFocus(focusTags),
+      memorySnippets: memorySnippetsForFocus(focusTags, {
+        userId: input.userId,
+      }),
     };
   }
 
   const materialBrief = getMaterialBriefRecord(material.id);
   const prepCard =
-    (input.prepCardId ? getPrepCardRecord(input.prepCardId) : null) ??
-    listPrepCardRecords().find((record) => record.materialId === material.id) ??
+    (input.prepCardId
+      ? getPrepCardRecord(input.prepCardId, { userId: input.userId })
+      : null) ??
+    listPrepCardRecords({ userId: input.userId }).find(
+      (record) => record.materialId === material.id,
+    ) ??
     null;
 
   return {
@@ -231,7 +246,7 @@ function resolveMaterialContext(
     memorySnippets:
       material.memoryStatus === "saved_to_memory" ||
       material.memoryStatus === "available_for_future"
-        ? memorySnippetsForFocus(focusTags)
+        ? memorySnippetsForFocus(focusTags, { userId: input.userId })
         : [],
   };
 }
@@ -255,7 +270,9 @@ function resolveFocusContext(
   };
 }
 
-export function createResolvedPracticeSession(input: CreatePracticeSessionInput) {
+export function createResolvedPracticeSession(
+  input: CreateResolvedPracticeSessionInput,
+) {
   const scenarioPack = resolveScenarioPack(input.scenarioPackId);
   const goal = resolveGoal(input, scenarioPack);
   const persona = resolvePersona(input.personaId, scenarioPack);
@@ -299,6 +316,7 @@ export function createResolvedPracticeSession(input: CreatePracticeSessionInput)
     prepCardId: materialContext.prepCardId ?? input.prepCardId,
     focusTags: focus.tags,
     trainingFocus: input.trainingFocus.length > 0 ? input.trainingFocus : focus.tags,
+    userId: input.userId,
     resolvedContext,
   });
 }

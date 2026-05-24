@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { generateMaterialBrief } from "@/lib/ai/material-brief";
 import { apiErrorResponse, handleApiError } from "@/lib/errors";
 import {
@@ -31,8 +32,11 @@ export async function GET(
   context: MaterialBriefRouteContext,
 ) {
   try {
+    const authContext = await requireAuthContext();
     const { materialId } = await context.params;
-    const material = getMaterialRecord(materialId);
+    const material = getMaterialRecord(materialId, {
+      userId: authContext.profileId,
+    });
 
     if (!material) {
       return apiErrorResponse("NOT_FOUND", "未找到材料", 404);

@@ -3,6 +3,7 @@ import type {
   MaterialBriefPayload,
   MaterialMemoryStatus,
 } from "@/lib/validation/materials";
+import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 
 export type MaterialProcessingStatus =
   | "uploaded"
@@ -11,8 +12,17 @@ export type MaterialProcessingStatus =
   | "failed"
   | "processing_not_supported_yet";
 
-export type MaterialRecord = CreateMaterialInput & {
+type MaterialCore = Omit<
+  CreateMaterialInput,
+  "customerType" | "industry" | "meetingGoal" | "notes"
+> &
+  Partial<
+    Pick<CreateMaterialInput, "customerType" | "industry" | "meetingGoal" | "notes">
+  >;
+
+export type MaterialRecord = MaterialCore & {
   id: string;
+  userId: string;
   processingStatus: MaterialProcessingStatus;
   memoryStatus: MaterialMemoryStatus;
   extractedText?: string;
@@ -31,18 +41,29 @@ export type MaterialBriefRecord = MaterialBriefPayload & {
   updatedAt: string;
 };
 
-export function listMaterialRecords() {
-  return Array.from(materialRecords.values()).sort((left, right) =>
+export function listMaterialRecords(scope?: UserScope) {
+  const records = Array.from(materialRecords.values()).filter((material) =>
+    scope?.userId ? material.userId === scope.userId : true,
+  );
+
+  return records.sort((left, right) =>
     right.createdAt.localeCompare(left.createdAt),
   );
 }
 
-export function getMaterialRecord(materialId: string) {
-  return materialRecords.get(materialId) ?? null;
+export function getMaterialRecord(materialId: string, scope?: UserScope) {
+  const material = materialRecords.get(materialId) ?? null;
+
+  if (!material || (scope?.userId && material.userId !== scope.userId)) {
+    return null;
+  }
+
+  return material;
 }
 
 export function saveMaterialRecord(
-  input: CreateMaterialInput & {
+  input: MaterialCore & {
+    userId?: string;
     processingStatus?: MaterialProcessingStatus;
     memoryStatus?: MaterialMemoryStatus;
     extractedText?: string;
@@ -52,6 +73,7 @@ export function saveMaterialRecord(
   const now = new Date().toISOString();
   const material: MaterialRecord = {
     id: `material_${crypto.randomUUID()}`,
+    userId: input.userId ?? LOCAL_DEMO_PROFILE_ID,
     processingStatus: input.processingStatus ?? "processing",
     memoryStatus:
       input.memoryStatus ?? (input.confidentialMode ? "confidential" : "session_only"),
@@ -113,8 +135,8 @@ export function saveMaterialBriefRecord(
   return record;
 }
 
-export function deleteMaterialRecord(materialId: string) {
-  const material = getMaterialRecord(materialId);
+export function deleteMaterialRecord(materialId: string, scope?: UserScope) {
+  const material = getMaterialRecord(materialId, scope);
 
   if (!material) {
     return null;

@@ -8,6 +8,7 @@ import {
   type ScenarioPack,
 } from "@/data/scenario-packs";
 import { createRealtimeSession, type RealtimePersona } from "@/lib/ai/realtime";
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
 import { getPrepCardRecord } from "@/lib/practice/prep-card-store";
@@ -87,10 +88,15 @@ function resolveVoicePack(voicePackId: string, scenarioPack: ScenarioPack) {
 
 export async function POST(request: Request) {
   try {
+    const authContext = await requireAuthContext();
+    const scope = { userId: authContext.profileId };
     const input = createRealtimeSessionInputSchema.parse(
       await readJsonBody(request),
     );
-    const practiceSession = getPracticeSessionRecord(input.practiceSessionId);
+    const practiceSession = getPracticeSessionRecord(
+      input.practiceSessionId,
+      scope,
+    );
     const cachedResolvedContext =
       input.resolvedContext as ResolvedPracticeContext | undefined;
     const resolvedContext =
@@ -162,7 +168,7 @@ export async function POST(request: Request) {
       ? getMaterialBriefRecord(materialId)
       : null;
     const prepCard = prepCardId
-      ? getPrepCardRecord(prepCardId)
+      ? getPrepCardRecord(prepCardId, scope)
       : null;
     const realtimeSession = await createRealtimeSession({
       practiceSessionId: input.practiceSessionId,

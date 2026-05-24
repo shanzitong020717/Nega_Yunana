@@ -79,9 +79,18 @@ enum WeaknessType {
   FLUENCY
 }
 
+enum AllowedUserStatus {
+  INVITED
+  ACTIVE
+  BLOCKED
+}
+
 model UserProfile {
   id                  String            @id @default(cuid())
+  authUserId          String?           @unique @db.Uuid
+  email               String?           @unique
   name                String
+  avatarUrl           String?
   role                String
   englishLevel        String            @default("B2")
   trainingPreferences Json              @default("{}")
@@ -92,6 +101,20 @@ model UserProfile {
   practiceSessions    PracticeSession[]
   phrases             Phrase[]
   weaknesses          WeaknessMetric[]
+}
+
+model AllowedUser {
+  id          String            @id @default(cuid())
+  email       String            @unique
+  status      AllowedUserStatus @default(INVITED)
+  invitedBy   String?
+  invitedAt   DateTime          @default(now())
+  activatedAt DateTime?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
 }
 
 model Material {

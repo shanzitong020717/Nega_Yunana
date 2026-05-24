@@ -1,7 +1,9 @@
 import type { WeaknessUpdateInput } from "@/lib/validation/reviews";
+import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 
 export type WeaknessMetric = WeaknessUpdateInput & {
   id: string;
+  userId?: string;
   label: string;
   occurrences: number;
   lastSeenAt: string;
@@ -9,6 +11,7 @@ export type WeaknessMetric = WeaknessUpdateInput & {
 
 export type WeaknessHistoryItem = WeaknessUpdateInput & {
   id: string;
+  userId?: string;
   sessionId: string;
   label: string;
   createdAt: string;
@@ -35,28 +38,40 @@ export const weaknessLabels: Record<WeaknessUpdateInput["type"], string> = {
   fluency: "流利度",
 };
 
-const weaknessMetrics = new Map<WeaknessUpdateInput["type"], WeaknessMetric>();
+const weaknessMetrics = new Map<string, WeaknessMetric>();
 const weaknessHistory: WeaknessHistoryItem[] = [];
+
+function getRecordUserId(record: { userId?: string }) {
+  return record.userId ?? LOCAL_DEMO_PROFILE_ID;
+}
+
+function metricKey(type: WeaknessUpdateInput["type"], scope?: UserScope) {
+  return `${scope?.userId ?? LOCAL_DEMO_PROFILE_ID}:${type}`;
+}
 
 export function upsertWeaknessUpdates(
   sessionId: string,
   updates: WeaknessUpdateInput[],
+  scope?: UserScope,
 ) {
   const now = new Date().toISOString();
 
   updates.forEach((update) => {
-    const existingMetric = weaknessMetrics.get(update.type);
+    const key = metricKey(update.type, scope);
+    const existingMetric = weaknessMetrics.get(key);
     const metric: WeaknessMetric = {
-      id: existingMetric?.id ?? `weakness_${update.type}`,
+      id: existingMetric?.id ?? `weakness_${key}`,
+      userId: scope?.userId ?? LOCAL_DEMO_PROFILE_ID,
       label: weaknessLabels[update.type],
       occurrences: (existingMetric?.occurrences ?? 0) + 1,
       lastSeenAt: now,
       ...update,
     };
 
-    weaknessMetrics.set(update.type, metric);
+    weaknessMetrics.set(key, metric);
     weaknessHistory.unshift({
       id: `weakness_history_${crypto.randomUUID()}`,
+      userId: scope?.userId ?? LOCAL_DEMO_PROFILE_ID,
       sessionId,
       label: weaknessLabels[update.type],
       createdAt: now,
@@ -65,8 +80,10 @@ export function upsertWeaknessUpdates(
   });
 }
 
-export function listWeaknessMetrics() {
-  return Array.from(weaknessMetrics.values()).sort((left, right) => {
+export function listWeaknessMetrics(scope?: UserScope) {
+  return Array.from(weaknessMetrics.values()).filter((metric) =>
+    scope?.userId ? getRecordUserId(metric) === scope.userId : true,
+  ).sort((left, right) => {
     if (right.severity !== left.severity) {
       return right.severity - left.severity;
     }
@@ -75,8 +92,11 @@ export function listWeaknessMetrics() {
   });
 }
 
-export function getProgressSummary(recentTrainingCount: number): ProgressSummary {
-  const metrics = listWeaknessMetrics();
+export function getProgressSummary(
+  recentTrainingCount: number,
+  scope?: UserScope,
+): ProgressSummary {
+  const metrics = listWeaknessMetrics(scope);
   const topWeaknesses = metrics.slice(0, 3);
   const improvedWeaknesses = metrics
     .filter((metric) => metric.severity <= 2)
@@ -90,7 +110,11 @@ export function getProgressSummary(recentTrainingCount: number): ProgressSummary
     topWeaknesses,
     improvedWeaknesses,
     recommendedDrills,
-    history: weaknessHistory.slice(0, 8),
+    history: weaknessHistory
+      .filter((historyItem) =>
+        scope?.userId ? getRecordUserId(historyItem) === scope.userId : true,
+      )
+      .slice(0, 8),
   };
 }
 

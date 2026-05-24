@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ZodError, z } from "zod";
 
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { apiErrorResponse, handleApiError } from "@/lib/errors";
 import { getOrGenerateReviewAnalytics } from "@/lib/progress/review-analytics-store";
 import { reviewAnalyticsRangeSchema } from "@/lib/validation/review-analytics";
@@ -21,8 +22,12 @@ function parseRangeFromRequest(request: Request) {
 
 export async function GET(request: Request) {
   try {
+    const authContext = await requireAuthContext();
     const range = parseRangeFromRequest(request);
-    const analytics = await getOrGenerateReviewAnalytics({ range });
+    const analytics = await getOrGenerateReviewAnalytics({
+      range,
+      userId: authContext.profileId,
+    });
 
     return NextResponse.json({
       analytics,
@@ -42,12 +47,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const authContext = await requireAuthContext();
     const text = await request.text();
     const body = text.trim() ? JSON.parse(text) : {};
     const input = refreshBodySchema.parse(body);
     const analytics = await getOrGenerateReviewAnalytics({
       range: input.range,
       force: true,
+      userId: authContext.profileId,
     });
 
     return NextResponse.json({

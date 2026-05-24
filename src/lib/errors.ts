@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 
 export type ApiErrorCode =
+  | "AUTH_REQUIRED"
+  | "AUTH_NOT_ALLOWED"
+  | "PROFILE_SYNC_FAILED"
   | "VALIDATION_ERROR"
   | "INVALID_JSON"
   | "NOT_FOUND"
@@ -34,6 +37,16 @@ export async function readJsonBody(request: Request) {
 }
 
 export function handleApiError(error: unknown) {
+  if (
+    error instanceof Error &&
+    "status" in error &&
+    "code" in error &&
+    typeof error.status === "number" &&
+    typeof error.code === "string"
+  ) {
+    return apiErrorResponse(error.code as ApiErrorCode, error.message, error.status);
+  }
+
   if (error instanceof ZodError) {
     return apiErrorResponse(
       "VALIDATION_ERROR",

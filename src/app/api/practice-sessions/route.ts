@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { apiErrorResponse, handleApiError, readJsonBody } from "@/lib/errors";
 import {
   createResolvedPracticeSession,
@@ -11,17 +12,27 @@ import {
 import { createPracticeSessionInputSchema } from "@/lib/validation/practice";
 
 export function GET() {
-  return NextResponse.json({
-    practiceSessions: listPracticeSessionRecords(),
-  });
+  return requireAuthContext()
+    .then((authContext) =>
+      NextResponse.json({
+        practiceSessions: listPracticeSessionRecords({
+          userId: authContext.profileId,
+        }),
+      }),
+    )
+    .catch((error) => handleApiError(error));
 }
 
 export async function POST(request: Request) {
   try {
+    const authContext = await requireAuthContext();
     const input = createPracticeSessionInputSchema.parse(
       await readJsonBody(request),
     );
-    const practiceSession = createResolvedPracticeSession(input);
+    const practiceSession = createResolvedPracticeSession({
+      ...input,
+      userId: authContext.profileId,
+    });
 
     return NextResponse.json(
       {

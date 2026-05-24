@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { defaultScenarioPack } from "@/data/scenario-packs";
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { generateSupportCue } from "@/lib/ai/support-cue";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
@@ -16,11 +17,13 @@ type SupportCueRouteContext = {
 
 export async function POST(request: Request, context: SupportCueRouteContext) {
   try {
+    const authContext = await requireAuthContext();
+    const scope = { userId: authContext.profileId };
     const { sessionId } = await context.params;
     const input = createSupportCueInputSchema.parse(await readJsonBody(request));
     const practiceSession = ensurePracticeSessionRecord(
       sessionId,
-      input.practiceSession,
+      { ...input.practiceSession, ...scope },
     );
     const persona =
       defaultScenarioPack.personas.find(
@@ -30,7 +33,7 @@ export async function POST(request: Request, context: SupportCueRouteContext) {
       ? getMaterialBriefRecord(practiceSession.materialId)
       : null;
     const prepCard = practiceSession.prepCardId
-      ? getPrepCardRecord(practiceSession.prepCardId)
+      ? getPrepCardRecord(practiceSession.prepCardId, scope)
       : null;
     const cueResult = await generateSupportCue({
       cue: input.cue,

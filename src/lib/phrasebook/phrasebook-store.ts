@@ -1,8 +1,10 @@
 import { seedPhrases } from "@/data/seed-phrases";
+import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 import type { CreatePhraseInput } from "@/lib/validation/phrasebook";
 
 export type PhraseRecord = CreatePhraseInput & {
   id: string;
+  userId?: string;
   createdAt: string | null;
 };
 
@@ -12,7 +14,11 @@ function normalizeEnglish(english: string) {
   return english.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
-export function findPhraseRecordByEnglish(english: string) {
+function getRecordUserId(record: { userId?: string }) {
+  return record.userId ?? LOCAL_DEMO_PROFILE_ID;
+}
+
+export function findPhraseRecordByEnglish(english: string, scope?: UserScope) {
   const normalizedEnglish = normalizeEnglish(english);
   const builtInPhrase = seedPhrases.find(
     (phrase) => normalizeEnglish(phrase.english) === normalizedEnglish,
@@ -30,12 +36,14 @@ export function findPhraseRecordByEnglish(english: string) {
 
   return (
     savedPhrases.find(
-      (phrase) => normalizeEnglish(phrase.english) === normalizedEnglish,
+      (phrase) =>
+        normalizeEnglish(phrase.english) === normalizedEnglish &&
+        (!scope?.userId || getRecordUserId(phrase) === scope.userId),
     ) ?? null
   );
 }
 
-export function listPhraseRecords() {
+export function listPhraseRecords(scope?: UserScope) {
   return [
     ...seedPhrases.map((phrase, index) => ({
       id: `built_in_${index + 1}`,
@@ -44,12 +52,14 @@ export function listPhraseRecords() {
       createdAt: null,
       ...phrase,
     })),
-    ...savedPhrases,
+    ...savedPhrases.filter((phrase) =>
+      scope?.userId ? getRecordUserId(phrase) === scope.userId : true,
+    ),
   ];
 }
 
-export function savePhraseRecord(input: CreatePhraseInput) {
-  const existingPhrase = findPhraseRecordByEnglish(input.english);
+export function savePhraseRecord(input: CreatePhraseInput, scope?: UserScope) {
+  const existingPhrase = findPhraseRecordByEnglish(input.english, scope);
 
   if (existingPhrase) {
     return {
@@ -60,6 +70,7 @@ export function savePhraseRecord(input: CreatePhraseInput) {
 
   const phrase: PhraseRecord = {
     id: `phrase_${crypto.randomUUID()}`,
+    userId: scope?.userId ?? LOCAL_DEMO_PROFILE_ID,
     createdAt: new Date().toISOString(),
     ...input,
   };

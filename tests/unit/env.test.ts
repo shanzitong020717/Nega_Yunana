@@ -7,6 +7,8 @@ const validEnv = {
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/rokid_coach?schema=public",
   APP_BASE_URL: "http://localhost:3000",
   UPLOAD_DIR: "./storage/uploads",
+  NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_key",
   CONFIDENTIAL_MODE_DEFAULT: "true",
 };
 

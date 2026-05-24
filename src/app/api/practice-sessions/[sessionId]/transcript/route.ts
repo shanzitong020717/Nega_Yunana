@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { requireAuthContext } from "@/lib/auth/require-user";
 import { apiErrorResponse, handleApiError, readJsonBody } from "@/lib/errors";
 import {
   deleteTranscriptTurns,
@@ -16,9 +17,12 @@ type TranscriptRouteContext = {
 
 export async function POST(request: Request, context: TranscriptRouteContext) {
   try {
+    const authContext = await requireAuthContext();
     const { sessionId } = await context.params;
     const input = saveTranscriptInputSchema.parse(await readJsonBody(request));
-    const savedTurns = saveTranscriptTurns(sessionId, input.turns);
+    const savedTurns = saveTranscriptTurns(sessionId, input.turns, {
+      userId: authContext.profileId,
+    });
 
     return NextResponse.json(
       {
@@ -35,9 +39,10 @@ export async function POST(request: Request, context: TranscriptRouteContext) {
 
 export async function DELETE(_request: Request, context: TranscriptRouteContext) {
   try {
+    const authContext = await requireAuthContext();
     const { sessionId } = await context.params;
 
-    if (!getPracticeSessionRecord(sessionId)) {
+    if (!getPracticeSessionRecord(sessionId, { userId: authContext.profileId })) {
       return apiErrorResponse("NOT_FOUND", "未找到练习会话", 404);
     }
 
