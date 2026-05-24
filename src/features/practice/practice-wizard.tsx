@@ -30,6 +30,8 @@ export type PracticeWizardInitialSelection = {
   voicePackId?: string;
   materialMode?: string;
   materialId?: string;
+  recommendationId?: string;
+  source?: string;
 };
 
 const focusTags = [
@@ -251,6 +253,8 @@ export function PracticeWizard({
         ...payload,
         ...result.practiceSession,
         id: result.practiceSession.id,
+        recommendationId: initialSelection?.recommendationId,
+        source: initialSelection?.source,
       });
       router.push(`/practice/${result.practiceSession.id}`);
     } catch (caughtError) {

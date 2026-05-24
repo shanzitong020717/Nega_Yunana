@@ -32,6 +32,9 @@ import {
   readPracticeSessionSelection,
   type StoredPracticeSessionSelection,
 } from "@/lib/practice/practice-session-selection";
+import {
+  completeTodayRecommendationAndPrefetch,
+} from "@/lib/recommendations/today-recommendation-cache";
 import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
 
 type RealtimeRoomProps = {
@@ -1737,6 +1740,14 @@ export function RealtimeRoom({
 
     try {
       await saveTranscript(turnsToSave);
+      const recommendationId = practiceSessionSelectionRef.current.recommendationId;
+
+      if (
+        practiceSessionSelectionRef.current.source === "today-recommendation" &&
+        recommendationId
+      ) {
+        void completeTodayRecommendationAndPrefetch(recommendationId);
+      }
       addSystemTurn("转写已保存，可用于复盘。");
     } catch {
       addSystemTurn("转写暂时无法保存，请稍后重试。");

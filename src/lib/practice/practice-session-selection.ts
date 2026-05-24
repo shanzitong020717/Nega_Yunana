@@ -13,7 +13,9 @@ export type StoredPracticeSessionSelection = {
   mode: CreatePracticeSessionInput["mode"];
   personaId: string;
   prepCardId?: string;
+  recommendationId?: string;
   scenarioPackId: string;
+  source?: string;
   sourceObjectionId?: string;
   trainingFocus: string[];
   voicePackId: string;

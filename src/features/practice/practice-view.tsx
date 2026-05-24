@@ -18,6 +18,8 @@ export function PracticeView({ searchParams = {} }: PracticeViewProps) {
     voicePackId: firstSearchValue(searchParams.voicePackId),
     materialMode: firstSearchValue(searchParams.materialMode),
     materialId: firstSearchValue(searchParams.materialId),
+    recommendationId: firstSearchValue(searchParams.recommendationId),
+    source: firstSearchValue(searchParams.source),
   };
   const initialStep =
     firstSearchValue(searchParams.initialStep) === "confirm" ? 3 : 1;

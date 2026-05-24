@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
 describe("static product views", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    window.localStorage.clear();
   });
 
   it("renders the redesigned primary navigation", () => {

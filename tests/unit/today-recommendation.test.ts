@@ -110,4 +110,34 @@ describe("today practice recommendation", () => {
       source: "ai",
     });
   });
+
+  it("avoids returning an excluded recommendation package", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "false");
+    generateTextJSONMock.mockResolvedValueOnce({
+      title: "采购经理 · 竞品差异说明",
+      reason:
+        "基于最近复盘，用户在说明 Rokid 与手机翻译的差异时缺少 workflow 角度，今天适合练习更清晰的竞品差异表达。",
+      goalId: "competitive_differences",
+      personaId: "procurement_manager",
+      voicePackId: "fenrir-excitable",
+      materialMode: "memory_context",
+      materialLabel: "系统记忆",
+      durationMinutes: 12,
+      evidence: ["unclear positioning"],
+    });
+
+    const recommendation = await generateTodayRecommendation({
+      progress,
+      recentMaterials: [],
+      memories: [],
+      excludedRecommendationIds: [
+        "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
+      ],
+    });
+
+    expect(recommendation.id).not.toBe(
+      "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
+    );
+    expect(recommendation.title).not.toBe("采购经理 · 竞品差异说明");
+  });
 });

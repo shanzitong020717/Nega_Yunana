@@ -11,6 +11,11 @@ import { generateTodayRecommendation } from "@/lib/recommendations/today-recomme
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
+  const excludedRecommendationIds = url.searchParams
+    .getAll("exclude")
+    .flatMap((value) => value.split(","))
+    .map((value) => value.trim())
+    .filter(Boolean);
   const recentTrainingCount = listPracticeSessionRecords().length;
   const progress = getProgressSummary(recentTrainingCount);
   const resolvedProgress =
@@ -25,6 +30,7 @@ export async function GET(request: Request) {
     progress: resolvedProgress,
     recentMaterials: listMaterialRecords().slice(0, 5),
     memories: rankMemoriesForPractice({ focusTags, limit: 6 }),
+    excludedRecommendationIds,
     mockMode: url.searchParams.get("mock") === "1",
   });
 

@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowRight, Clock3, Mic2, UserRound, Volume2 } from "lucide-react";
+import {
+  ArrowRight,
+  Clock3,
+  Mic2,
+  RefreshCw,
+  UserRound,
+  Volume2,
+} from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -8,6 +15,11 @@ import {
   buildPracticeHrefFromRecommendation,
   type TodayRecommendation,
 } from "@/lib/recommendations/today-recommendation";
+import {
+  fetchTodayRecommendationPackage,
+  readTodayRecommendationCache,
+  writeTodayRecommendationCache,
+} from "@/lib/recommendations/today-recommendation-cache";
 
 type TodayPracticeCardProps = {
   initialRecommendation?: TodayRecommendation | null;
@@ -39,8 +51,11 @@ export function TodayPracticeCard({
   initialRecommendation = null,
 }: TodayPracticeCardProps) {
   const [recommendation, setRecommendation] =
-    useState<TodayRecommendation | null>(initialRecommendation);
+    useState<TodayRecommendation | null>(
+      () => initialRecommendation ?? readTodayRecommendationCache()?.recommendation ?? null,
+    );
   const [failed, setFailed] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const visibleRecommendation =
     recommendation ?? (failed ? errorRecommendation : loadingRecommendation);
   const practiceHref = recommendation
@@ -51,24 +66,18 @@ export function TodayPracticeCard({
     const controller = new AbortController();
 
     async function loadRecommendation() {
+      if (recommendation) {
+        writeTodayRecommendationCache(recommendation);
+        return;
+      }
+
       try {
-        const response = await fetch("/api/today-recommendation", {
+        const nextRecommendation = await fetchTodayRecommendationPackage({
           signal: controller.signal,
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to load today recommendation.");
-        }
-
-        const payload = (await response.json()) as {
-          recommendation?: TodayRecommendation;
-        };
-
-        if (!payload.recommendation) {
-          throw new Error("Today recommendation payload is empty.");
-        }
-
-        setRecommendation(payload.recommendation);
+        writeTodayRecommendationCache(nextRecommendation);
+        setRecommendation(nextRecommendation);
         setFailed(false);
       } catch {
         if (!controller.signal.aborted) {
@@ -82,15 +91,70 @@ export function TodayPracticeCard({
     return () => {
       controller.abort();
     };
-  }, []);
+  }, [recommendation]);
+
+  function excludedRecommendationIds() {
+    const cache = readTodayRecommendationCache();
+
+    return Array.from(
+      new Set(
+        [
+          ...(cache?.completedRecommendationIds ?? []),
+          recommendation?.id,
+        ].filter((recommendationId): recommendationId is string =>
+          Boolean(recommendationId),
+        ),
+      ),
+    );
+  }
+
+  async function refreshRecommendation() {
+    const controller = new AbortController();
+
+    setIsRefreshing(true);
+    setFailed(false);
+
+    try {
+      const nextRecommendation = await fetchTodayRecommendationPackage({
+        excludedRecommendationIds: excludedRecommendationIds(),
+        refresh: true,
+        signal: controller.signal,
+      });
+
+      writeTodayRecommendationCache(nextRecommendation);
+      setRecommendation(nextRecommendation);
+    } catch {
+      setFailed(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }
 
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-5">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold text-[var(--primary)]">
-            今日建议你练
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-[var(--primary)]">
+              今日建议你练
+            </p>
+            <button
+              type="button"
+              aria-label="刷新今日建议"
+              title="刷新今日建议"
+              disabled={isRefreshing}
+              onClick={refreshRecommendation}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-[#9ccfca] bg-[#eff9f7] text-[var(--primary-strong)] transition hover:border-[var(--primary)] hover:bg-[#dff3f0] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                className={[
+                  "h-4 w-4",
+                  isRefreshing ? "animate-spin" : "",
+                ].join(" ")}
+                aria-hidden="true"
+              />
+            </button>
+          </div>
           <h2 className="mt-2 text-2xl font-semibold text-[var(--foreground)]">
             {visibleRecommendation.title}
           </h2>

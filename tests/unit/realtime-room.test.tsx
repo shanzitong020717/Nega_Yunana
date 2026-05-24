@@ -1,10 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RealtimeRoom } from "@/features/practice/realtime-room";
 import type { TranscriptTurn } from "@/features/practice/conversation-transcript-panel";
 import { savePracticeSessionSelection } from "@/lib/practice/practice-session-selection";
+import {
+  readTodayRecommendationCache,
+  writeTodayRecommendationCache,
+} from "@/lib/recommendations/today-recommendation-cache";
+import type { TodayRecommendation } from "@/lib/recommendations/today-recommendation";
 
 const mockSuggestedAnswerPayload = {
   suggestion: {
@@ -105,6 +110,42 @@ const mockBetterPhrasePayload = {
   },
 };
 
+const completedRecommendation: TodayRecommendation = {
+  id: "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
+  title: "采购经理 · 竞品差异说明",
+  reason: "今天先练竞品差异。",
+  goalId: "competitive_differences",
+  goalLabel: "竞品差异说明",
+  personaId: "procurement_manager",
+  personaLabel: "采购经理",
+  voicePackId: "fenrir-excitable",
+  voicePackLabel: "Fenrir 高能追问",
+  materialMode: "memory_context",
+  materialLabel: "系统记忆",
+  durationMinutes: 8,
+  href: "/practice",
+  source: "ai",
+  evidence: ["recent review"],
+};
+
+const nextRecommendation: TodayRecommendation = {
+  id: "application_scenarios:enterprise_buyer:kore-firm:memory_context",
+  title: "企业买家 · 应用场景说明",
+  reason: "完成快速练习后预取的新推荐。",
+  goalId: "application_scenarios",
+  goalLabel: "应用场景说明",
+  personaId: "enterprise_buyer",
+  personaLabel: "企业买家",
+  voicePackId: "kore-firm",
+  voicePackLabel: "Kore 坚定专业",
+  materialMode: "memory_context",
+  materialLabel: "系统记忆",
+  durationMinutes: 10,
+  href: "/practice",
+  source: "ai",
+  evidence: ["next package"],
+};
+
 function installSupportResultFetchMock() {
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
@@ -170,6 +211,7 @@ describe("RealtimeRoom mock UI", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     window.sessionStorage.clear();
+    window.localStorage.clear();
   });
 
   it("renders the live room status and controls without default transcript turns", () => {
@@ -622,6 +664,97 @@ describe("RealtimeRoom mock UI", () => {
       trainingFocus: ["channel partnership"],
       focusTags: ["渠道合作"],
     });
+  });
+
+  it("preloads the next daily recommendation after a quick practice ends", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: vi.fn().mockResolvedValue({
+          getTracks: () => [{ stop: vi.fn() }],
+          getAudioTracks: () => [{ enabled: true }],
+        }),
+      },
+    });
+    vi.stubGlobal("RTCPeerConnection", undefined);
+    writeTodayRecommendationCache(completedRecommendation);
+    savePracticeSessionSelection({
+      id: "session_quick_practice",
+      scenarioPackId: "rokid-overseas-sales",
+      goalId: "competitive_differences",
+      mode: "customer_qa",
+      personaId: "procurement_manager",
+      voicePackId: "fenrir-excitable",
+      difficulty: "normal",
+      trainingFocus: ["竞品差异"],
+      focusTags: ["竞品差异"],
+      source: "today-recommendation",
+      recommendationId: completedRecommendation.id,
+    });
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url === "/api/realtime/session") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              clientSecret: "mock_realtime_client_secret_123",
+              sessionId: "rt_session_quick",
+              expiresAt: new Date(Date.now() + 60_000).toISOString(),
+              model: "gpt-realtime-mini",
+              instructionsPreview: "Procurement Manager",
+            }),
+            { status: 201 },
+          ),
+        );
+      }
+
+      if (url.includes("/transcript")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ status: "saved" }), { status: 201 }),
+        );
+      }
+
+      if (url.includes("/api/today-recommendation")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ recommendation: nextRecommendation }), {
+            status: 200,
+          }),
+        );
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<RealtimeRoom sessionId="session_quick_practice" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+    expect(await screen.findByRole("heading", { name: "对话中" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/api/today-recommendation?"),
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      );
+    });
+    expect(
+      String(
+        fetchMock.mock.calls.find((call) =>
+          String(call[0]).includes("/api/today-recommendation"),
+        )?.[0],
+      ),
+    ).toContain(`exclude=${encodeURIComponent(completedRecommendation.id)}`);
+    expect(readTodayRecommendationCache()?.completedRecommendationIds).toContain(
+      completedRecommendation.id,
+    );
+    expect(readTodayRecommendationCache()?.recommendation.title).toBe(
+      "企业买家 · 应用场景说明",
+    );
   });
 
   it("shows a suggested answer module under the transcript and sends the selected context", async () => {

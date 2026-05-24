@@ -32,6 +32,7 @@ export type TodayRecommendationMaterialMode =
   | "specific_material";
 
 export type TodayRecommendation = {
+  id: string;
   title: string;
   reason: string;
   goalId: PracticeGoalId;
@@ -52,9 +53,12 @@ export type TodayRecommendation = {
 export type PracticeRecommendationLinkParams = Pick<
   TodayRecommendation,
   "goalId" | "personaId" | "voicePackId" | "materialMode" | "materialId"
->;
+> & {
+  id?: string;
+};
 
 type GenerateTodayRecommendationInput = {
+  excludedRecommendationIds?: string[];
   progress: ProgressSummary;
   recentMaterials: MaterialContext[];
   memories: MemoryItem[];
@@ -136,6 +140,13 @@ function normalizeRecommendation(
     (payload.materialMode === "no_material" ? "不使用材料" : "系统记忆");
 
   const recommendation = {
+    id: buildRecommendationId({
+      goalId: goal.id,
+      personaId: persona.id,
+      voicePackId: voicePack.id,
+      materialMode: payload.materialMode,
+      materialId: payload.materialId,
+    }),
     title: payload.title ?? `${persona.label} · ${goal.label}`,
     reason: payload.reason,
     goalId: goal.id,
@@ -162,8 +173,13 @@ function normalizeRecommendation(
 export function buildPracticeHrefFromRecommendation(
   recommendation: PracticeRecommendationLinkParams,
 ) {
+  const recommendationId =
+    "id" in recommendation && typeof recommendation.id === "string"
+      ? recommendation.id
+      : buildRecommendationId(recommendation);
   const params = new URLSearchParams({
     source: "today-recommendation",
+    recommendationId,
     goalId: recommendation.goalId,
     personaId: recommendation.personaId,
     voicePackId: recommendation.voicePackId,
@@ -175,6 +191,27 @@ export function buildPracticeHrefFromRecommendation(
   }
 
   return `/practice?${params.toString()}`;
+}
+
+export function buildRecommendationId(
+  recommendation: PracticeRecommendationLinkParams,
+) {
+  return [
+    recommendation.goalId,
+    recommendation.personaId,
+    recommendation.voicePackId,
+    recommendation.materialMode,
+    recommendation.materialId,
+  ]
+    .filter((value): value is string => Boolean(value))
+    .join(":");
+}
+
+function isExcludedRecommendation(
+  recommendation: TodayRecommendation,
+  excludedRecommendationIds: string[] | undefined,
+) {
+  return Boolean(excludedRecommendationIds?.includes(recommendation.id));
 }
 
 function formatProgressContext(progress: ProgressSummary) {
@@ -271,6 +308,9 @@ ${formatMaterialsContext(input.recentMaterials)}
 Long-term memory context:
 ${formatMemoryContext(input.memories)}
 
+Already completed or manually skipped package ids today:
+${input.excludedRecommendationIds?.length ? input.excludedRecommendationIds.join("\n") : "None"}
+
 Return JSON only:
 {
   "title": "中文标题，格式为：客户角色 · 练习目标",
@@ -286,9 +326,13 @@ Return JSON only:
 }`;
 }
 
-function buildFallbackRecommendation(input: GenerateTodayRecommendationInput) {
+function buildFallbackRecommendationForGoal(
+  input: GenerateTodayRecommendationInput,
+  preferredGoalId?: PracticeGoalId,
+) {
   const topWeakness = input.progress.topWeaknesses[0];
-  const goalId = topWeakness ? weaknessGoalMap[topWeakness.type] : undefined;
+  const goalId =
+    preferredGoalId ?? (topWeakness ? weaknessGoalMap[topWeakness.type] : undefined);
   const goal = findGoal(goalId ?? "application_scenarios");
   const persona = findPersona(goal.recommendedPersonaIds[0], goal.recommendedPersonaIds);
   const voicePack = findVoicePack(
@@ -329,6 +373,28 @@ function buildFallbackRecommendation(input: GenerateTodayRecommendationInput) {
   );
 }
 
+function buildFallbackRecommendation(input: GenerateTodayRecommendationInput) {
+  const topWeakness = input.progress.topWeaknesses[0];
+  const preferredGoalId = topWeakness ? weaknessGoalMap[topWeakness.type] : undefined;
+  const preferredRecommendation = buildFallbackRecommendationForGoal(
+    input,
+    preferredGoalId,
+  );
+
+  if (!isExcludedRecommendation(preferredRecommendation, input.excludedRecommendationIds)) {
+    return preferredRecommendation;
+  }
+
+  return (
+    defaultScenarioPack.practiceGoals
+      .map((goal) => buildFallbackRecommendationForGoal(input, goal.id))
+      .find(
+        (recommendation) =>
+          !isExcludedRecommendation(recommendation, input.excludedRecommendationIds),
+      ) ?? preferredRecommendation
+  );
+}
+
 export async function generateTodayRecommendation(
   input: GenerateTodayRecommendationInput,
 ): Promise<TodayRecommendation> {
@@ -345,7 +411,13 @@ export async function generateTodayRecommendation(
     });
     const recommendationPayload = recommendationPayloadSchema.parse(payload);
 
-    return normalizeRecommendation(recommendationPayload, "ai");
+    const recommendation = normalizeRecommendation(recommendationPayload, "ai");
+
+    if (isExcludedRecommendation(recommendation, input.excludedRecommendationIds)) {
+      return buildFallbackRecommendation(input);
+    }
+
+    return recommendation;
   } catch {
     return buildFallbackRecommendation(input);
   }
