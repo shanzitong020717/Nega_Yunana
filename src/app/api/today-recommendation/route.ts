@@ -7,6 +7,7 @@ import {
   getDefaultProgressSummary,
   getProgressSummary,
 } from "@/lib/progress/weakness-store";
+import { getCachedReviewAnalytics } from "@/lib/progress/review-analytics-store";
 import { generateTodayRecommendation } from "@/lib/recommendations/today-recommendation";
 
 export async function GET(request: Request) {
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     progress: resolvedProgress,
     recentMaterials: listMaterialRecords().slice(0, 5),
     memories: rankMemoriesForPractice({ focusTags, limit: 6 }),
+    analytics: getCachedReviewAnalytics("7d"),
     excludedRecommendationIds,
     mockMode: url.searchParams.get("mock") === "1",
   });

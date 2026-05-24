@@ -21,6 +21,7 @@ const review: PracticeReviewPayload = {
   },
   topImprovements: ["Ask one more discovery question."],
   bestMoments: ["Kept the answer safe."],
+  sentenceReviews: [],
   sentenceUpgrades: [],
   materialCoverage: {
     covered: ["Real-time translated captions"],

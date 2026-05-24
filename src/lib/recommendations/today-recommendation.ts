@@ -14,6 +14,7 @@ import type { MemoryItem } from "@/lib/validation/memory";
 import type { ProgressSummary, WeaknessMetric } from "@/lib/progress/weakness-store";
 import type { MaterialProcessingStatus } from "@/lib/materials/material-store";
 import type { MaterialMemoryStatus } from "@/lib/validation/materials";
+import type { ReviewAnalyticsSnapshot } from "@/lib/validation/review-analytics";
 
 type MaterialContext = {
   id: string;
@@ -58,6 +59,7 @@ export type PracticeRecommendationLinkParams = Pick<
 };
 
 type GenerateTodayRecommendationInput = {
+  analytics?: ReviewAnalyticsSnapshot | null;
   excludedRecommendationIds?: string[];
   progress: ProgressSummary;
   recentMaterials: MaterialContext[];
@@ -283,6 +285,36 @@ function formatMemoryContext(memories: MemoryItem[]) {
     .join("\n\n");
 }
 
+function formatReviewAnalyticsContext(
+  analytics?: ReviewAnalyticsSnapshot | null,
+) {
+  if (!analytics) {
+    return "长期复盘: No long-term review analytics available yet.";
+  }
+
+  const mistakes = analytics.recurringMistakes
+    .slice(0, 2)
+    .map(
+      (mistake, index) =>
+        `${index + 1}. ${mistake.title}; count=${mistake.occurrenceCount}; drill=${mistake.recommendedDrill}`,
+    )
+    .join("\n");
+  const growth = analytics.topGrowthSignals
+    .slice(0, 2)
+    .map((signal, index) => `${index + 1}. ${signal.title}: ${signal.summaryZh}`)
+    .join("\n");
+
+  return [
+    `长期复盘范围: ${analytics.range}`,
+    `长期复盘总结: ${analytics.summaryZh}`,
+    `长期推荐训练: ${analytics.nextTrainingPlan.title}`,
+    `推荐原因: ${analytics.nextTrainingPlan.reasonZh}`,
+    `推荐重点: ${analytics.nextTrainingPlan.focusTags.join(", ")}`,
+    `经常犯的错误:\n${mistakes || "None"}`,
+    `成长亮点:\n${growth || "None"}`,
+  ].join("\n");
+}
+
 function formatScenarioOptions() {
   const goals = defaultScenarioPack.practiceGoals
     .map(
@@ -338,6 +370,9 @@ ${formatMaterialsContext(input.recentMaterials)}
 
 Long-term memory context:
 ${formatMemoryContext(input.memories)}
+
+Long-term review analytics context:
+${formatReviewAnalyticsContext(input.analytics)}
 
 Already completed or manually skipped package ids today:
 ${input.excludedRecommendationIds?.length ? input.excludedRecommendationIds.join("\n") : "None"}

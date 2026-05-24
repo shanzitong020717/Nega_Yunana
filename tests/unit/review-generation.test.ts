@@ -1,4 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { generateTextJSONMock } = vi.hoisted(() => ({
+  generateTextJSONMock: vi.fn(),
+}));
+
+vi.mock("@/lib/ai/text-client", () => ({
+  TEXT_ANALYSIS_BOUNDARY: "DeepSeek text analysis boundary",
+  generateTextJSON: generateTextJSONMock,
+  hasTextAIApiKey: vi.fn(() => true),
+}));
 
 import { personas } from "@/data/personas";
 import { generatePracticeReview } from "@/lib/ai/review";
@@ -31,6 +41,10 @@ const transcriptTurns = [
 ];
 
 describe("generatePracticeReview", () => {
+  beforeEach(() => {
+    generateTextJSONMock.mockReset();
+  });
+
   it("returns a validated structured review with scorecard, sentence upgrades, and learning assets", async () => {
     const review = await generatePracticeReview({
       practiceSession: {
@@ -107,6 +121,24 @@ describe("generatePracticeReview", () => {
         (upgrade) => upgrade.status === "already_natural",
       ),
     ).not.toHaveProperty("naturalEnglish");
+    expect(review.reviewSnapshot).toMatchObject({
+      overallSummaryZh: expect.any(String),
+      nextPracticeFocus: expect.any(String),
+    });
+    expect(review.sentenceReviews[0]).toMatchObject({
+      original: expect.stringContaining("translation function"),
+      translationZh: expect.any(String),
+      quality: "needs_improvement",
+      grammarIssues: expect.any(Array),
+      wordChoiceIssues: expect.any(Array),
+      naturalnessIssues: expect.any(Array),
+      highlights: expect.any(Array),
+      vocabulary: expect.any(Array),
+      phrasebookCandidate: expect.objectContaining({
+        english: expect.any(String),
+        chinese: expect.any(String),
+      }),
+    });
     expect(review.materialCoverage.covered).toContain("Real-time translated captions");
     expect(review.phrasebookSuggestions[0]).toMatchObject({
       source: "review",
@@ -122,11 +154,156 @@ describe("generatePracticeReview", () => {
           type: expect.any(String),
           title: expect.any(String),
           summary: expect.any(String),
+          evidence: expect.any(Array),
           sensitivity: expect.any(String),
           confidence: expect.any(Number),
+          importance: expect.any(Number),
+          enabledForAi: expect.any(Boolean),
         }),
       ]),
     );
     expect(review.nextSessionRecommendation.focus).toContain("business value");
+  });
+
+  it("asks the text model to generate sentence reviews and validates the returned structure", async () => {
+    generateTextJSONMock.mockResolvedValueOnce({
+      meetingOutcome: {
+        summary:
+          "The learner explained the business value but needs a sharper pilot answer.",
+        customerReaction: "Interested and asking for workflow proof.",
+        nextStep: "Practice a shorter pilot answer.",
+      },
+      reviewSnapshot: {
+        overallSummaryZh: "你能说明业务价值，但试点回答还可以更具体。",
+        strengths: ["能把 Rokid 和会议效率连接起来"],
+        priorityImprovements: ["少堆功能，多说客户结果"],
+        phrasebookCandidateCount: 1,
+        memoryCandidateCount: 1,
+        nextPracticeFocus: "应用场景说明",
+      },
+      scores: {
+        clarity: { score: 4, rationale: "Clear." },
+        businessConfidence: { score: 3, rationale: "Needs stronger framing." },
+        discoverySkill: { score: 3, rationale: "Needs more questions." },
+        productPositioning: { score: 4, rationale: "Relevant." },
+        objectionHandling: { score: 3, rationale: "Needs next step." },
+        englishNaturalness: { score: 3, rationale: "Understandable." },
+      },
+      topImprovements: ["Lead with customer outcomes."],
+      bestMoments: ["Connected Rokid to meeting flow."],
+      sentenceReviews: [
+        {
+          id: "sentence_review_1",
+          original: "We have translation function and it can help your meeting.",
+          translationZh: "我们有翻译功能，可以帮助你们的会议。",
+          quality: "needs_improvement",
+          grammarIssues: [],
+          wordChoiceIssues: [
+            {
+              type: "word_choice",
+              severity: 3,
+              originalFragment: "translation function",
+              correction: "real-time translated captions",
+              explanationZh: "用产品价值表达替代直译式功能表达。",
+            },
+          ],
+          naturalnessIssues: [
+            {
+              type: "naturalness",
+              severity: 3,
+              originalFragment: "help your meeting",
+              correction: "make multilingual meetings easier to follow",
+              explanationZh: "更贴合商务会议语境。",
+            },
+          ],
+          highlights: [
+            {
+              type: "customer_empathy",
+              text: "meeting",
+              explanationZh: "有意识围绕客户会议场景回答。",
+              alternatives: ["meeting flow"],
+            },
+          ],
+          upgradedExpression:
+            "Rokid makes multilingual meetings easier to follow with real-time translated captions.",
+          upgradedExpressionZh:
+            "Rokid 通过实时翻译字幕让多语言会议更容易跟上。",
+          reasonZh: "改写后从功能转向客户结果，更自然也更商务。",
+          practicePrompt: "用这句话重新回答客户关于会议场景的问题。",
+          vocabulary: [
+            {
+              term: "multilingual meetings",
+              phonetic: "/ˌmʌltiˈlɪŋɡwəl ˈmiːtɪŋz/",
+              chinese: "多语言会议",
+              example: "Rokid makes multilingual meetings easier to follow.",
+              sourceSentence:
+                "We have translation function and it can help your meeting.",
+            },
+          ],
+          phrasebookCandidate: {
+            english:
+              "Rokid makes multilingual meetings easier to follow with real-time translated captions.",
+            chinese: "Rokid 通过实时翻译字幕让多语言会议更容易跟上。",
+            useCase: "说明 Rokid 在多语言会议中的价值。",
+            tags: ["review", "sentence-review"],
+          },
+        },
+      ],
+      sentenceUpgrades: [],
+      materialCoverage: { covered: [], missed: [], unclear: [] },
+      phrasebookSuggestions: [],
+      weaknessUpdates: [],
+      memoryCandidates: [
+        {
+          type: "speaking_pattern",
+          title: "Feature-first answering pattern",
+          summary: "Learner tends to explain function before customer value.",
+          evidence: ["translation function"],
+          sensitivity: "low",
+          confidence: 0.8,
+          importance: 4,
+          enabledForAi: true,
+        },
+      ],
+      nextSessionRecommendation: {
+        focus: "应用场景说明",
+        drill: "Feature-to-value drill",
+        prompt: "Explain the meeting scenario in two sentences.",
+      },
+    });
+
+    const review = await generatePracticeReview({
+      practiceSession: {
+        id: "session_456",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "application_scenarios",
+        mode: "demo_narration",
+        personaId: "enterprise_buyer",
+        voicePackId: "kore-firm",
+        materialId: undefined,
+        prepCardId: undefined,
+        difficulty: "normal",
+        trainingFocus: ["应用场景说明"],
+        focusTags: ["应用场景说明"],
+        sourceObjectionId: undefined,
+        status: "completed",
+        createdAt: new Date().toISOString(),
+      },
+      transcriptTurns,
+      persona: personas.find((persona) => persona.id === "enterprise_buyer")!,
+      mockMode: false,
+    });
+
+    expect(generateTextJSONMock).toHaveBeenCalledTimes(1);
+    const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;
+    expect(prompt).toContain("sentenceReviews");
+    expect(prompt).toContain("grammarIssues");
+    expect(prompt).toContain("wordChoiceIssues");
+    expect(prompt).toContain("naturalnessIssues");
+    expect(prompt).toContain("highlights");
+    expect(prompt).toContain("Do not rewrite sentences that are already natural");
+    expect(review.sentenceReviews[0]?.phrasebookCandidate?.english).toContain(
+      "Rokid makes multilingual meetings",
+    );
   });
 });

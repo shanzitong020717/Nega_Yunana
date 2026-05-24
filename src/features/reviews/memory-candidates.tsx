@@ -100,7 +100,8 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
               summary: candidate.draftSummary,
               source: "review",
               confidence: candidate.confidence,
-              importance: candidate.sensitivity === "high" ? 5 : 3,
+              importance: candidate.importance,
+              enabledForAi: candidate.enabledForAi,
               sensitive: candidate.sensitivity === "high",
             }),
           }).then((response) => {
@@ -200,11 +201,29 @@ export function MemoryCandidates({ candidates }: MemoryCandidatesProps) {
                 <StatusPill tone="primary">
                   {`${Math.round(candidate.confidence * 100)}%`}
                 </StatusPill>
+                <StatusPill tone="neutral">
+                  {`重要度 ${candidate.importance}/5`}
+                </StatusPill>
+                <StatusPill tone={candidate.enabledForAi ? "primary" : "neutral"}>
+                  {`AI 记忆：${candidate.enabledForAi ? "启用" : "关闭"}`}
+                </StatusPill>
               </div>
             </div>
             <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
               {candidate.draftSummary}
             </p>
+            {candidate.evidence.length > 0 ? (
+              <div className="mt-3 rounded-md bg-[var(--surface-subtle)] p-3">
+                <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+                  保存证据
+                </p>
+                <ul className="mt-2 space-y-1 text-sm leading-6 text-[var(--muted)]">
+                  {candidate.evidence.map((evidence) => (
+                    <li key={evidence}>{evidence}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {isEditing ? (
               <div className="mt-4 grid gap-3">
                 <label className="flex flex-col gap-2 text-sm font-medium">

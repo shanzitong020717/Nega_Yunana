@@ -4,6 +4,7 @@ import {
   type MemoryType,
   type UpdateMemoryInput,
 } from "@/lib/validation/memory";
+import type { MemoryCandidate } from "@/lib/validation/reviews";
 
 type ListMemoriesInput = {
   type?: MemoryType | "all";
@@ -64,6 +65,20 @@ const memoryItems = new Map<string, MemoryItem>([
   ],
 ]);
 
+const candidateTypeMap: Record<string, MemoryType> = {
+  customer_context: "customer_context",
+  learning_preference: "learning_preference",
+  material_context: "material_context",
+  practice_focus: "learning_preference",
+  recurring_error: "weakness",
+  speaking_pattern: "speaking_habit",
+  strength: "learning_preference",
+};
+
+export type ReviewMemoryUpsertResult = MemoryItem & {
+  action: "created" | "merged";
+};
+
 function sortByUpdatedAt(memories: MemoryItem[]) {
   return [...memories].sort(
     (a, b) =>
@@ -113,6 +128,88 @@ export function createMemory(input: CreateMemoryInput) {
   memoryItems.set(memory.id, memory);
 
   return memory;
+}
+
+function normalizeMemoryText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fa5]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findSimilarMemory(type: MemoryType, title: string) {
+  const normalizedTitle = normalizeMemoryText(title);
+
+  return listMemories().find((memory) => {
+    if (memory.type !== type) {
+      return false;
+    }
+
+    const memoryTitle = normalizeMemoryText(memory.title);
+
+    return (
+      memoryTitle === normalizedTitle ||
+      memoryTitle.includes(normalizedTitle) ||
+      normalizedTitle.includes(memoryTitle)
+    );
+  });
+}
+
+function buildMergedSummary(memory: MemoryItem, candidate: MemoryCandidate) {
+  const evidenceText = candidate.evidence.length
+    ? ` Evidence: ${candidate.evidence.slice(0, 2).join(" | ")}`
+    : "";
+  const nextSummary = `${memory.summary}\n\n${candidate.summary}${evidenceText}`;
+
+  return nextSummary.length > 900 ? nextSummary.slice(0, 897).trimEnd() + "..." : nextSummary;
+}
+
+export function upsertMemoryFromReviewCandidate(
+  candidate: MemoryCandidate,
+  source: {
+    reviewId: string;
+    sessionId: string;
+    sourceCreatedAt: string;
+  },
+): ReviewMemoryUpsertResult {
+  const type = candidateTypeMap[candidate.type] ?? "learning_preference";
+  const existing = findSimilarMemory(type, candidate.title);
+
+  if (!existing) {
+    return {
+      ...createMemory({
+        scenarioPackId: "rokid-overseas-sales",
+        type,
+        title: candidate.title,
+        summary: candidate.summary,
+        source: "review",
+        sourceCreatedAt: source.sourceCreatedAt,
+        confidence: candidate.confidence,
+        importance: candidate.importance,
+        enabledForAi: candidate.enabledForAi,
+        sensitive: candidate.sensitivity !== "low",
+      }),
+      action: "created",
+    };
+  }
+
+  const merged = updateMemory(existing.id, {
+    summary: buildMergedSummary(existing, candidate),
+    source: "review",
+    confidence: Number(
+      ((existing.confidence * existing.useCount + candidate.confidence) /
+        Math.max(existing.useCount + 1, 1)).toFixed(2),
+    ),
+    importance: Math.max(existing.importance, candidate.importance),
+    enabledForAi: existing.enabledForAi || candidate.enabledForAi,
+    sensitive: existing.sensitive || candidate.sensitivity !== "low",
+  });
+
+  return {
+    ...(merged ?? existing),
+    action: "merged",
+  };
 }
 
 export function updateMemory(memoryId: string, input: UpdateMemoryInput) {

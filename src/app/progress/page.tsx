@@ -6,17 +6,20 @@ import {
   getDefaultProgressSummary,
   getProgressSummary,
 } from "@/lib/progress/weakness-store";
+import { getOrGenerateReviewAnalytics } from "@/lib/progress/review-analytics-store";
 
 export const metadata: Metadata = {
   title: "复盘 | Rokid Coach",
 };
 
-export default function ProgressPage() {
+export default async function ProgressPage() {
   const recentTrainingCount = listPracticeSessionRecords().length;
   const progress = getProgressSummary(recentTrainingCount);
+  const analytics = await getOrGenerateReviewAnalytics({ range: "7d" });
 
   return (
     <ProgressView
+      analytics={analytics.trainingCount >= 2 ? analytics : null}
       progress={
         progress.topWeaknesses.length > 0
           ? progress

@@ -3,6 +3,7 @@ import type {
   ResolvedPracticeContext,
   TranscriptTurnInput,
 } from "@/lib/validation/practice";
+import { consolidateReviewMemoryCandidates } from "@/lib/memory/review-memory-consolidation";
 import { upsertWeaknessUpdates } from "@/lib/progress/weakness-store";
 import type { PracticeReviewPayload } from "@/lib/validation/reviews";
 import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
@@ -174,12 +175,19 @@ export function saveReviewRecord(
     updatedAt: now,
   });
   upsertWeaknessUpdates(sessionId, review.weaknessUpdates);
+  consolidateReviewMemoryCandidates(reviewRecord);
 
   return reviewRecord;
 }
 
 export function getReviewRecord(reviewId: string) {
   return reviewRecords.get(reviewId) ?? null;
+}
+
+export function listReviewRecords() {
+  return Array.from(reviewRecords.values()).sort((left, right) =>
+    right.createdAt.localeCompare(left.createdAt),
+  );
 }
 
 export function getReviewBySessionId(sessionId: string) {

@@ -13,6 +13,7 @@ vi.mock("@/lib/ai/text-client", () => ({
 
 import { generateTodayRecommendation } from "@/lib/recommendations/today-recommendation";
 import type { ProgressSummary } from "@/lib/progress/weakness-store";
+import type { ReviewAnalyticsSnapshot } from "@/lib/validation/review-analytics";
 
 const progress: ProgressSummary = {
   recentTrainingCount: 4,
@@ -174,5 +175,65 @@ describe("today practice recommendation", () => {
       "demo_narration:channel_partner:zephyr-bright:memory_context",
     );
     expect(recommendation.title).toBe("渠道合作伙伴 · 产品演示讲解");
+  });
+
+  it("uses long-term review analytics when generating today's recommendation", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "false");
+    const analytics: ReviewAnalyticsSnapshot = {
+      id: "review_analytics_7d",
+      range: "7d",
+      generatedAt: "2026-05-24T09:00:00.000Z",
+      staleAfter: "2026-05-24T23:59:59.999Z",
+      sourceReviewIds: ["review_1", "review_2"],
+      sourceSessionIds: ["session_1", "session_2"],
+      trainingCount: 2,
+      summaryZh: "隐私和部署回答仍然偏长。",
+      topGrowthSignals: [],
+      recurringMistakes: [],
+      naturalnessPatterns: [],
+      phraseGrowth: {
+        newPhraseCount: 0,
+        reviewGeneratedPhraseCount: 0,
+        vocabularyItems: [],
+        reusableSentences: [],
+      },
+      memoryInsights: [],
+      nextTrainingPlan: {
+        title: "技术负责人 · 隐私与部署推进",
+        reasonZh: "长期复盘建议练短回答。",
+        goalId: "privacy_security",
+        mode: "objection_challenge",
+        personaId: "technical_lead",
+        voicePackId: "charon-informative",
+        materialMode: "memory_context",
+        focusTags: ["隐私安全", "部署推进"],
+        estimatedMinutes: 8,
+      },
+      aiGenerated: true,
+    };
+    generateTextJSONMock.mockResolvedValueOnce({
+      title: "技术负责人 · 隐私与部署推进",
+      reason: "长期复盘显示隐私和部署回答仍然偏长，今天适合练短回答。",
+      goalId: "privacy_security",
+      personaId: "technical_lead",
+      voicePackId: "charon-informative",
+      materialMode: "memory_context",
+      materialLabel: "系统记忆",
+      durationMinutes: 8,
+      evidence: ["长期复盘建议练短回答"],
+    });
+
+    const recommendation = await generateTodayRecommendation({
+      progress,
+      recentMaterials: [],
+      memories: [],
+      analytics,
+    });
+
+    const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;
+    expect(prompt).toContain("长期复盘");
+    expect(prompt).toContain("隐私和部署回答仍然偏长");
+    expect(prompt).toContain("技术负责人 · 隐私与部署推进");
+    expect(recommendation.personaId).toBe("technical_lead");
   });
 });

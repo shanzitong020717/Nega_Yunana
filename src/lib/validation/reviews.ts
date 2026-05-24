@@ -21,14 +21,88 @@ export const sentenceUpgradeSchema = z.discriminatedUnion("status", [
   }),
 ]);
 
+export const sentenceIssueSchema = z.object({
+  type: z.enum([
+    "grammar",
+    "word_choice",
+    "naturalness",
+    "conciseness",
+    "business_tone",
+    "logic",
+  ]),
+  severity: z.number().int().min(1).max(5),
+  originalFragment: nonEmptyString("原片段不能为空"),
+  correction: nonEmptyString("修正表达不能为空"),
+  explanationZh: nonEmptyString("中文解释不能为空"),
+});
+
+export const sentenceHighlightSchema = z.object({
+  type: z.enum([
+    "advanced_word",
+    "business_tone",
+    "good_structure",
+    "synonym_usage",
+    "clear_next_step",
+    "customer_empathy",
+  ]),
+  text: nonEmptyString("亮点文本不能为空"),
+  explanationZh: nonEmptyString("亮点解释不能为空"),
+  alternatives: z.array(z.string().min(1)).default([]).optional(),
+});
+
+export const reviewVocabularyItemSchema = z.object({
+  term: nonEmptyString("词汇不能为空"),
+  phonetic: z.string().optional(),
+  chinese: nonEmptyString("中文翻译不能为空"),
+  example: nonEmptyString("例句不能为空"),
+  sourceSentence: nonEmptyString("来源句子不能为空"),
+});
+
+export const sentenceReviewSchema = z.object({
+  id: nonEmptyString("逐句复盘 ID 不能为空"),
+  turnId: z.string().optional(),
+  original: nonEmptyString("原句不能为空"),
+  translationZh: nonEmptyString("中文意思不能为空"),
+  quality: z.enum(["excellent", "good", "needs_improvement"]),
+  grammarIssues: z.array(sentenceIssueSchema).default([]),
+  wordChoiceIssues: z.array(sentenceIssueSchema).default([]),
+  naturalnessIssues: z.array(sentenceIssueSchema).default([]),
+  highlights: z.array(sentenceHighlightSchema).default([]),
+  upgradedExpression: z.string().optional(),
+  upgradedExpressionZh: z.string().optional(),
+  reasonZh: nonEmptyString("复盘原因不能为空"),
+  practicePrompt: nonEmptyString("练习提示不能为空"),
+  vocabulary: z.array(reviewVocabularyItemSchema).default([]),
+  phrasebookCandidate: z
+    .object({
+      english: nonEmptyString("表达英文不能为空"),
+      chinese: nonEmptyString("表达中文不能为空"),
+      useCase: nonEmptyString("使用场景不能为空"),
+      tags: z.array(z.string().min(1)).default([]),
+    })
+    .optional(),
+});
+
+export const reviewSnapshotSchema = z.object({
+  overallSummaryZh: nonEmptyString("复盘总评不能为空"),
+  strengths: z.array(nonEmptyString("亮点不能为空")).min(1).max(3),
+  priorityImprovements: z.array(nonEmptyString("改进点不能为空")).min(1).max(3),
+  phrasebookCandidateCount: z.number().int().min(0),
+  memoryCandidateCount: z.number().int().min(0),
+  nextPracticeFocus: nonEmptyString("下次练习重点不能为空"),
+});
+
 export const memoryCandidateSchema = z.object({
   type: nonEmptyString("记忆类型不能为空"),
   title: nonEmptyString("记忆标题不能为空"),
   summary: nonEmptyString("记忆摘要不能为空"),
+  evidence: z.array(z.string().min(1)).default([]),
   sensitivity: z.enum(["low", "medium", "high"], {
     error: "敏感度无效",
   }),
   confidence: z.number().min(0).max(1),
+  importance: z.number().int().min(1).max(5).default(3),
+  enabledForAi: z.boolean().default(true),
 });
 
 export const meetingOutcomeSchema = z.object({
@@ -103,12 +177,14 @@ export const nextSessionRecommendationSchema = z.object({
 
 export const createReviewInputSchema = z.object({
   meetingOutcome: meetingOutcomeSchema,
+  reviewSnapshot: reviewSnapshotSchema.optional(),
   scores: businessScorecardSchema,
   topImprovements: z
     .array(nonEmptyString("改进点不能为空"))
     .min(1)
     .max(3),
   bestMoments: stringArraySchema,
+  sentenceReviews: z.array(sentenceReviewSchema).default([]),
   sentenceUpgrades: z.array(sentenceUpgradeSchema).default([]),
   suggestedAnswers: z.array(suggestedAnswerRecordSchema).default([]).optional(),
   materialCoverage: materialCoverageSchema,
@@ -125,5 +201,10 @@ export type ObjectionFrameworkReview = z.infer<
 >;
 export type WeaknessUpdateInput = z.infer<typeof weaknessUpdateInputSchema>;
 export type MemoryCandidate = z.infer<typeof memoryCandidateSchema>;
+export type SentenceIssue = z.infer<typeof sentenceIssueSchema>;
+export type SentenceHighlight = z.infer<typeof sentenceHighlightSchema>;
+export type ReviewVocabularyItem = z.infer<typeof reviewVocabularyItemSchema>;
+export type SentenceReview = z.infer<typeof sentenceReviewSchema>;
+export type ReviewSnapshot = z.infer<typeof reviewSnapshotSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type PracticeReviewPayload = z.infer<typeof createReviewInputSchema>;

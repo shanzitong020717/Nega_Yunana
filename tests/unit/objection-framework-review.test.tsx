@@ -26,6 +26,7 @@ const baseReview: PracticeReviewPayload = {
     "Close with a next step.",
   ],
   bestMoments: ["The answer did not overclaim."],
+  sentenceReviews: [],
   sentenceUpgrades: [],
   materialCoverage: {
     covered: [],
