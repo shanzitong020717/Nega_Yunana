@@ -89,6 +89,7 @@ describe("allowlist", () => {
     });
     expect(client.profileUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
+        id: "profile_00000000000040008000000000000001",
         authUserId: "00000000-0000-4000-8000-000000000001",
         email: "friend@example.com",
         name: "Rokid Friend",

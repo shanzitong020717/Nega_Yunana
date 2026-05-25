@@ -10,6 +10,7 @@ const errorMessages: Record<string, string> = {
   missing_email: "登录账号缺少邮箱，暂时无法校验白名单。",
   not_allowed: "该邮箱不在访问白名单中，请联系管理员添加。",
   oauth_failed: "Google 登录失败，请稍后重试。",
+  profile_sync_failed: "账号资料同步失败，请稍后重新登录。",
 };
 
 export function LoginView({ error }: { error?: string }) {

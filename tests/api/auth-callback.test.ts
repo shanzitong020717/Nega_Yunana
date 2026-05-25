@@ -90,4 +90,35 @@ describe("GET /auth/callback", () => {
       "http://localhost:3000/login?error=not_allowed",
     );
   });
+
+  it("signs out and redirects when profile sync fails after allowlist passes", async () => {
+    const user = {
+      id: "00000000-0000-4000-8000-000000000001",
+      email: "friend@example.com",
+      user_metadata: {},
+    };
+    const auth = {
+      exchangeCodeForSession: vi.fn().mockResolvedValue({ error: null }),
+      getUser: vi.fn().mockResolvedValue({ data: { user }, error: null }),
+      signOut: vi.fn().mockResolvedValue({ error: null }),
+    };
+
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ auth } as never);
+    vi.mocked(assertAllowedEmail).mockResolvedValue({
+      id: "allow_1",
+      email: "friend@example.com",
+      status: "ACTIVE",
+    });
+    vi.mocked(syncUserProfile).mockRejectedValue(new Error("profile failed"));
+
+    const response = await GET(
+      new Request("http://localhost:3000/auth/callback?code=abc"),
+    );
+
+    expect(auth.signOut).toHaveBeenCalled();
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?error=profile_sync_failed",
+    );
+  });
 });

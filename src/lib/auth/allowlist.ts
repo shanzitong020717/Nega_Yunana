@@ -43,6 +43,10 @@ type AdminClient = {
   };
 };
 
+function profileIdForAuthUser(authUserId: string) {
+  return `profile_${authUserId.replaceAll("-", "")}`;
+}
+
 export async function assertAllowedEmail(
   adminClient: AdminClient,
   email: string,
@@ -85,6 +89,7 @@ export async function syncUserProfile(adminClient: AdminClient, user: User) {
   const table = adminClient.from("UserProfile");
   const query = table.upsert?.(
     {
+      id: profileIdForAuthUser(user.id),
       authUserId: user.id,
       email,
       name: displayName,

@@ -45,10 +45,17 @@ export async function GET(request: Request) {
 
   try {
     await assertAllowedEmail(supabase as never, user.email);
-    await syncUserProfile(supabase as never, user);
   } catch {
     await supabase.auth.signOut();
     loginUrl.searchParams.set("error", "not_allowed");
+    return NextResponse.redirect(loginUrl);
+  }
+
+  try {
+    await syncUserProfile(supabase as never, user);
+  } catch {
+    await supabase.auth.signOut();
+    loginUrl.searchParams.set("error", "profile_sync_failed");
     return NextResponse.redirect(loginUrl);
   }
 
