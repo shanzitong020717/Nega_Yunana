@@ -233,11 +233,39 @@ export function buildRecommendationId(
     .join(":");
 }
 
+function buildRecommendationPackageKey(
+  recommendation: Pick<
+    PracticeRecommendationLinkParams,
+    "goalId" | "personaId" | "voicePackId"
+  >,
+) {
+  return [
+    recommendation.goalId,
+    recommendation.personaId,
+    recommendation.voicePackId,
+  ].join(":");
+}
+
+function buildRecommendationPackageKeyFromId(recommendationId: string) {
+  return recommendationId.split(":").slice(0, 3).join(":");
+}
+
 function isExcludedRecommendation(
   recommendation: TodayRecommendation,
   excludedRecommendationIds: string[] | undefined,
 ) {
-  return Boolean(excludedRecommendationIds?.includes(recommendation.id));
+  if (!excludedRecommendationIds?.length) {
+    return false;
+  }
+
+  const excludedPackageKeys = new Set(
+    excludedRecommendationIds.map(buildRecommendationPackageKeyFromId),
+  );
+
+  return (
+    excludedRecommendationIds.includes(recommendation.id) ||
+    excludedPackageKeys.has(buildRecommendationPackageKey(recommendation))
+  );
 }
 
 function formatProgressContext(progress: ProgressSummary) {

@@ -146,6 +146,47 @@ describe("today practice recommendation", () => {
     expect(recommendation.title).not.toBe("采购经理 · 竞品差异说明");
   });
 
+  it("treats the same goal role and voice as excluded even when material mode changes", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "false");
+    generateTextJSONMock.mockResolvedValueOnce({
+      title: "采购经理 · 竞品差异说明",
+      reason:
+        "基于最近复盘，用户在说明 Rokid 与手机翻译的差异时缺少 workflow 角度，今天适合练习更清晰的竞品差异表达。",
+      goalId: "competitive_differences",
+      personaId: "procurement_manager",
+      voicePackId: "fenrir-excitable",
+      materialMode: "recent_material",
+      materialId: "material_recent",
+      materialLabel: "Rokid competitor comparison deck",
+      durationMinutes: 12,
+      evidence: ["unclear positioning"],
+    });
+
+    const recommendation = await generateTodayRecommendation({
+      progress,
+      recentMaterials: [
+        {
+          id: "material_recent",
+          name: "Rokid competitor comparison deck",
+          processingStatus: "ready",
+          memoryStatus: "available_for_future",
+          confidentialMode: false,
+          createdAt: "2026-05-23T10:00:00.000Z",
+          updatedAt: "2026-05-23T10:00:00.000Z",
+        },
+      ],
+      memories: [],
+      excludedRecommendationIds: [
+        "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
+      ],
+    });
+
+    expect(recommendation.id.startsWith(
+      "competitive_differences:procurement_manager:fenrir-excitable",
+    )).toBe(false);
+    expect(recommendation.title).not.toBe("采购经理 · 竞品差异说明");
+  });
+
   it("keeps rotating fallback packages when several shown packages are excluded", async () => {
     vi.stubEnv("AI_MOCK_MODE", "false");
     generateTextJSONMock.mockResolvedValueOnce({
