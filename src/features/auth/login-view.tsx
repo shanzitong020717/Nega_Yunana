@@ -13,7 +13,8 @@ const errorMessages: Record<string, string> = {
   profile_sync_failed: "账号资料同步失败，请稍后重新登录。",
 };
 
-const GOOGLE_IDENTITY_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+const GOOGLE_IDENTITY_SCRIPT_SRC =
+  "https://accounts.google.com/gsi/client?hl=zh-CN";
 
 type GoogleCredentialResponse = {
   credential?: string;
