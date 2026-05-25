@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInWithOAuth = vi.fn().mockResolvedValue({ error: null });
+const signInWithIdToken = vi.fn().mockResolvedValue({ error: null });
 
 vi.mock("@/lib/auth/supabase-browser", () => ({
   createSupabaseBrowserClient: () => ({
     auth: {
       signInWithOAuth,
+      signInWithIdToken,
     },
   }),
 }));
@@ -14,6 +16,16 @@ vi.mock("@/lib/auth/supabase-browser", () => ({
 import { LoginView } from "@/features/auth/login-view";
 
 describe("LoginView", () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+    delete (window as typeof window & { google?: unknown }).google;
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("shows Google login and allowlist guidance", () => {
     render(<LoginView />);
 
@@ -38,6 +50,38 @@ describe("LoginView", () => {
       options: {
         redirectTo: "http://localhost:3000/auth/callback",
       },
+    });
+  });
+
+  it("renders the Google Identity Services button when a client id is configured", async () => {
+    vi.stubEnv("NEXT_PUBLIC_GOOGLE_CLIENT_ID", "google-client-id");
+    const initialize = vi.fn();
+    const renderButton = vi.fn();
+    (window as typeof window & { google?: unknown }).google = {
+      accounts: {
+        id: {
+          initialize,
+          renderButton,
+        },
+      },
+    };
+
+    render(<LoginView />);
+
+    await waitFor(() => {
+      expect(initialize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          client_id: "google-client-id",
+        }),
+      );
+      expect(renderButton).toHaveBeenCalledWith(
+        expect.any(HTMLDivElement),
+        expect.objectContaining({
+          theme: "outline",
+          size: "large",
+          locale: "zh_CN",
+        }),
+      );
     });
   });
 });
