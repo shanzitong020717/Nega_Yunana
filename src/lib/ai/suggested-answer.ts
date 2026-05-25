@@ -167,6 +167,24 @@ const vocabularyPatterns: SuggestedVocabularyItem[] = [
     example: "understand the customer's business problem",
   },
   {
+    term: "customer segment",
+    phonetic: "/ˈkʌstəmər ˈseɡmənt/",
+    chinese: "客户细分群体",
+    example: "identify the first customer segment to target",
+  },
+  {
+    term: "use case",
+    phonetic: "/juːs keɪs/",
+    chinese: "使用场景",
+    example: "connect the answer to the customer's use case",
+  },
+  {
+    term: "target customer",
+    phonetic: "/ˈtɑːrɡɪt ˈkʌstəmər/",
+    chinese: "目标客户",
+    example: "clarify the target customer before the pilot",
+  },
+  {
     term: "technical review",
     phonetic: "/ˈteknɪkəl rɪˈvjuː/",
     chinese: "技术评审",
@@ -219,6 +237,96 @@ const genericVocabularyStopWords = new Set([
   "your",
 ]);
 
+const fillerVocabularyWords = new Set([
+  "a",
+  "am",
+  "an",
+  "and",
+  "are",
+  "asked",
+  "asking",
+  "be",
+  "been",
+  "being",
+  "but",
+  "can",
+  "certainly",
+  "clarify",
+  "could",
+  "did",
+  "do",
+  "does",
+  "for",
+  "how",
+  "i",
+  "is",
+  "it",
+  "me",
+  "of",
+  "ok",
+  "okay",
+  "or",
+  "please",
+  "question",
+  "sure",
+  "the",
+  "they",
+  "to",
+  "was",
+  "we",
+  "were",
+  "what",
+  "when",
+  "where",
+  "which",
+  "why",
+  "would",
+  "you",
+]);
+
+const meaningfulVocabularyKeywords = new Set([
+  "application",
+  "business",
+  "caption",
+  "captions",
+  "customer",
+  "data",
+  "deployment",
+  "differentiation",
+  "encryption",
+  "engineer",
+  "equipment",
+  "expert",
+  "field",
+  "flow",
+  "guidance",
+  "hands-free",
+  "integration",
+  "maintenance",
+  "meeting",
+  "meetings",
+  "multilingual",
+  "on-premise",
+  "pilot",
+  "privacy",
+  "product",
+  "remote",
+  "requirement",
+  "requirements",
+  "return",
+  "roi",
+  "scenario",
+  "security",
+  "segment",
+  "smart",
+  "support",
+  "target",
+  "team",
+  "technical",
+  "translation",
+  "workflow",
+]);
+
 const fallbackChineseByKeyword: Array<[string, string]> = [
   ["remote", "远程"],
   ["support", "支持"],
@@ -239,11 +347,67 @@ const fallbackChineseByKeyword: Array<[string, string]> = [
   ["translation", "翻译"],
   ["caption", "字幕"],
   ["workflow", "流程"],
+  ["segment", "细分群体"],
+  ["target", "目标"],
   ["field", "现场"],
   ["engineer", "工程师"],
 ];
 
+const fallbackChineseByPhrase: Record<string, string> = {
+  "business requirement": "业务需求",
+  "customer segment": "客户细分群体",
+  "customer use case": "客户使用场景",
+  "target customer": "目标客户",
+  "use case": "使用场景",
+};
+
+const knownVocabularyTerms = new Set(
+  vocabularyPatterns.map((item) => item.term.toLowerCase()),
+);
+
+function normalizeVocabularyTerm(term: string) {
+  return term
+    .toLowerCase()
+    .replace(/[^a-z0-9-\s]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isUsefulVocabularyTerm(term: string) {
+  const normalizedTerm = normalizeVocabularyTerm(term);
+
+  if (!normalizedTerm) {
+    return false;
+  }
+
+  if (knownVocabularyTerms.has(normalizedTerm)) {
+    return true;
+  }
+
+  const words = normalizedTerm.split(/\s+/);
+
+  if (words.length > 4 || words.length === 0) {
+    return false;
+  }
+
+  if (words.some((word) => fillerVocabularyWords.has(word))) {
+    return false;
+  }
+
+  if (words.every((word) => word.length < 4)) {
+    return false;
+  }
+
+  return words.some((word) => meaningfulVocabularyKeywords.has(word));
+}
+
 function phraseToFallbackChinese(phrase: string) {
+  const normalizedPhrase = normalizeVocabularyTerm(phrase);
+
+  if (fallbackChineseByPhrase[normalizedPhrase]) {
+    return fallbackChineseByPhrase[normalizedPhrase];
+  }
+
   const translatedWords = phrase
     .split(/\s+/)
     .map((word) => {
@@ -283,19 +447,55 @@ function extractVocabularyPhrases(text: string) {
   for (const length of [3, 2]) {
     for (let index = 0; index <= words.length - length; index += 1) {
       const slice = words.slice(index, index + length);
+      const phrase = slice.join(" ");
 
       if (
         slice.some((word) => genericVocabularyStopWords.has(word)) ||
-        slice.every((word) => word.length < 4)
+        slice.every((word) => word.length < 4) ||
+        !isUsefulVocabularyTerm(phrase)
       ) {
         continue;
       }
 
-      phrases.push(slice.join(" "));
+      phrases.push(phrase);
     }
   }
 
   return phrases;
+}
+
+function normalizeVocabularyItems(
+  vocabularyItems: SuggestedVocabularyItem[],
+  input: GenerateSuggestedAnswerInput,
+  suggestedReplies: SuggestedAnswerCore["suggestedReplies"],
+) {
+  const normalizedVocabulary: SuggestedVocabularyItem[] = [];
+  const seenTerms = new Set<string>();
+
+  function addVocabularyItem(item: SuggestedVocabularyItem) {
+    const normalizedTerm = normalizeVocabularyTerm(item.term);
+
+    if (!isUsefulVocabularyTerm(item.term) || seenTerms.has(normalizedTerm)) {
+      return;
+    }
+
+    seenTerms.add(normalizedTerm);
+    normalizedVocabulary.push({
+      ...item,
+      term: normalizedTerm,
+      phonetic: item.phonetic.trim(),
+      chinese: item.chinese.trim(),
+      example: item.example?.trim(),
+    });
+  }
+
+  vocabularyItems.forEach(addVocabularyItem);
+
+  if (normalizedVocabulary.length < 2) {
+    deriveVocabularyFromContext(input, suggestedReplies).forEach(addVocabularyItem);
+  }
+
+  return normalizedVocabulary.slice(0, Math.max(normalizedVocabulary.length, 2));
 }
 
 function deriveVocabularyFromContext(
@@ -311,14 +511,17 @@ function deriveVocabularyFromContext(
   const seenTerms = new Set<string>();
 
   function addVocabularyItem(item: SuggestedVocabularyItem) {
-    const normalizedTerm = item.term.toLowerCase();
+    const normalizedTerm = normalizeVocabularyTerm(item.term);
 
-    if (seenTerms.has(normalizedTerm)) {
+    if (!isUsefulVocabularyTerm(item.term) || seenTerms.has(normalizedTerm)) {
       return;
     }
 
     seenTerms.add(normalizedTerm);
-    vocabulary.push(item);
+    vocabulary.push({
+      ...item,
+      term: normalizedTerm,
+    });
   }
 
   vocabularyPatterns.forEach((item) => {
@@ -400,6 +603,11 @@ function normalizeSuggestedAnswerCore(
         "It answers the concern safely and moves the conversation toward a concrete next step.",
       ),
     })),
+    vocabulary: normalizeVocabularyItems(
+      core.vocabulary,
+      input,
+      core.suggestedReplies,
+    ),
   });
 }
 

@@ -241,6 +241,58 @@ describe("generateSuggestedAnswer", () => {
     );
   });
 
+  it("does not turn conversational filler chunks into fallback vocabulary", async () => {
+    generateTextJSONMock.mockRejectedValueOnce(new Error("model unavailable"));
+    vi.stubEnv("NODE_ENV", "production");
+
+    const suggestion = await generateSuggestedAnswer({
+      practiceSession: {
+        id: "session_no_filler_vocabulary",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "customer_qa",
+        mode: "customer_qa",
+        personaId: "enterprise_buyer",
+        voicePackId: "kore-firm",
+        materialId: undefined,
+        prepCardId: undefined,
+        difficulty: "normal",
+        trainingFocus: ["application scenarios"],
+        focusTags: ["应用场景"],
+        sourceObjectionId: undefined,
+        status: "active",
+        createdAt: new Date().toISOString(),
+      },
+      persona: defaultScenarioPack.personas.find(
+        (persona) => persona.id === "enterprise_buyer",
+      )!,
+      latestAiTurn: {
+        speaker: "ai_customer",
+        text: "Certainly, I was asking which customer segment you are targeting first.",
+        translationZh: "当然，我是在问你们优先面向哪个客户细分群体。",
+        timestamp: 0,
+        metadata: {},
+      },
+      transcriptTurns: [],
+    });
+    vi.unstubAllEnvs();
+
+    const terms = suggestion.vocabulary.map((item) => item.term);
+
+    expect(terms).toEqual(expect.arrayContaining(["customer segment"]));
+    expect(terms).not.toEqual(
+      expect.arrayContaining([
+        "certainly i was",
+        "i was asking",
+        "was asking which",
+        "asking which customer",
+        "customer segment you",
+      ]),
+    );
+    suggestion.vocabulary.forEach((item) => {
+      expect(item.chinese).not.toMatch(/^[a-z]+$/i);
+    });
+  });
+
   it("provides at least two vocabulary items for deployment questions", async () => {
     const suggestion = await generateSuggestedAnswer({
       practiceSession: {
