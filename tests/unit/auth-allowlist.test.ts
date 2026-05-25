@@ -93,6 +93,7 @@ describe("allowlist", () => {
         authUserId: "00000000-0000-4000-8000-000000000001",
         email: "friend@example.com",
         name: "Rokid Friend",
+        updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
       }),
       { onConflict: "authUserId" },
     );

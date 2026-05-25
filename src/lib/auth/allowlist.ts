@@ -95,6 +95,7 @@ export async function syncUserProfile(adminClient: AdminClient, user: User) {
       name: displayName,
       avatarUrl,
       role: "Rokid 海外销售",
+      updatedAt: new Date().toISOString(),
     },
     { onConflict: "authUserId" },
   );
