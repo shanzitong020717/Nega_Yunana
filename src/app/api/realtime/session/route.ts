@@ -12,7 +12,7 @@ import { requireAuthContext } from "@/lib/auth/require-user";
 import { handleApiError, readJsonBody } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
 import { getPrepCardRecord } from "@/lib/practice/prep-card-store";
-import { getPracticeSessionRecord } from "@/lib/practice/practice-session-store";
+import { getPracticeSessionRecordAsync } from "@/lib/practice/practice-session-store";
 import {
   personaIdSchema,
   practiceModeSchema,
@@ -93,7 +93,7 @@ export async function POST(request: Request) {
     const input = createRealtimeSessionInputSchema.parse(
       await readJsonBody(request),
     );
-    const practiceSession = getPracticeSessionRecord(
+    const practiceSession = await getPracticeSessionRecordAsync(
       input.practiceSessionId,
       scope,
     );

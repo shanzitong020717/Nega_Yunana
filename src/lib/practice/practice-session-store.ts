@@ -3,7 +3,14 @@ import type {
   ResolvedPracticeContext,
   TranscriptTurnInput,
 } from "@/lib/validation/practice";
+import {
+  Difficulty,
+  PracticeMode,
+  PracticeSessionStatus,
+  TranscriptSpeaker,
+} from "@/generated/prisma/enums";
 import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
+import { getDb } from "@/lib/db";
 import { consolidateReviewMemoryCandidates } from "@/lib/memory/review-memory-consolidation";
 import { upsertWeaknessUpdates } from "@/lib/progress/weakness-store";
 import type { PracticeReviewPayload } from "@/lib/validation/reviews";
@@ -55,8 +62,221 @@ const transcriptTurns = new Map<string, TranscriptTurnRecord[]>();
 const reviewRecords = new Map<string, ReviewRecord>();
 const suggestedAnswerRecords = new Map<string, SuggestedAnswerRecord[]>();
 
+function canPersistPracticeData() {
+  return process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
+}
+
 function getRecordUserId(record: { userId?: string }) {
   return record.userId ?? LOCAL_DEMO_PROFILE_ID;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function objectValue<T extends object>(value: unknown): Partial<T> {
+  return value && typeof value === "object" ? (value as Partial<T>) : {};
+}
+
+function toDateString(value: unknown) {
+  return value instanceof Date ? value.toISOString() : new Date().toISOString();
+}
+
+function toDbPracticeMode(mode: PracticeSessionRecord["mode"]) {
+  if (mode === "solution_meeting") {
+    return PracticeMode.SOLUTION_MEETING;
+  }
+
+  if (mode === "objection_handling") {
+    return PracticeMode.OBJECTION_CHALLENGE;
+  }
+
+  return PracticeMode.CUSTOMER_QA;
+}
+
+function fromDbPracticeMode(mode: string): PracticeSessionRecord["mode"] {
+  if (mode === PracticeMode.SOLUTION_MEETING) {
+    return "solution_meeting";
+  }
+
+  if (mode === PracticeMode.OBJECTION_CHALLENGE) {
+    return "objection_handling";
+  }
+
+  return "customer_qa";
+}
+
+function toDbDifficulty(difficulty: PracticeSessionRecord["difficulty"]) {
+  if (difficulty === "easy") {
+    return Difficulty.EASY;
+  }
+
+  if (difficulty === "hard") {
+    return Difficulty.HARD;
+  }
+
+  if (difficulty === "executive") {
+    return Difficulty.EXECUTIVE;
+  }
+
+  return Difficulty.NORMAL;
+}
+
+function fromDbDifficulty(difficulty: string): PracticeSessionRecord["difficulty"] {
+  if (difficulty === Difficulty.EASY) {
+    return "easy";
+  }
+
+  if (difficulty === Difficulty.HARD) {
+    return "hard";
+  }
+
+  if (difficulty === Difficulty.EXECUTIVE) {
+    return "executive";
+  }
+
+  return "normal";
+}
+
+function toDbSessionStatus(status: PracticeSessionRecord["status"]) {
+  return PracticeSessionStatus[
+    status.toUpperCase() as keyof typeof PracticeSessionStatus
+  ];
+}
+
+function fromDbSessionStatus(status: string): PracticeSessionRecord["status"] {
+  if (status === PracticeSessionStatus.ACTIVE) {
+    return "active";
+  }
+
+  if (status === PracticeSessionStatus.COMPLETED) {
+    return "completed";
+  }
+
+  if (status === PracticeSessionStatus.REVIEWED) {
+    return "reviewed";
+  }
+
+  return "created";
+}
+
+function toDbSpeaker(speaker: TranscriptTurnInput["speaker"]) {
+  if (speaker === "ai_customer") {
+    return TranscriptSpeaker.AI_CUSTOMER;
+  }
+
+  if (speaker === "system") {
+    return TranscriptSpeaker.SYSTEM;
+  }
+
+  return TranscriptSpeaker.USER;
+}
+
+function fromDbSpeaker(speaker: string): TranscriptTurnInput["speaker"] {
+  if (speaker === TranscriptSpeaker.AI_CUSTOMER) {
+    return "ai_customer";
+  }
+
+  if (speaker === TranscriptSpeaker.SYSTEM) {
+    return "system";
+  }
+
+  return "user";
+}
+
+function persistedSessionToRecord(session: {
+  createdAt: unknown;
+  difficulty: string;
+  focusTags?: unknown;
+  goalId?: string;
+  id: string;
+  materialId?: string | null;
+  materialMode?: string | null;
+  mode: string;
+  payload?: unknown;
+  personaId: string;
+  prepCardId?: string | null;
+  resolvedContext?: unknown;
+  scenarioPackId?: string;
+  sourceObjectionId?: string | null;
+  status: string;
+  trainingFocus: unknown;
+  updatedAt?: unknown;
+  userId: string;
+  voicePackId?: string;
+}): PracticeSessionRecord {
+  const payload = objectValue<PracticeSessionRecord>(session.payload);
+
+  return {
+    id: session.id,
+    userId: session.userId,
+    scenarioPackId:
+      payload.scenarioPackId ?? session.scenarioPackId ?? "rokid-overseas-sales",
+    goalId: payload.goalId ?? session.goalId ?? "customer_qa",
+    mode: payload.mode ?? fromDbPracticeMode(session.mode),
+    personaId: payload.personaId ?? session.personaId,
+    voicePackId: payload.voicePackId ?? session.voicePackId ?? "kore-firm",
+    materialMode:
+      payload.materialMode ??
+      (session.materialMode as PracticeSessionRecord["materialMode"]) ??
+      undefined,
+    materialId: payload.materialId ?? session.materialId ?? undefined,
+    prepCardId: payload.prepCardId ?? session.prepCardId ?? undefined,
+    difficulty: payload.difficulty ?? fromDbDifficulty(session.difficulty),
+    trainingFocus:
+      payload.trainingFocus ?? stringArray(session.trainingFocus),
+    focusTags: payload.focusTags ?? stringArray(session.focusTags),
+    sourceObjectionId:
+      payload.sourceObjectionId ?? session.sourceObjectionId ?? undefined,
+    status: fromDbSessionStatus(session.status),
+    resolvedContext:
+      payload.resolvedContext ??
+      (session.resolvedContext as ResolvedPracticeContext | undefined),
+    createdAt: payload.createdAt ?? toDateString(session.createdAt),
+    updatedAt: payload.updatedAt ?? toDateString(session.updatedAt),
+  };
+}
+
+function persistedTurnToRecord(turn: {
+  createdAt: unknown;
+  id: string;
+  metadata: unknown;
+  sessionId: string;
+  speaker: string;
+  text: string;
+  timestamp: number;
+}): TranscriptTurnRecord {
+  return {
+    id: turn.id,
+    sessionId: turn.sessionId,
+    speaker: fromDbSpeaker(turn.speaker),
+    text: turn.text,
+    timestamp: turn.timestamp,
+    metadata: objectValue<Record<string, unknown>>(turn.metadata),
+    createdAt: toDateString(turn.createdAt),
+  };
+}
+
+function persistedReviewToRecord(review: {
+  createdAt: unknown;
+  id: string;
+  payload?: unknown;
+  session?: { userId?: string } | null;
+  sessionId: string;
+  updatedAt: unknown;
+}): ReviewRecord {
+  const payload = objectValue<PracticeReviewPayload>(review.payload);
+
+  return {
+    id: review.id,
+    sessionId: review.sessionId,
+    userId: review.session?.userId,
+    createdAt: toDateString(review.createdAt),
+    updatedAt: toDateString(review.updatedAt),
+    ...(payload as PracticeReviewPayload),
+  };
 }
 
 export function listPracticeSessionRecords(scope?: UserScope) {
@@ -96,6 +316,87 @@ export function savePracticeSessionRecord(
   return practiceSession;
 }
 
+export async function persistPracticeSessionRecord(
+  practiceSession: PracticeSessionRecord,
+) {
+  if (!canPersistPracticeData()) {
+    return practiceSession;
+  }
+
+  const db = getDb();
+
+  await db.practiceSession.upsert({
+    where: { id: practiceSession.id },
+    create: {
+      id: practiceSession.id,
+      userId: getRecordUserId(practiceSession),
+      scenarioPackId: practiceSession.scenarioPackId,
+      goalId: practiceSession.goalId,
+      mode: toDbPracticeMode(practiceSession.mode),
+      personaId: practiceSession.personaId,
+      voicePackId: practiceSession.voicePackId,
+      materialMode: practiceSession.materialMode,
+      difficulty: toDbDifficulty(practiceSession.difficulty),
+      trainingFocus: practiceSession.trainingFocus,
+      focusTags: practiceSession.focusTags,
+      resolvedContext: practiceSession.resolvedContext,
+      payload: practiceSession,
+      sourceObjectionId: practiceSession.sourceObjectionId,
+      status: toDbSessionStatus(practiceSession.status),
+    },
+    update: {
+      scenarioPackId: practiceSession.scenarioPackId,
+      goalId: practiceSession.goalId,
+      mode: toDbPracticeMode(practiceSession.mode),
+      personaId: practiceSession.personaId,
+      voicePackId: practiceSession.voicePackId,
+      materialMode: practiceSession.materialMode,
+      difficulty: toDbDifficulty(practiceSession.difficulty),
+      trainingFocus: practiceSession.trainingFocus,
+      focusTags: practiceSession.focusTags,
+      resolvedContext: practiceSession.resolvedContext,
+      payload: practiceSession,
+      sourceObjectionId: practiceSession.sourceObjectionId,
+      status: toDbSessionStatus(practiceSession.status),
+    },
+  });
+
+  return practiceSession;
+}
+
+export async function listPracticeSessionRecordsAsync(scope?: UserScope) {
+  if (!canPersistPracticeData()) {
+    return listPracticeSessionRecords(scope);
+  }
+
+  const sessions = await getDb().practiceSession.findMany({
+    where: scope?.userId ? { userId: scope.userId } : undefined,
+    orderBy: { createdAt: "desc" },
+  });
+
+  return sessions.map(persistedSessionToRecord);
+}
+
+export async function getPracticeSessionRecordAsync(
+  sessionId: string,
+  scope?: UserScope,
+) {
+  const memorySession = getPracticeSessionRecord(sessionId, scope);
+
+  if (memorySession || !canPersistPracticeData()) {
+    return memorySession;
+  }
+
+  const session = await getDb().practiceSession.findFirst({
+    where: {
+      id: sessionId,
+      ...(scope?.userId ? { userId: scope.userId } : {}),
+    },
+  });
+
+  return session ? persistedSessionToRecord(session) : null;
+}
+
 export function ensurePracticeSessionRecord(
   sessionId: string,
   fallback?: Partial<CreatePracticeSessionInput> & UserScope,
@@ -131,6 +432,24 @@ export function ensurePracticeSessionRecord(
   return practiceSession;
 }
 
+export async function ensurePracticeSessionRecordAsync(
+  sessionId: string,
+  fallback?: Partial<CreatePracticeSessionInput> & UserScope,
+) {
+  const existingSession = await getPracticeSessionRecordAsync(sessionId, fallback);
+
+  if (existingSession) {
+    practiceSessions.set(sessionId, existingSession);
+    return existingSession;
+  }
+
+  const practiceSession = ensurePracticeSessionRecord(sessionId, fallback);
+
+  await persistPracticeSessionRecord(practiceSession);
+
+  return practiceSession;
+}
+
 export function saveTranscriptTurns(
   sessionId: string,
   turns: TranscriptTurnInput[],
@@ -156,12 +475,79 @@ export function saveTranscriptTurns(
   return savedTurns;
 }
 
+export async function saveTranscriptTurnsAsync(
+  sessionId: string,
+  turns: TranscriptTurnInput[],
+  scope?: UserScope,
+) {
+  const savedTurns = saveTranscriptTurns(sessionId, turns, scope);
+
+  if (!canPersistPracticeData()) {
+    return savedTurns;
+  }
+
+  const session = getPracticeSessionRecord(sessionId, scope) ??
+    ensurePracticeSessionRecord(sessionId, scope);
+
+  await persistPracticeSessionRecord(session);
+  await getDb().$transaction([
+    getDb().transcriptTurn.deleteMany({ where: { sessionId } }),
+    ...(savedTurns.length > 0
+      ? [
+          getDb().transcriptTurn.createMany({
+            data: savedTurns.map((turn) => ({
+              id: turn.id,
+              sessionId,
+              speaker: toDbSpeaker(turn.speaker),
+              text: turn.text,
+              timestamp: turn.timestamp,
+              metadata: turn.metadata as never,
+              createdAt: new Date(turn.createdAt),
+            })),
+          }),
+        ]
+      : []),
+    getDb().practiceSession.update({
+      where: { id: sessionId },
+      data: {
+        status: PracticeSessionStatus.COMPLETED,
+        endedAt: new Date(),
+        payload: getPracticeSessionRecord(sessionId, scope) ?? session,
+      },
+    }),
+  ]);
+
+  return savedTurns;
+}
+
 export function getTranscriptTurns(sessionId: string, scope?: UserScope) {
   if (scope?.userId && !getPracticeSessionRecord(sessionId, scope)) {
     return [];
   }
 
   return transcriptTurns.get(sessionId) ?? [];
+}
+
+export async function getTranscriptTurnsAsync(
+  sessionId: string,
+  scope?: UserScope,
+) {
+  if (!canPersistPracticeData()) {
+    return getTranscriptTurns(sessionId, scope);
+  }
+
+  const session = await getPracticeSessionRecordAsync(sessionId, scope);
+
+  if (!session) {
+    return [];
+  }
+
+  const turns = await getDb().transcriptTurn.findMany({
+    where: { sessionId },
+    orderBy: { timestamp: "asc" },
+  });
+
+  return turns.map(persistedTurnToRecord);
 }
 
 export function saveSuggestedAnswerRecord(
@@ -231,6 +617,61 @@ export function saveReviewRecord(
   return reviewRecord;
 }
 
+export async function saveReviewRecordAsync(
+  sessionId: string,
+  review: PracticeReviewPayload,
+  scope?: UserScope,
+) {
+  const reviewRecord = saveReviewRecord(sessionId, review, scope);
+
+  if (!canPersistPracticeData()) {
+    return reviewRecord;
+  }
+
+  const session = getPracticeSessionRecord(sessionId, scope) ??
+    ensurePracticeSessionRecord(sessionId, scope);
+
+  await persistPracticeSessionRecord(session);
+  await getDb().review.upsert({
+    where: { sessionId },
+    create: {
+      id: reviewRecord.id,
+      sessionId,
+      payload: review,
+      meetingOutcome: review.meetingOutcome,
+      scores: review.scores,
+      topImprovements: review.topImprovements,
+      bestMoments: review.bestMoments,
+      sentenceUpgrades: review.sentenceUpgrades,
+      materialCoverage: review.materialCoverage,
+      phrasebookSuggestions: review.phrasebookSuggestions,
+      weaknessUpdates: review.weaknessUpdates,
+      nextSessionRecommendation: review.nextSessionRecommendation,
+    },
+    update: {
+      payload: review,
+      meetingOutcome: review.meetingOutcome,
+      scores: review.scores,
+      topImprovements: review.topImprovements,
+      bestMoments: review.bestMoments,
+      sentenceUpgrades: review.sentenceUpgrades,
+      materialCoverage: review.materialCoverage,
+      phrasebookSuggestions: review.phrasebookSuggestions,
+      weaknessUpdates: review.weaknessUpdates,
+      nextSessionRecommendation: review.nextSessionRecommendation,
+    },
+  });
+  await getDb().practiceSession.update({
+    where: { id: sessionId },
+    data: {
+      status: PracticeSessionStatus.REVIEWED,
+      payload: getPracticeSessionRecord(sessionId, scope) ?? session,
+    },
+  });
+
+  return reviewRecord;
+}
+
 export function getReviewRecord(reviewId: string, scope?: UserScope) {
   const review = reviewRecords.get(reviewId) ?? null;
 
@@ -241,12 +682,56 @@ export function getReviewRecord(reviewId: string, scope?: UserScope) {
   return review;
 }
 
+export async function getReviewRecordAsync(reviewId: string, scope?: UserScope) {
+  const memoryReview = getReviewRecord(reviewId, scope);
+
+  if (memoryReview || !canPersistPracticeData()) {
+    return memoryReview;
+  }
+
+  const review = await getDb().review.findFirst({
+    where: {
+      id: reviewId,
+      ...(scope?.userId ? { session: { userId: scope.userId } } : {}),
+    },
+    include: {
+      session: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+
+  return review ? persistedReviewToRecord(review) : null;
+}
+
 export function listReviewRecords(scope?: UserScope) {
   return Array.from(reviewRecords.values()).filter((review) =>
     scope?.userId ? getRecordUserId(review) === scope.userId : true,
   ).sort((left, right) =>
     right.createdAt.localeCompare(left.createdAt),
   );
+}
+
+export async function listReviewRecordsAsync(scope?: UserScope) {
+  if (!canPersistPracticeData()) {
+    return listReviewRecords(scope);
+  }
+
+  const reviews = await getDb().review.findMany({
+    where: scope?.userId ? { session: { userId: scope.userId } } : undefined,
+    include: {
+      session: {
+        select: {
+          userId: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return reviews.map(persistedReviewToRecord);
 }
 
 export function getReviewBySessionId(sessionId: string, scope?: UserScope) {

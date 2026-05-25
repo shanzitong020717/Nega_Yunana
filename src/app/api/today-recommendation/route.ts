@@ -4,7 +4,7 @@ import { requireAuthContext } from "@/lib/auth/require-user";
 import { handleApiError } from "@/lib/errors";
 import { listMaterialRecords } from "@/lib/materials/material-store";
 import { rankMemoriesForPractice } from "@/lib/memory/memory-store";
-import { listPracticeSessionRecords } from "@/lib/practice/practice-session-store";
+import { listPracticeSessionRecordsAsync } from "@/lib/practice/practice-session-store";
 import {
   getDefaultProgressSummary,
   getProgressSummary,
@@ -22,7 +22,7 @@ export async function GET(request: Request) {
       .flatMap((value) => value.split(","))
       .map((value) => value.trim())
       .filter(Boolean);
-    const recentTrainingCount = listPracticeSessionRecords(scope).length;
+    const recentTrainingCount = (await listPracticeSessionRecordsAsync(scope)).length;
     const progress = getProgressSummary(recentTrainingCount, scope);
     const resolvedProgress =
       progress.topWeaknesses.length > 0

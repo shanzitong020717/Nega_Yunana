@@ -7,20 +7,23 @@ import {
   PracticeSessionCreationError,
 } from "@/lib/practice/create-practice-session";
 import {
-  listPracticeSessionRecords,
+  listPracticeSessionRecordsAsync,
+  persistPracticeSessionRecord,
 } from "@/lib/practice/practice-session-store";
 import { createPracticeSessionInputSchema } from "@/lib/validation/practice";
 
-export function GET() {
-  return requireAuthContext()
-    .then((authContext) =>
-      NextResponse.json({
-        practiceSessions: listPracticeSessionRecords({
-          userId: authContext.profileId,
-        }),
+export async function GET() {
+  try {
+    const authContext = await requireAuthContext();
+
+    return NextResponse.json({
+      practiceSessions: await listPracticeSessionRecordsAsync({
+        userId: authContext.profileId,
       }),
-    )
-    .catch((error) => handleApiError(error));
+    });
+  } catch (error) {
+    return handleApiError(error);
+  }
 }
 
 export async function POST(request: Request) {
@@ -33,6 +36,7 @@ export async function POST(request: Request) {
       ...input,
       userId: authContext.profileId,
     });
+    await persistPracticeSessionRecord(practiceSession);
 
     return NextResponse.json(
       {

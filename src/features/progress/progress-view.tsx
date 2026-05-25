@@ -29,6 +29,12 @@ import type {
 type ProgressViewProps = {
   analytics?: ReviewAnalyticsSnapshot | null;
   progress?: ProgressSummary;
+  reviewHistory?: Array<{
+    createdAt: string;
+    id: string;
+    sessionId: string;
+    summary: string;
+  }>;
 };
 
 const rangeLabels: Record<ReviewAnalyticsRange, string> = {
@@ -52,6 +58,7 @@ function severityTone(severity: number) {
 export function ProgressView({
   analytics = null,
   progress = getDefaultProgressSummary(),
+  reviewHistory = [],
 }: ProgressViewProps) {
   const [selectedRange, setSelectedRange] = useState<ReviewAnalyticsRange>(
     analytics?.range ?? "7d",
@@ -452,7 +459,29 @@ export function ProgressView({
           <h2 className="text-lg font-semibold">历史记录</h2>
         </div>
         <div className="mt-4 divide-y divide-[var(--border)]">
-          {progress.history.length > 0 ? (
+          {reviewHistory.length > 0 ? (
+            reviewHistory.slice(0, 8).map((item) => (
+              <div key={item.id} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <Link
+                      href={`/reviews/${item.id}`}
+                      className="text-sm font-semibold text-[var(--foreground)] transition hover:text-[var(--primary)]"
+                    >
+                      {new Date(item.createdAt).toLocaleString("zh-CN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </Link>
+                    <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                      {item.summary}
+                    </p>
+                  </div>
+                  <StatusPill tone="neutral">{item.sessionId}</StatusPill>
+                </div>
+              </div>
+            ))
+          ) : progress.history.length > 0 ? (
             progress.history.map((item) => (
               <div key={item.id} className="py-3 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-start justify-between gap-3">

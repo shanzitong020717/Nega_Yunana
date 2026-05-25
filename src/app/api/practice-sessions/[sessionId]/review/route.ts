@@ -10,11 +10,11 @@ import { apiErrorResponse, handleApiError } from "@/lib/errors";
 import { getMaterialBriefRecord } from "@/lib/materials/material-store";
 import {
   deleteReviewBySessionId,
-  ensurePracticeSessionRecord,
+  ensurePracticeSessionRecordAsync,
   getPracticeSessionRecord,
   getSuggestedAnswerRecords,
-  getTranscriptTurns,
-  saveReviewRecord,
+  getTranscriptTurnsAsync,
+  saveReviewRecordAsync,
 } from "@/lib/practice/practice-session-store";
 import { getPrepCardRecord } from "@/lib/practice/prep-card-store";
 import { createReviewInputSchema } from "@/lib/validation/reviews";
@@ -45,7 +45,10 @@ export async function POST(request: Request, context: ReviewRouteContext) {
     const scope = { userId: authContext.profileId };
     const { sessionId } = await context.params;
     const requestBody = await readOptionalJsonBody(request);
-    const practiceSession = ensurePracticeSessionRecord(sessionId, scope);
+    const practiceSession = await ensurePracticeSessionRecordAsync(
+      sessionId,
+      scope,
+    );
     const persona =
       personas.find((item) => item.id === practiceSession.personaId) ??
       personas[0];
@@ -59,13 +62,13 @@ export async function POST(request: Request, context: ReviewRouteContext) {
       ? createReviewInputSchema.parse(requestBody)
       : await generatePracticeReview({
           practiceSession,
-          transcriptTurns: getTranscriptTurns(sessionId, scope),
+          transcriptTurns: await getTranscriptTurnsAsync(sessionId, scope),
           persona,
           materialBrief,
           prepCard,
           suggestedAnswers: getSuggestedAnswerRecords(sessionId, scope),
         });
-    const reviewRecord = saveReviewRecord(sessionId, review, scope);
+    const reviewRecord = await saveReviewRecordAsync(sessionId, review, scope);
 
     return NextResponse.json(
       {

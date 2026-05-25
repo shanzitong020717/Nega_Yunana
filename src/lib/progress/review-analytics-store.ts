@@ -2,8 +2,9 @@ import { generateLongTermReviewSnapshot } from "@/lib/ai/long-term-review";
 import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 import { listMemories } from "@/lib/memory/memory-store";
 import {
-  listPracticeSessionRecords,
+  listPracticeSessionRecordsAsync,
   listReviewRecords,
+  listReviewRecordsAsync,
 } from "@/lib/practice/practice-session-store";
 import { buildReviewAnalyticsDraft } from "@/lib/progress/review-analytics";
 import type {
@@ -27,8 +28,8 @@ function cacheKey(range: ReviewAnalyticsRange, scope?: UserScope) {
   return `${scope?.userId ?? LOCAL_DEMO_PROFILE_ID}:${range}`;
 }
 
-function buildSourceSignature(scope?: UserScope) {
-  return listReviewRecords(scope)
+async function buildSourceSignature(scope?: UserScope) {
+  return (await listReviewRecordsAsync(scope))
     .map((review) => `${review.id}:${review.updatedAt}`)
     .sort()
     .join("|");
@@ -87,7 +88,7 @@ export async function getOrGenerateReviewAnalytics(
 ) {
   const scope = { userId: input.userId };
   const key = cacheKey(input.range, scope);
-  const signature = buildSourceSignature(scope);
+  const signature = await buildSourceSignature(scope);
   const cached = cache.get(key);
 
   if (
@@ -99,11 +100,14 @@ export async function getOrGenerateReviewAnalytics(
     return cached.snapshot;
   }
 
-  const reviews = listReviewRecords(scope);
+  const [reviews, sessions] = await Promise.all([
+    listReviewRecordsAsync(scope),
+    listPracticeSessionRecordsAsync(scope),
+  ]);
   const draft = buildReviewAnalyticsDraft({
     range: input.range,
     reviews,
-    sessions: listPracticeSessionRecords(scope),
+    sessions,
     memories: listMemories({ enabledForAi: true, userId: scope.userId }),
   });
   const snapshot =

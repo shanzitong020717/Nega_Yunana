@@ -141,4 +141,29 @@ describe("ProgressView long-term review analytics", () => {
     expect(screen.getByText("完成 2 次以上练习后，系统会生成长期趋势复盘。"))
       .toBeInTheDocument();
   });
+
+  it("renders persisted practice reviews in history", () => {
+    render(
+      <ProgressView
+        progress={progress}
+        analytics={null}
+        reviewHistory={[
+          {
+            id: "review_live_1",
+            sessionId: "session_live_1",
+            createdAt: "2026-05-26T00:00:00.000Z",
+            summary: "本次练习已经生成复盘并保存到后端。",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /2026/ })).toHaveAttribute(
+      "href",
+      "/reviews/review_live_1",
+    );
+    expect(screen.getByText("本次练习已经生成复盘并保存到后端。"))
+      .toBeInTheDocument();
+    expect(screen.getByText("session_live_1")).toBeInTheDocument();
+  });
 });

@@ -202,6 +202,14 @@ function installMockVoiceSession() {
         }),
         { status: 201 },
       ),
+    ).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          reviewId: "review_123",
+          sessionId: "session_123",
+        }),
+        { status: 201 },
+      ),
     ),
   );
 }
@@ -345,6 +353,14 @@ describe("RealtimeRoom mock UI", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "结束并复盘" }));
     expect(screen.getByRole("heading", { name: "会话已结束" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/practice-sessions/session_123/review",
+        expect.objectContaining({
+          method: "POST",
+        }),
+      );
+    });
   });
 
   it("opens local coaching panels for manual cues without asking the AI customer to continue", () => {

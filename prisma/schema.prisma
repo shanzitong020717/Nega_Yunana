@@ -188,12 +188,19 @@ model PrepCard {
 model PracticeSession {
   id                String                @id @default(cuid())
   userId            String
+  scenarioPackId    String                @default("rokid-overseas-sales")
+  goalId            String                @default("customer_qa")
   mode              PracticeMode
   personaId         String
+  voicePackId       String                @default("kore-firm")
+  materialMode      String?
   materialId        String?
   prepCardId        String?
   difficulty        Difficulty            @default(NORMAL)
   trainingFocus     Json                  @default("[]")
+  focusTags         Json                  @default("[]")
+  resolvedContext   Json?
+  payload           Json                  @default("{}")
   sourceObjectionId String?
   status            PracticeSessionStatus @default(CREATED)
   startedAt         DateTime?
@@ -227,6 +234,7 @@ model TranscriptTurn {
 model Review {
   id                        String          @id @default(cuid())
   sessionId                 String          @unique
+  payload                   Json            @default("{}")
   meetingOutcome            Json            @default("{}")
   scores                    Json            @default("{}")
   topImprovements           Json            @default("[]")

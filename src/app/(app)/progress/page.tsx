@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 
 import { ProgressView } from "@/features/progress/progress-view";
-import { listPracticeSessionRecords } from "@/lib/practice/practice-session-store";
+import { requireAuthContext } from "@/lib/auth/require-user";
+import {
+  listPracticeSessionRecordsAsync,
+  listReviewRecordsAsync,
+} from "@/lib/practice/practice-session-store";
 import {
   getDefaultProgressSummary,
   getProgressSummary,
@@ -13,13 +17,28 @@ export const metadata: Metadata = {
 };
 
 export default async function ProgressPage() {
-  const recentTrainingCount = listPracticeSessionRecords().length;
-  const progress = getProgressSummary(recentTrainingCount);
-  const analytics = await getOrGenerateReviewAnalytics({ range: "7d" });
+  const authContext = await requireAuthContext();
+  const scope = { userId: authContext.profileId };
+  const [practiceSessions, reviewRecords] = await Promise.all([
+    listPracticeSessionRecordsAsync(scope),
+    listReviewRecordsAsync(scope),
+  ]);
+  const recentTrainingCount = practiceSessions.length;
+  const progress = getProgressSummary(recentTrainingCount, scope);
+  const analytics = await getOrGenerateReviewAnalytics({
+    range: "7d",
+    userId: scope.userId,
+  });
 
   return (
     <ProgressView
       analytics={analytics.trainingCount >= 2 ? analytics : null}
+      reviewHistory={reviewRecords.map((review) => ({
+        id: review.id,
+        sessionId: review.sessionId,
+        createdAt: review.createdAt,
+        summary: review.meetingOutcome.summary,
+      }))}
       progress={
         progress.topWeaknesses.length > 0
           ? progress

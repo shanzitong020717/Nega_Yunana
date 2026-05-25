@@ -1732,14 +1732,29 @@ export function RealtimeRoom({
     }
   }
 
+  async function generateReview() {
+    const response = await fetch(`/api/practice-sessions/${sessionId}/review`, {
+      method: "POST",
+    });
+
+    if (!response.ok) {
+      throw new Error("生成复盘失败。");
+    }
+
+    return response.json() as Promise<{
+      reviewId?: string;
+    }>;
+  }
+
   async function handleEnd() {
     closeRealtimeConnection();
     setIsMuted(false);
     setState("Session Ended");
-    const turnsToSave = addSystemTurn("会话已结束，正在保存转写用于复盘。");
+    const turnsToSave = addSystemTurn("会话已结束，正在保存转写并生成复盘。");
 
     try {
       await saveTranscript(turnsToSave);
+      const reviewPayload = await generateReview();
       const recommendationId = practiceSessionSelectionRef.current.recommendationId;
 
       if (
@@ -1748,9 +1763,13 @@ export function RealtimeRoom({
       ) {
         void completeTodayRecommendationAndPrefetch(recommendationId);
       }
-      addSystemTurn("转写已保存，可用于复盘。");
+      addSystemTurn(
+        reviewPayload.reviewId
+          ? "复盘已生成，可在复盘页面查看。"
+          : "转写已保存，复盘已生成。",
+      );
     } catch {
-      addSystemTurn("转写暂时无法保存，请稍后重试。");
+      addSystemTurn("练习记录暂时无法保存或生成复盘，请稍后重试。");
     }
   }
 

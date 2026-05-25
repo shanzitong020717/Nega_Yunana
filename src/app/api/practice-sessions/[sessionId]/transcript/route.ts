@@ -5,7 +5,7 @@ import { apiErrorResponse, handleApiError, readJsonBody } from "@/lib/errors";
 import {
   deleteTranscriptTurns,
   getPracticeSessionRecord,
-  saveTranscriptTurns,
+  saveTranscriptTurnsAsync,
 } from "@/lib/practice/practice-session-store";
 import { saveTranscriptInputSchema } from "@/lib/validation/practice";
 
@@ -20,7 +20,7 @@ export async function POST(request: Request, context: TranscriptRouteContext) {
     const authContext = await requireAuthContext();
     const { sessionId } = await context.params;
     const input = saveTranscriptInputSchema.parse(await readJsonBody(request));
-    const savedTurns = saveTranscriptTurns(sessionId, input.turns, {
+    const savedTurns = await saveTranscriptTurnsAsync(sessionId, input.turns, {
       userId: authContext.profileId,
     });
 

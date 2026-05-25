@@ -1,9 +1,10 @@
 import { PageHeader } from "@/components/page-header";
 import { personas } from "@/data/personas";
 import { generatePracticeReview } from "@/lib/ai/review";
+import { requireAuthContext } from "@/lib/auth/require-user";
 import {
   ensurePracticeSessionRecord,
-  getReviewRecord,
+  getReviewRecordAsync,
 } from "@/lib/practice/practice-session-store";
 import { ReviewView } from "@/features/reviews/review-view";
 
@@ -15,7 +16,10 @@ type ReviewPageProps = {
 
 export default async function ReviewPage({ params }: ReviewPageProps) {
   const { reviewId } = await params;
-  const storedReview = getReviewRecord(reviewId);
+  const authContext = await requireAuthContext();
+  const storedReview = await getReviewRecordAsync(reviewId, {
+    userId: authContext.profileId,
+  });
   const fallbackSession = ensurePracticeSessionRecord("session_preview");
   const fallbackReview = storedReview
     ? null
