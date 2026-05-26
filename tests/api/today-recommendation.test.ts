@@ -12,14 +12,16 @@ vi.mock("@/lib/ai/text-client", () => ({
 }));
 
 import { GET as getTodayRecommendation } from "@/app/api/today-recommendation/route";
+import { resetTodayRecommendationPoolsForTest } from "@/lib/recommendations/today-recommendation-pool";
 
 describe("today recommendation API", () => {
   afterEach(() => {
     generateTextJSONMock.mockReset();
+    resetTodayRecommendationPoolsForTest();
     vi.unstubAllEnvs();
   });
 
-  it("returns an AI-generated recommendation from backend context", async () => {
+  it("serves a preloaded daily pool and rotates to the next package without realtime AI", async () => {
     vi.stubEnv("AI_MOCK_MODE", "false");
     generateTextJSONMock.mockResolvedValueOnce({
       title: "企业买家 · 应用场景说明",
@@ -34,21 +36,30 @@ describe("today recommendation API", () => {
       evidence: ["Feature-first answering pattern"],
     });
 
-    const response = await getTodayRecommendation(
+    const firstResponse = await getTodayRecommendation(
       new Request("http://localhost/api/today-recommendation"),
     );
-    const payload = (await response.json()) as {
-      recommendation?: Record<string, unknown>;
+    const firstPayload = (await firstResponse.json()) as {
+      pool?: { activeIndex: number; size: number };
+      recommendation?: { id: string; title: string; source: string };
+    };
+    const secondResponse = await getTodayRecommendation(
+      new Request("http://localhost/api/today-recommendation?refresh=1"),
+    );
+    const secondPayload = (await secondResponse.json()) as {
+      pool?: { activeIndex: number; size: number };
+      recommendation?: { id: string; title: string; source: string };
     };
 
-    expect(response.status).toBe(200);
-    expect(generateTextJSONMock).toHaveBeenCalledTimes(1);
-    expect(payload.recommendation).toMatchObject({
-      title: "企业买家 · 应用场景说明",
-      goalLabel: "应用场景说明",
-      personaLabel: "企业买家",
-      voicePackLabel: "Kore 坚定专业",
-      source: "ai",
-    });
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(generateTextJSONMock).not.toHaveBeenCalled();
+    expect(firstPayload.pool).toEqual({ activeIndex: 0, size: 10 });
+    expect(secondPayload.pool).toEqual({ activeIndex: 1, size: 10 });
+    expect(firstPayload.recommendation?.source).toBe("fallback");
+    expect(secondPayload.recommendation?.source).toBe("fallback");
+    expect(secondPayload.recommendation?.id).not.toBe(
+      firstPayload.recommendation?.id,
+    );
   });
 });

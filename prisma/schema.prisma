@@ -86,21 +86,22 @@ enum AllowedUserStatus {
 }
 
 model UserProfile {
-  id                  String            @id @default(cuid())
-  authUserId          String?           @unique @db.Uuid
-  email               String?           @unique
-  name                String
-  avatarUrl           String?
-  role                String
-  englishLevel        String            @default("B2")
-  trainingPreferences Json              @default("{}")
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  materials           Material[]
-  prepCards           PrepCard[]
-  practiceSessions    PracticeSession[]
-  phrases             Phrase[]
-  weaknesses          WeaknessMetric[]
+  id                       String                    @id @default(cuid())
+  authUserId               String?                   @unique @db.Uuid
+  email                    String?                   @unique
+  name                     String
+  avatarUrl                String?
+  role                     String
+  englishLevel             String                    @default("B2")
+  trainingPreferences      Json                      @default("{}")
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  materials                Material[]
+  prepCards                PrepCard[]
+  practiceSessions         PracticeSession[]
+  phrases                  Phrase[]
+  todayRecommendationPools TodayRecommendationPool[]
+  weaknesses               WeaknessMetric[]
 }
 
 model AllowedUser {
@@ -287,4 +288,20 @@ model WeaknessMetric {
 
   @@unique([userId, type])
   @@index([userId])
+}
+
+model TodayRecommendationPool {
+  id          String      @id @default(cuid())
+  userId      String
+  dateKey     String
+  activeIndex Int         @default(0)
+  items       Json        @default("[]")
+  generatedAt DateTime    @default(now())
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dateKey])
+  @@index([userId])
+  @@index([dateKey])
 }

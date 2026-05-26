@@ -93,22 +93,6 @@ export function TodayPracticeCard({
     };
   }, [recommendation]);
 
-  function excludedRecommendationIds() {
-    const cache = readTodayRecommendationCache();
-
-    return Array.from(
-      new Set(
-        [
-          ...(cache?.shownRecommendationIds ?? []),
-          ...(cache?.completedRecommendationIds ?? []),
-          recommendation?.id,
-        ].filter((recommendationId): recommendationId is string =>
-          Boolean(recommendationId),
-        ),
-      ),
-    );
-  }
-
   async function refreshRecommendation() {
     const controller = new AbortController();
 
@@ -117,7 +101,6 @@ export function TodayPracticeCard({
 
     try {
       const nextRecommendation = await fetchTodayRecommendationPackage({
-        excludedRecommendationIds: excludedRecommendationIds(),
         refresh: true,
         signal: controller.signal,
       });

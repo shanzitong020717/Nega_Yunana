@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import {
   defaultScenarioPack,
+  type PracticeGoal,
   type PracticeGoalId,
   type VoicePackId,
 } from "@/data/scenario-packs";
@@ -58,7 +59,7 @@ export type PracticeRecommendationLinkParams = Pick<
   id?: string;
 };
 
-type GenerateTodayRecommendationInput = {
+export type GenerateTodayRecommendationInput = {
   analytics?: ReviewAnalyticsSnapshot | null;
   excludedRecommendationIds?: string[];
   progress: ProgressSummary;
@@ -66,6 +67,8 @@ type GenerateTodayRecommendationInput = {
   memories: MemoryItem[];
   mockMode?: boolean;
 };
+
+export const TODAY_RECOMMENDATION_POOL_SIZE = 10;
 
 const recommendationPayloadSchema = z.object({
   title: z.string().min(1).optional(),
@@ -487,6 +490,120 @@ function buildFallbackRecommendation(input: GenerateTodayRecommendationInput) {
           !isExcludedRecommendation(recommendation, input.excludedRecommendationIds),
       ) ?? preferredRecommendation
   );
+}
+
+function matchingFocusCount(goal: PracticeGoal, focusTags: string[]) {
+  const normalizedFocusTags = new Set(
+    focusTags.map((tag) => tag.trim()).filter(Boolean),
+  );
+
+  return goal.defaultFocusTags.filter((tag) => normalizedFocusTags.has(tag)).length;
+}
+
+function scorePresetGoal(
+  goal: PracticeGoal,
+  input: GenerateTodayRecommendationInput,
+  baseIndex: number,
+) {
+  const topWeakness = input.progress.topWeaknesses[0];
+  const preferredGoalId = topWeakness
+    ? weaknessGoalMap[topWeakness.type]
+    : undefined;
+  const weaknessFocusTags = input.progress.topWeaknesses.flatMap((weakness) => [
+    weakness.label,
+    weakness.recommendedDrill,
+  ]);
+  const analyticsFocusTags =
+    input.analytics?.nextTrainingPlan.focusTags ??
+    input.analytics?.recurringMistakes.flatMap((mistake) => [
+      mistake.title,
+      mistake.recommendedDrill,
+    ]) ??
+    [];
+  const hasReadyMaterial = input.recentMaterials.some(
+    (material) =>
+      material.processingStatus === "ready" &&
+      material.memoryStatus !== "confidential",
+  );
+
+  return (
+    100 -
+    baseIndex +
+    (goal.id === preferredGoalId ? 500 : 0) +
+    matchingFocusCount(goal, weaknessFocusTags) * 40 +
+    matchingFocusCount(goal, analyticsFocusTags) * 50 +
+    (hasReadyMaterial &&
+    ["application_scenarios", "demo_narration", "product_parameters"].includes(
+      goal.id,
+    )
+      ? 25
+      : 0)
+  );
+}
+
+function buildPresetRecommendationReason(
+  input: GenerateTodayRecommendationInput,
+  goal: PracticeGoal,
+) {
+  const topWeakness = input.progress.topWeaknesses[0];
+  const analyticsPlan = input.analytics?.nextTrainingPlan;
+  const readyMaterial = input.recentMaterials.find(
+    (material) =>
+      material.processingStatus === "ready" &&
+      material.memoryStatus !== "confidential",
+  );
+
+  if (topWeakness && weaknessGoalMap[topWeakness.type] === goal.id) {
+    return `推荐原因：你最近的复盘显示「${topWeakness.label}」需要优先加强，今天先用「${goal.label}」把这个弱点练成可直接复用的商务表达。`;
+  }
+
+  if (
+    analyticsPlan &&
+    matchingFocusCount(goal, analyticsPlan.focusTags) > 0
+  ) {
+    return `推荐原因：长期复盘建议继续加强「${analyticsPlan.title}」，这个预设包会用「${goal.label}」把下一步训练落到具体会谈里。`;
+  }
+
+  if (
+    readyMaterial &&
+    ["application_scenarios", "demo_narration", "product_parameters"].includes(
+      goal.id,
+    )
+  ) {
+    return `推荐原因：最近材料「${readyMaterial.name}」适合沉淀成客户可理解的表达，今天用「${goal.label}」练习把材料讲清楚。`;
+  }
+
+  if (input.memories.length > 0) {
+    return `推荐原因：系统记忆显示你适合持续沉淀商务会谈表达，今天用「${goal.label}」补齐一个常见客户沟通场景。`;
+  }
+
+  return `推荐原因：今天先用「${goal.label}」覆盖 Rokid 海外商务会谈中的一个高频场景，保持练习节奏并积累复盘数据。`;
+}
+
+export function buildPresetTodayRecommendationPool(
+  input: GenerateTodayRecommendationInput,
+) {
+  return defaultScenarioPack.practiceGoals
+    .map((goal, index) => ({
+      goal,
+      score: scorePresetGoal(goal, input, index),
+    }))
+    .sort((left, right) => right.score - left.score)
+    .slice(0, TODAY_RECOMMENDATION_POOL_SIZE)
+    .map(({ goal }) => {
+      const recommendation = buildFallbackRecommendationForGoal(input, goal.id);
+
+      return {
+        ...recommendation,
+        reason: buildPresetRecommendationReason(input, goal),
+        evidence: Array.from(
+          new Set([
+            ...recommendation.evidence,
+            ...goal.defaultFocusTags,
+          ]),
+        ).slice(0, 6),
+      };
+    });
 }
 
 export async function generateTodayRecommendation(

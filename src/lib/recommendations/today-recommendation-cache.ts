@@ -166,10 +166,8 @@ export function markTodayRecommendationCompleted(
 }
 
 export function buildTodayRecommendationRequestURL({
-  excludedRecommendationIds = [],
   refresh = false,
 }: {
-  excludedRecommendationIds?: string[];
   refresh?: boolean;
 } = {}) {
   const params = new URLSearchParams();
@@ -177,10 +175,6 @@ export function buildTodayRecommendationRequestURL({
   if (refresh) {
     params.set("refresh", "1");
   }
-
-  excludedRecommendationIds.forEach((recommendationId) => {
-    params.append("exclude", recommendationId);
-  });
 
   const queryString = params.toString();
 
@@ -190,17 +184,14 @@ export function buildTodayRecommendationRequestURL({
 }
 
 export async function fetchTodayRecommendationPackage({
-  excludedRecommendationIds = [],
   refresh = false,
   signal,
 }: {
-  excludedRecommendationIds?: string[];
   refresh?: boolean;
   signal?: AbortSignal;
 } = {}) {
   const response = await fetch(
     buildTodayRecommendationRequestURL({
-      excludedRecommendationIds,
       refresh,
     }),
     { signal },
@@ -229,7 +220,6 @@ export async function completeTodayRecommendationAndPrefetch(
 
   try {
     const nextRecommendation = await fetchTodayRecommendationPackage({
-      excludedRecommendationIds: completedState.completedRecommendationIds,
       refresh: true,
       signal: controller.signal,
     });

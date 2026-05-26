@@ -2,50 +2,33 @@ import { NextResponse } from "next/server";
 
 import { requireAuthContext } from "@/lib/auth/require-user";
 import { handleApiError } from "@/lib/errors";
-import { listMaterialRecords } from "@/lib/materials/material-store";
-import { rankMemoriesForPractice } from "@/lib/memory/memory-store";
-import { listPracticeSessionRecordsAsync } from "@/lib/practice/practice-session-store";
 import {
-  getDefaultProgressSummary,
-  getProgressSummary,
-} from "@/lib/progress/weakness-store";
-import { getCachedReviewAnalytics } from "@/lib/progress/review-analytics-store";
-import { generateTodayRecommendation } from "@/lib/recommendations/today-recommendation";
+  advanceTodayRecommendationPool,
+  getOrCreateTodayRecommendationPool,
+  selectActiveTodayRecommendation,
+} from "@/lib/recommendations/today-recommendation-pool";
 
 export async function GET(request: Request) {
   try {
     const authContext = await requireAuthContext();
-    const scope = { userId: authContext.profileId };
     const url = new URL(request.url);
-    const excludedRecommendationIds = url.searchParams
-      .getAll("exclude")
-      .flatMap((value) => value.split(","))
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const recentTrainingCount = (await listPracticeSessionRecordsAsync(scope)).length;
-    const progress = getProgressSummary(recentTrainingCount, scope);
-    const resolvedProgress =
-      progress.topWeaknesses.length > 0
-        ? progress
-        : { ...getDefaultProgressSummary(), recentTrainingCount };
-    const focusTags = resolvedProgress.topWeaknesses.flatMap((weakness) => [
-      weakness.label,
-      weakness.recommendedDrill,
-    ]);
-    const recommendation = await generateTodayRecommendation({
-      progress: resolvedProgress,
-      recentMaterials: listMaterialRecords(scope).slice(0, 5),
-      memories: rankMemoriesForPractice({
-        focusTags,
-        limit: 6,
-        userId: scope.userId,
-      }),
-      analytics: getCachedReviewAnalytics("7d", scope),
-      excludedRecommendationIds,
-      mockMode: url.searchParams.get("mock") === "1",
-    });
+    const shouldAdvance = url.searchParams.get("refresh") === "1";
+    const pool = shouldAdvance
+      ? await advanceTodayRecommendationPool({
+          userId: authContext.profileId,
+        })
+      : await getOrCreateTodayRecommendationPool({
+          userId: authContext.profileId,
+        });
+    const recommendation = selectActiveTodayRecommendation(pool);
 
-    return NextResponse.json({ recommendation });
+    return NextResponse.json({
+      recommendation,
+      pool: {
+        activeIndex: pool.activeIndex,
+        size: pool.items.length,
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }

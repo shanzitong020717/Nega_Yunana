@@ -73,7 +73,7 @@ describe("today recommendation daily cache", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("refreshes the recommendation package when the refresh button is clicked", async () => {
+  it("switches to the next preloaded recommendation package when refresh is clicked", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       recommendationResponse(refreshedRecommendation),
     );
@@ -88,21 +88,17 @@ describe("today recommendation daily cache", () => {
       await screen.findByText("企业买家 · 应用场景说明"),
     ).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/today-recommendation?"),
+      "/api/today-recommendation?refresh=1",
       expect.objectContaining({
         signal: expect.any(AbortSignal),
       }),
-    );
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("refresh=1");
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      `exclude=${encodeURIComponent(cachedRecommendation.id)}`,
     );
     expect(readTodayRecommendationCache()?.recommendation.title).toBe(
       "企业买家 · 应用场景说明",
     );
   });
 
-  it("excludes every recommendation already shown today when refreshing again", async () => {
+  it("keeps refresh as a simple next-package switch across repeated clicks", async () => {
     const thirdRecommendation: TodayRecommendation = {
       id: "demo_narration:channel_partner:zephyr-bright:memory_context",
       title: "渠道合作伙伴 · 产品演示讲解",
@@ -139,14 +135,10 @@ describe("today recommendation daily cache", () => {
       await screen.findByText("渠道合作伙伴 · 产品演示讲解"),
     ).toBeInTheDocument();
 
-    const secondRefreshUrl = String(fetchMock.mock.calls[1]?.[0]);
-
-    expect(secondRefreshUrl).toContain(
-      `exclude=${encodeURIComponent(cachedRecommendation.id)}`,
-    );
-    expect(secondRefreshUrl).toContain(
-      `exclude=${encodeURIComponent(refreshedRecommendation.id)}`,
-    );
+    expect(fetchMock.mock.calls.map((call) => call[0])).toEqual([
+      "/api/today-recommendation?refresh=1",
+      "/api/today-recommendation?refresh=1",
+    ]);
     expect(readTodayRecommendationCache()?.shownRecommendationIds).toEqual([
       cachedRecommendation.id,
       refreshedRecommendation.id,
@@ -164,14 +156,10 @@ describe("today recommendation daily cache", () => {
     await completeTodayRecommendationAndPrefetch(cachedRecommendation.id);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("/api/today-recommendation?"),
+      "/api/today-recommendation?refresh=1",
       expect.objectContaining({
         signal: expect.any(AbortSignal),
       }),
-    );
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("refresh=1");
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain(
-      `exclude=${encodeURIComponent(cachedRecommendation.id)}`,
     );
     await waitFor(() => {
       expect(readTodayRecommendationCache()?.completedRecommendationIds).toContain(
