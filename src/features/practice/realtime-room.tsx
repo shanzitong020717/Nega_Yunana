@@ -241,10 +241,6 @@ function resolvePersonaLabel(personaId: string) {
   );
 }
 
-function resolveScenarioPersona(personaId: string) {
-  return defaultScenarioPack.personas.find((persona) => persona.id === personaId);
-}
-
 function buildStartRoleplayInstructions(
   practiceSession: StoredPracticeSessionSelection,
 ) {
@@ -342,13 +338,6 @@ function latestConversationTurn(turns: TranscriptTurn[]) {
   return [...turns].reverse().find((turn) => turn.speaker !== "system");
 }
 
-function latestTurnBySpeaker(
-  turns: TranscriptTurn[],
-  speaker: TranscriptTurn["speaker"],
-) {
-  return [...turns].reverse().find((turn) => turn.speaker === speaker);
-}
-
 function buildSmartGuidance(turns: TranscriptTurn[]): SmartGuidanceState {
   const latestTurn = latestConversationTurn(turns);
 
@@ -368,284 +357,6 @@ function buildSmartGuidance(turns: TranscriptTurn[]): SmartGuidanceState {
     nextStep: "先保持对话节奏，等 AI 分析返回后再按照当前语境选择下一步。",
     sayThis:
       "Let me make sure I understand your point before I answer.",
-  };
-}
-
-function textIncludesAny(text: string, keywords: string[]) {
-  const normalizedText = text.toLowerCase();
-
-  return keywords.some((keyword) => normalizedText.includes(keyword));
-}
-
-function buildBetterPhraseContent(
-  latestAiText: string,
-  latestUserText: string,
-  practiceSession: StoredPracticeSessionSelection,
-) {
-  const persona = resolveScenarioPersona(practiceSession.personaId);
-  const personaLabel = resolvePersonaLabel(practiceSession.personaId);
-  const combinedContext = `${latestAiText} ${latestUserText}`;
-  const focusText =
-    practiceSession.focusTags.length > 0
-      ? practiceSession.focusTags.join("、")
-      : practiceSession.trainingFocus.join("、");
-  const focusContext = focusText ? `本轮练习重点是${focusText}。` : "";
-
-  if (
-    personaLabel === "技术负责人" ||
-    textIncludesAny(combinedContext, [
-      "deployment",
-      "cloud",
-      "on-premise",
-      "on premise",
-      "security",
-      "privacy",
-      "encrypted",
-      "integration",
-    ])
-  ) {
-    return {
-      personaLabel,
-      personaContext: `${personaLabel}通常会追问参数、集成、部署和安全边界。${focusContext}这里不要只说“翻译更好”，要把价值放进技术评审语境，并主动承认需要和 IT 团队确认。`,
-      logic:
-        "你的原句能表达大方向，但对技术负责人来说还不够具体。更自然的做法是先回应客户正在关心的部署或安全问题，再把实时字幕、免手持和会议连续性说成可评估的工作流价值。",
-      expression:
-        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
-      translation:
-        "在技术评审中，核心价值不只是翻译。Rokid 可以帮助多语言团队在会议中保持信息可见和免手持沟通，同时我们会和你们 IT 团队确认部署与安全要求。",
-      reason:
-        "这版更像真实商务会谈：它没有过度承诺部署能力，而是把产品价值、客户角色关注点和下一步技术确认放在同一个回答里。",
-      vocabulary: [
-        {
-          term: "technical review",
-          phonetic: "/ˈteknɪkəl rɪˈvjuː/",
-          chinese: "技术评审",
-          example: "For a technical review, we can first confirm the data flow.",
-        },
-        {
-          term: "meeting flow",
-          phonetic: "/ˈmiːtɪŋ floʊ/",
-          chinese: "会议流程、会议中的沟通连续性",
-          example: "Rokid helps keep the meeting flow visible and natural.",
-        },
-        {
-          term: "hands-free",
-          phonetic: "/ˌhændz ˈfriː/",
-          chinese: "免手持的",
-          example: "Hands-free captions help users stay engaged.",
-        },
-      ],
-    };
-  }
-
-  if (
-    personaLabel === "采购经理" ||
-    textIncludesAny(combinedContext, ["cost", "price", "budget", "competitor"])
-  ) {
-    return {
-      personaLabel,
-      personaContext: `${personaLabel}会关注采购风险、成本边界和竞品差异。${focusContext}表达时要减少形容词，多说可验证的使用价值和下一步评估方式。`,
-      logic:
-        "你的原句说明了产品方向，但还没有回应采购方最在意的投入产出和替代方案。更自然的表达应该承认需要评估，同时给出一个低风险的试点路径。",
-      expression:
-        "The value is not only better communication, but whether the pilot can prove a clear workflow fit before a larger purchase decision.",
-      translation:
-        "价值不只是沟通更顺畅，而是试点能否在更大规模采购前证明清晰的流程适配度。",
-      reason:
-        "这版能把销售表达从“产品很好”转成“先验证再采购”，更符合采购经理的决策方式。",
-      vocabulary: [
-        {
-          term: "workflow fit",
-          phonetic: "/ˈwɜːrkfloʊ fɪt/",
-          chinese: "流程适配度",
-          example: "We should confirm the workflow fit before scaling.",
-        },
-        {
-          term: "purchase decision",
-          phonetic: "/ˈpɜːrtʃəs dɪˈsɪʒən/",
-          chinese: "采购决策",
-          example: "A pilot can support the final purchase decision.",
-        },
-      ],
-    };
-  }
-
-  return {
-    personaLabel,
-    personaContext: persona
-      ? `${personaLabel}的沟通风格是${persona.communicationStyle} ${focusContext}当前回答需要把产品功能转成客户能判断的业务结果。`
-      : `${personaLabel}会先判断表达是否贴合真实场景。${focusContext}当前回答需要更具体地说明客户能获得什么改变。`,
-    logic:
-      "你的原句方向是对的，但偏泛。更自然的表达要先给客户一个清楚的业务结果，再用一个具体场景支撑，不要只停留在“沟通更好”。",
-    expression:
-      "The main value is that Rokid can reduce communication friction in real meetings, especially when teams need to follow multilingual discussions without breaking eye contact or switching devices.",
-    translation:
-      "主要价值在于 Rokid 能减少真实会议中的沟通摩擦，尤其适合团队需要跟上多语言讨论，同时不想打断眼神交流或频繁切换设备的场景。",
-    reason:
-      "这版更自然，因为它把抽象价值变成了具体会议场景，也更容易引出客户的真实使用方式。",
-    vocabulary: [
-      {
-        term: "communication friction",
-        phonetic: "/kəˌmjuːnɪˈkeɪʃən ˈfrɪkʃən/",
-        chinese: "沟通摩擦",
-        example: "Rokid can reduce communication friction in real meetings.",
-      },
-      {
-        term: "switching devices",
-        phonetic: "/ˈswɪtʃɪŋ dɪˈvaɪsɪz/",
-        chinese: "切换设备",
-        example: "Users can follow the meeting without switching devices.",
-      },
-    ],
-  };
-}
-
-function buildSupportCueResult(
-  cue: SupportCue,
-  turns: TranscriptTurn[],
-  practiceSession: StoredPracticeSessionSelection,
-): SupportCueResult {
-  const latestAiTurn = latestTurnBySpeaker(turns, "ai_customer");
-  const latestUserTurn = latestTurnBySpeaker(turns, "user");
-  const guidance = buildSmartGuidance(turns);
-  const latestAiText =
-    latestAiTurn?.text ??
-    "当前还没有客户问题，先用开场问题确认客户的真实使用场景。";
-  const latestUserText =
-    latestUserTurn?.text ??
-    "还没有捕捉到你的上一句英文。你可以先回答一句，再用这个功能优化表达。";
-
-  if (cue === "Better Phrase") {
-    const betterPhrase = buildBetterPhraseContent(
-      latestAiText,
-      latestUserText,
-      practiceSession,
-    );
-
-    return {
-      id: `support-${cue}`,
-      title: "更自然表达分析",
-      badge: "优化表达",
-      sections: [
-        {
-          label: "AI 客户上下文",
-          english: latestAiText,
-        },
-        {
-          label: "客户角色",
-          english: betterPhrase.personaLabel,
-          chinese: betterPhrase.personaContext,
-        },
-        {
-          label: "你的原句",
-          english: latestUserText,
-        },
-        {
-          label: "语句逻辑拆解",
-          chinese: betterPhrase.logic,
-        },
-        {
-          label: "更自然表达",
-          english: betterPhrase.expression,
-          chinese: betterPhrase.translation,
-        },
-        {
-          label: "为什么更好",
-          chinese: betterPhrase.reason,
-        },
-      ],
-      vocabulary: betterPhrase.vocabulary,
-    };
-  }
-
-  if (cue === "Ask a Discovery Question") {
-    return {
-      id: `support-${cue}`,
-      title: "探索问题建议",
-      badge: "推进会谈",
-      sections: [
-        {
-          label: "客户上一句",
-          english: latestAiText,
-        },
-        {
-          label: "上下文判断",
-          chinese: guidance.currentJudgment,
-        },
-        {
-          label: "推荐问题",
-          english: "What does a successful pilot look like for your team?",
-          chinese: "对你们团队来说，什么样的试点结果才算成功？",
-        },
-        {
-          label: "建议原因",
-          chinese:
-            "这个问题能把客户从泛泛了解拉回到试点目标、评估标准和下一步决策条件，方便你后续围绕 ROI、部署和场景价值继续沟通。",
-        },
-      ],
-    };
-  }
-
-  if (cue === "Use Material Point") {
-    return {
-      id: `support-${cue}`,
-      title: "材料要点建议",
-      badge: "引用材料",
-      sections: [
-        {
-          label: "客户上一句",
-          english: latestAiText,
-        },
-        {
-          label: "可引用要点",
-          english:
-            "Rokid supports real-time translated captions for multilingual conversations.",
-          chinese: "Rokid 支持面向多语言沟通的实时翻译字幕。",
-        },
-        {
-          label: "使用方式",
-          english:
-            "In this scenario, the translated captions can help both sides follow the meeting without switching devices.",
-          chinese:
-            "在这个场景中，实时字幕能帮助双方持续跟上会议内容，不需要频繁切换设备。",
-        },
-        {
-          label: "风险边界",
-          note: "不要补充材料中没有确认的价格、认证或部署承诺。",
-        },
-      ],
-    };
-  }
-
-  return {
-    id: `support-${cue}`,
-    title: "挑战练习建议",
-    badge: "进阶练习",
-    sections: [
-      {
-        label: "挑战问题",
-        english:
-          "Why should we choose Rokid instead of a phone translation app?",
-        chinese: "我们为什么应该选择 Rokid，而不是手机翻译应用？",
-      },
-      {
-        label: "训练目的",
-        chinese:
-          "这个挑战会逼你说明智能眼镜相对手机方案的差异：免手持、会议连续性、现场协作和企业场景适配。",
-      },
-      {
-        label: "作答抓手",
-        english:
-          "The difference is not only translation accuracy, but whether the user can stay engaged in the workflow.",
-        chinese:
-          "差异不只是翻译准确率，而是用户能否持续参与当前工作流程。",
-      },
-      {
-        label: "回答边界",
-        chinese:
-          "不要贬低竞品或做绝对化承诺，重点说清楚 Rokid 更适合哪些高频商务和现场协作场景。",
-      },
-    ],
   };
 }
 
@@ -1966,18 +1677,11 @@ export function RealtimeRoom({
       return;
     }
 
-    const fallbackCueResult = buildSupportCueResult(
-      cue,
-      transcriptTurnsRef.current,
-      practiceSessionSelectionRef.current,
-    );
-
     upsertSupportResultTab({
       id: tabId,
       title: supportResultTabTitles[tabType],
       type: tabType,
       status: "loading",
-      payload: fallbackCueResult,
     });
     closeSupportPanelOnNarrowViewport();
     setSystemNotice(supportCueNotices[cue]);
@@ -2022,8 +1726,7 @@ export function RealtimeRoom({
         title: supportResultTabTitles[tabType],
         type: tabType,
         status: "error",
-        errorMessage: "AI 分析暂时不可用，已展示本地兜底建议。",
-        payload: fallbackCueResult,
+        errorMessage: "AI 分析暂时不可用，请稍后重试。",
       });
     }
   }

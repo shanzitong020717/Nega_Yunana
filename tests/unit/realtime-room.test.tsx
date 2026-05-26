@@ -110,6 +110,82 @@ const mockBetterPhrasePayload = {
   },
 };
 
+const mockDiscoveryPayload = {
+  cueResult: {
+    id: "support_discovery_question",
+    title: "探索问题建议",
+    badge: "AI 分析",
+    sections: [
+      {
+        label: "AI 客户上下文",
+        english: "What workflow are you trying to improve?",
+      },
+      {
+        label: "推荐问题",
+        english: "What does a successful pilot look like for your team?",
+        chinese: "对你们团队来说，什么样的试点结果才算成功？",
+      },
+      {
+        label: "建议原因",
+        chinese: "这个问题能把客户需求推进到试点目标和评估标准。",
+      },
+    ],
+    vocabulary: [
+      {
+        term: "successful pilot",
+        phonetic: "/səkˈsesfəl ˈpaɪlət/",
+        chinese: "成功试点",
+        example: "What does a successful pilot look like?",
+      },
+      {
+        term: "evaluation criteria",
+        phonetic: "/ɪˌvæljuˈeɪʃən kraɪˈtɪriə/",
+        chinese: "评估标准",
+        example: "We should align on evaluation criteria.",
+      },
+    ],
+  },
+};
+
+const mockMaterialPointPayload = {
+  cueResult: {
+    id: "support_material_point",
+    title: "材料要点建议",
+    badge: "AI 分析",
+    sections: [
+      {
+        label: "AI 客户上下文",
+        english: "What workflow are you trying to improve?",
+      },
+      {
+        label: "可引用要点",
+        english:
+          "Use verified material points and mark unsupported deployment details as items for IT confirmation.",
+        chinese:
+          "引用已验证材料要点，并把未确认部署细节标记为需要 IT 确认的事项。",
+      },
+      {
+        label: "风险边界",
+        note: "不要补充材料中没有确认的价格、认证或部署承诺。",
+      },
+    ],
+    vocabulary: [
+      {
+        term: "verified material points",
+        phonetic: "/ˈverɪfaɪd məˈtɪriəl pɔɪnts/",
+        chinese: "已验证材料要点",
+        example: "Use verified material points in the answer.",
+      },
+      {
+        term: "IT confirmation",
+        phonetic: "/ˌaɪ ˈtiː ˌkɑːnfərˈmeɪʃən/",
+        chinese: "IT 确认",
+        example: "Frame it as an item for IT confirmation.",
+      },
+    ],
+  },
+};
+
 const completedRecommendation: TodayRecommendation = {
   id: "competitive_differences:procurement_manager:fenrir-excitable:memory_context",
   title: "采购经理 · 竞品差异说明",
@@ -147,7 +223,7 @@ const nextRecommendation: TodayRecommendation = {
 };
 
 function installSupportResultFetchMock() {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
 
     if (url.includes("/suggested-answer")) {
@@ -157,8 +233,17 @@ function installSupportResultFetchMock() {
     }
 
     if (url.includes("/support-cue")) {
+      const body = init?.body ? JSON.parse(String(init.body)) : {};
+      const cue = body.cue as string | undefined;
+      const payload =
+        cue === "Ask a Discovery Question"
+          ? mockDiscoveryPayload
+          : cue === "Use Material Point"
+            ? mockMaterialPointPayload
+            : mockBetterPhrasePayload;
+
       return Promise.resolve(
-        new Response(JSON.stringify(mockBetterPhrasePayload), { status: 201 }),
+        new Response(JSON.stringify(payload), { status: 201 }),
       );
     }
 
@@ -338,15 +423,6 @@ describe("RealtimeRoom mock UI", () => {
     expect(screen.getByText("麦克风已静音")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
-    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
-    expect(screen.getByText("更自然表达分析")).toBeInTheDocument();
-    expect(screen.getByText("你的原句")).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText("高级词汇")).toBeInTheDocument();
     expect(
       screen.queryByText("Live coaching cue: Better Phrase"),
     ).not.toBeInTheDocument();
@@ -363,7 +439,8 @@ describe("RealtimeRoom mock UI", () => {
     });
   });
 
-  it("opens local coaching panels for manual cues without asking the AI customer to continue", () => {
+  it("opens AI coaching panels for manual cues without asking the AI customer to continue", async () => {
+    installSupportResultFetchMock();
     const initialTranscriptTurns: TranscriptTurn[] = [
       {
         id: "turn_ai_need",
@@ -394,7 +471,7 @@ describe("RealtimeRoom mock UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
     fireEvent.click(screen.getByRole("button", { name: "问一个探索问题" }));
 
-    expect(screen.getByText("探索问题建议")).toBeInTheDocument();
+    expect(await screen.findByText("探索问题建议")).toBeInTheDocument();
     expect(screen.getByText("推荐问题")).toBeInTheDocument();
     expect(
       screen.getByText("What does a successful pilot look like for your team?"),
@@ -403,14 +480,114 @@ describe("RealtimeRoom mock UI", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "使用材料要点" }));
 
-    expect(screen.getByText("材料要点建议")).toBeInTheDocument();
+    expect(await screen.findByText("材料要点建议")).toBeInTheDocument();
     expect(screen.getByText("可引用要点")).toBeInTheDocument();
     expect(
       screen.getByText("不要补充材料中没有确认的价格、认证或部署承诺。"),
     ).toBeInTheDocument();
   });
 
-  it("tailors the better phrase analysis to the conversation context and shows vocabulary", () => {
+  it("does not render canned support cue content while waiting for AI analysis", async () => {
+    let resolveSupportCue: (response: Response) => void = () => {};
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes("/support-cue")) {
+        return new Promise<Response>((resolve) => {
+          resolveSupportCue = resolve;
+        });
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_material_waiting",
+        speaker: "ai_customer",
+        text: "Do you have material that supports this deployment claim?",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_material_waiting",
+        speaker: "user",
+        text: "We have some material for customer review.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_support_ai_waiting"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "使用材料要点" }));
+
+    expect(screen.getByText("生成中")).toBeInTheDocument();
+    expect(screen.queryByText("材料要点建议")).not.toBeInTheDocument();
+    expect(screen.queryByText("可引用要点")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Rokid supports real-time translated captions for multilingual conversations.",
+      ),
+    ).not.toBeInTheDocument();
+
+    resolveSupportCue(
+      new Response(
+        JSON.stringify({
+          cueResult: {
+            id: "support_material_ai",
+            title: "材料要点建议",
+            badge: "AI 分析",
+            sections: [
+              {
+                label: "AI 客户上下文",
+                english:
+                  "Do you have material that supports this deployment claim?",
+              },
+              {
+                label: "可引用要点",
+                english:
+                  "Use the verified material point and frame unsupported deployment details as items for IT confirmation.",
+                chinese:
+                  "引用已验证材料要点，并把未确认部署细节表述为需要 IT 确认的事项。",
+              },
+            ],
+            vocabulary: [
+              {
+                term: "verified material point",
+                phonetic: "/ˈverɪfaɪd məˈtɪriəl pɔɪnt/",
+                chinese: "已验证材料要点",
+                example: "Use a verified material point in the answer.",
+              },
+              {
+                term: "IT confirmation",
+                phonetic: "/ˌaɪ ˈtiː ˌkɑːnfərˈmeɪʃən/",
+                chinese: "IT 确认",
+                example: "Frame this as an item for IT confirmation.",
+              },
+            ],
+          },
+        }),
+        { status: 201 },
+      ),
+    );
+
+    expect(await screen.findByText("材料要点建议")).toBeInTheDocument();
+    expect(screen.getByText("verified material point")).toBeInTheDocument();
+  });
+
+  it("tailors the better phrase analysis to the conversation context and shows vocabulary", async () => {
+    installSupportResultFetchMock();
     const initialTranscriptTurns: TranscriptTurn[] = [
       {
         id: "turn_ai_deployment_context",
@@ -452,17 +629,17 @@ describe("RealtimeRoom mock UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
     fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
 
+    expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
     expect(screen.getByText("AI 客户上下文")).toBeInTheDocument();
-    expect(screen.getByText("客户角色")).toBeInTheDocument();
-    expect(screen.getByText("技术负责人")).toBeInTheDocument();
+    expect(screen.getByText("你的原句")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "For a technical review, the main value is not just translation. Rokid helps multilingual teams keep the meeting flow visible and hands-free, while we confirm deployment and security requirements with your IT team.",
+        "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("高级词汇")).toBeInTheDocument();
     expect(screen.getByText("technical review")).toBeInTheDocument();
-    expect(screen.getByText("hands-free")).toBeInTheDocument();
+    expect(screen.getByText("security requirements")).toBeInTheDocument();
   });
 
   it("shows support results in switchable tabs instead of stacking panels", async () => {
@@ -764,7 +941,7 @@ describe("RealtimeRoom mock UI", () => {
           String(call[0]).includes("/api/today-recommendation"),
         )?.[0],
       ),
-    ).toContain(`exclude=${encodeURIComponent(completedRecommendation.id)}`);
+    ).toBe("/api/today-recommendation?refresh=1");
     expect(readTodayRecommendationCache()?.completedRecommendationIds).toContain(
       completedRecommendation.id,
     );

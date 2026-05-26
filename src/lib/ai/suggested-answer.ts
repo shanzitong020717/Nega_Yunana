@@ -38,8 +38,7 @@ function shouldUseMockMode(input: Pick<GenerateSuggestedAnswerInput, "mockMode">
   return (
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
-    process.env.NODE_ENV === "test" ||
-    !hasTextAIApiKey()
+    process.env.NODE_ENV === "test"
   );
 }
 
@@ -790,6 +789,8 @@ function buildSuggestedAnswerPrompt(input: GenerateSuggestedAnswerInput) {
     "The learner clicked Suggested Answer because they do not know how to answer the AI customer's latest question.",
     "Analyze the latest AI question and recommend how the learner should respond.",
     "Consider the selected scenario, practice goal, customer persona, communication style, training focus, material brief, prep card, and recent transcript.",
+    "Use the same reasoning process as other live support panels: recent context -> customer intent -> learner need -> recommended action -> safe boundary. The answer must be consistent with the same conversation state.",
+    "Ground the analysis in the latest transcript. Do not return canned security, deployment, ROI, or pilot language unless the current conversation actually supports it.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, encryption guarantees, or contract terms not provided in the material. If details are unknown, suggest a safe answer that proposes confirmation or technical review.",
     "JSON shape: aiQuestion { english, translationZh }, analysis, responseStrategy { english, chinese }, contextBreakdown { conversationStateZh, customerQuestionReasonZh, priorUserAnswerZh, missingInformationZh, responseBoundaryZh }, logicBreakdown { surfaceMeaningZh, customerIntentZh, informationNeededZh, responseFocusZh }, suggestedReplies array of 1-3 items { english, chinese, reason }, vocabulary array of at least 2 items with no upper limit { term, phonetic, chinese, example }, phrasebookEntry.",
     "Strict language separation: responseStrategy.english and suggestedReplies[].reason must be English only. responseStrategy.chinese, aiQuestion.translationZh, every contextBreakdown field, and every logicBreakdown field must be Chinese only.",
@@ -816,6 +817,10 @@ export async function generateSuggestedAnswer(
   if (shouldUseMockMode(input)) {
     core = generateMockSuggestedAnswer(input);
   } else {
+    if (!hasTextAIApiKey()) {
+      throw new Error("建议回答 AI 生成失败：缺少文本模型 API Key。");
+    }
+
     try {
       core = normalizeSuggestedAnswerCore(
         suggestedAnswerCoreSchema.parse(
@@ -829,11 +834,8 @@ export async function generateSuggestedAnswer(
         input,
       );
     } catch (error) {
-      console.warn(
-        "Suggested answer text model failed; using safe local fallback.",
-        error,
-      );
-      core = generateMockSuggestedAnswer(input);
+      console.warn("Suggested answer text model failed.", error);
+      throw new Error("建议回答 AI 生成失败，请稍后重试。");
     }
   }
 

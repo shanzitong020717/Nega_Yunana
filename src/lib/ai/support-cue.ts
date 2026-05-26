@@ -39,8 +39,7 @@ function shouldUseMockMode(input: { mockMode?: boolean }) {
   return (
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
-    process.env.NODE_ENV === "test" ||
-    !hasTextAIApiKey()
+    process.env.NODE_ENV === "test"
   );
 }
 
@@ -363,6 +362,8 @@ function buildSupportCuePrompt(input: GenerateSupportCueInput) {
     "Return strict JSON only. Do not include Markdown.",
     "The learner clicked a support cue. Generate a coaching and analysis panel, not a customer reply. Do not instruct the AI customer to speak.",
     "Every result must consider recent transcript context, customer persona, practice goal, selected training focus, business English norms, available material brief, and prep card.",
+    "Use the same analysis process for every cue: recent context -> customer intent -> learner need -> recommended action -> safe boundary. The wording can vary, but the reasoning must stay consistent with the real conversation.",
+    "Ground every section in the latest transcript. Do not return canned examples or generic Rokid talking points unless the current conversation and material context support them.",
     "Do not invent product claims, prices, certifications, accuracy numbers, deployment guarantees, or unsupported security details.",
     "JSON shape: { id, title, badge, sections, vocabulary }. sections is an array of { label, english, chinese, note }. vocabulary is an array of at least 2 advanced terms when possible, each { term, phonetic, chinese, example }.",
     "For Better Phrase: analyze the learner's latest English sentence, explain strengths/weaknesses, then provide a more natural and more context-appropriate business English version. The improved sentence must be detailed enough to be useful, not a generic slogan.",
@@ -406,6 +407,10 @@ export async function generateSupportCue(
     return fallbackSupportCue(input);
   }
 
+  if (!hasTextAIApiKey()) {
+    throw new Error("提示分析 AI 生成失败：缺少文本模型 API Key。");
+  }
+
   try {
     return supportCueResultSchema.parse(
       await generateTextJSON({
@@ -416,8 +421,8 @@ export async function generateSupportCue(
       }),
     );
   } catch (error) {
-    console.warn("Support cue text model failed; using safe local fallback.", error);
-    return fallbackSupportCue(input);
+    console.warn("Support cue text model failed.", error);
+    throw new Error("提示分析 AI 生成失败，请稍后重试。");
   }
 }
 

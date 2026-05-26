@@ -120,11 +120,11 @@ describe("generateSuggestedAnswer", () => {
     );
   });
 
-  it("falls back to a safe local suggestion when the text model fails", async () => {
+  it("does not silently return canned suggested answers when the production model fails", async () => {
     generateTextJSONMock.mockRejectedValueOnce(new Error("model unavailable"));
     vi.stubEnv("NODE_ENV", "production");
 
-    const suggestion = await generateSuggestedAnswer({
+    await expect(generateSuggestedAnswer({
       practiceSession: {
         id: "session_suggested_fallback",
         scenarioPackId: "rokid-overseas-sales",
@@ -152,43 +152,9 @@ describe("generateSuggestedAnswer", () => {
         metadata: {},
       },
       transcriptTurns: [],
-    });
+    })).rejects.toThrow("建议回答 AI 生成失败");
     vi.unstubAllEnvs();
 
-    expect(suggestion).toMatchObject({
-      id: expect.stringMatching(/^suggestion_/),
-      aiQuestion: {
-        english: expect.stringContaining("encrypted"),
-      },
-      responseStrategy: {
-        english: expect.stringContaining("technical buyer"),
-        chinese: expect.stringContaining("客户"),
-      },
-      logicBreakdown: {
-        surfaceMeaningZh: expect.stringContaining("加密"),
-        customerIntentZh: expect.stringContaining("确认"),
-        informationNeededZh: expect.stringContaining("数据"),
-        responseFocusZh: expect.stringContaining("安全"),
-      },
-      contextBreakdown: {
-        conversationStateZh: expect.stringContaining("安全"),
-        customerQuestionReasonZh: expect.stringContaining("客户"),
-        priorUserAnswerZh: expect.any(String),
-        missingInformationZh: expect.stringContaining("数据"),
-        responseBoundaryZh: expect.stringContaining("承诺"),
-      },
-      suggestedReplies: expect.arrayContaining([
-        expect.objectContaining({
-          english: expect.stringContaining("security question"),
-        }),
-      ]),
-      phrasebookEntry: {
-        tags: expect.arrayContaining(["suggested-answer", "live-coaching"]),
-      },
-    });
-    expect(suggestion.suggestedReplies[0]?.reason).not.toMatch(
-      /[\u4e00-\u9fff]/,
-    );
     expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaName: "suggested answer",
@@ -198,9 +164,6 @@ describe("generateSuggestedAnswer", () => {
   });
 
   it("derives fallback vocabulary from the current question instead of fixed defaults", async () => {
-    generateTextJSONMock.mockRejectedValueOnce(new Error("model unavailable"));
-    vi.stubEnv("NODE_ENV", "production");
-
     const suggestion = await generateSuggestedAnswer({
       practiceSession: {
         id: "session_dynamic_fallback_vocabulary",
@@ -221,6 +184,7 @@ describe("generateSuggestedAnswer", () => {
       persona: defaultScenarioPack.personas.find(
         (persona) => persona.id === "enterprise_buyer",
       )!,
+      mockMode: true,
       latestAiTurn: {
         speaker: "ai_customer",
         text: "How would a remote support team use Rokid glasses during equipment maintenance?",
@@ -230,7 +194,6 @@ describe("generateSuggestedAnswer", () => {
       },
       transcriptTurns: [],
     });
-    vi.unstubAllEnvs();
 
     expect(suggestion.vocabulary.length).toBeGreaterThanOrEqual(2);
     expect(suggestion.vocabulary.map((item) => item.term)).toEqual(
@@ -242,9 +205,6 @@ describe("generateSuggestedAnswer", () => {
   });
 
   it("does not turn conversational filler chunks into fallback vocabulary", async () => {
-    generateTextJSONMock.mockRejectedValueOnce(new Error("model unavailable"));
-    vi.stubEnv("NODE_ENV", "production");
-
     const suggestion = await generateSuggestedAnswer({
       practiceSession: {
         id: "session_no_filler_vocabulary",
@@ -265,6 +225,7 @@ describe("generateSuggestedAnswer", () => {
       persona: defaultScenarioPack.personas.find(
         (persona) => persona.id === "enterprise_buyer",
       )!,
+      mockMode: true,
       latestAiTurn: {
         speaker: "ai_customer",
         text: "Certainly, I was asking which customer segment you are targeting first.",
@@ -274,7 +235,6 @@ describe("generateSuggestedAnswer", () => {
       },
       transcriptTurns: [],
     });
-    vi.unstubAllEnvs();
 
     const terms = suggestion.vocabulary.map((item) => item.term);
 
