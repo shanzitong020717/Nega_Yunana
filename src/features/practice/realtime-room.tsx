@@ -153,7 +153,7 @@ function supportResultTabId(type: SupportResultTabType) {
   return `support-result-${type}`;
 }
 
-const recommendedPhraseSectionLabels = new Set([
+const recommendedPhraseSectionLabelKeys = new Set([
   "推荐说法",
   "更自然表达",
   "改进后句子",
@@ -163,12 +163,46 @@ const recommendedPhraseSectionLabels = new Set([
   "Recommended improved sentence",
   "Improved sentence",
   "Recommendation",
-]);
+].map(normalizeSupportCueLabelKey));
+
+const analysisSectionLabelKeys = new Set([
+  "analysis",
+  "原文分析",
+  "原句分析",
+  "你的原句",
+  "当前句子分析",
+  "current sentence analysis",
+].map(normalizeSupportCueLabelKey));
+
+function normalizeSupportCueLabelKey(label: string) {
+  return label.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isBetterPhraseResult(result: SupportCueResult) {
+  const titleAndBadge = normalizeSupportCueLabelKey(
+    `${result.title} ${result.badge}`,
+  );
+
+  return (
+    titleAndBadge.includes("better phrase") ||
+    titleAndBadge.includes("更自然") ||
+    titleAndBadge.includes("表达优化") ||
+    titleAndBadge.includes("句子优化")
+  );
+}
 
 function supportCueSectionDisplayLabel(section: SupportCueResultSection) {
-  return recommendedPhraseSectionLabels.has(section.label)
-    ? "改进后句子"
-    : section.label;
+  const labelKey = normalizeSupportCueLabelKey(section.label);
+
+  if (recommendedPhraseSectionLabelKeys.has(labelKey)) {
+    return "改进后句子";
+  }
+
+  if (analysisSectionLabelKeys.has(labelKey)) {
+    return "原句分析";
+  }
+
+  return section.label;
 }
 
 function isRecommendedPhraseSection(section: SupportCueResultSection) {
@@ -586,6 +620,137 @@ function SuggestedAnswerPanel({
   );
 }
 
+function SupportCueVocabularyBlock({
+  result,
+}: {
+  result: Pick<SupportCueResult, "id" | "vocabulary">;
+}) {
+  if (!result.vocabulary || result.vocabulary.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-[var(--border)] p-3">
+      <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+        高级词汇
+      </p>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {result.vocabulary.map((item) => (
+          <div
+            key={`${result.id}-${item.term}`}
+            className="rounded-md bg-[var(--surface-subtle)] p-3"
+          >
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {item.term}
+            </p>
+            <p className="mt-1 text-sm text-[var(--primary-strong)]">
+              {item.phonetic}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+              {item.chinese}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+              {item.example}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BetterPhraseResultPanel({
+  errorMessage,
+  isLoading,
+  result,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  result: SupportCueResult;
+}) {
+  const orderedSections = [...result.sections].sort((left, right) => {
+    const leftLabel = supportCueSectionDisplayLabel(left);
+    const rightLabel = supportCueSectionDisplayLabel(right);
+    const rank = (label: string) =>
+      label === "原句分析" ? 0 : label === "改进后句子" ? 1 : 2;
+
+    return rank(leftLabel) - rank(rightLabel);
+  });
+
+  return (
+    <section
+      aria-live="polite"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <BookOpenCheck
+            className="h-5 w-5 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            更自然表达分析
+          </h2>
+        </div>
+        <span className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]">
+          {isLoading ? "AI 生成中" : "表达优化"}
+        </span>
+      </div>
+
+      {errorMessage ? (
+        <p className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-3">
+        {orderedSections.map((section) => {
+          const displayLabel = supportCueSectionDisplayLabel(section);
+          const isImproved = displayLabel === "改进后句子";
+
+          return (
+            <article
+              key={`${result.id}-${section.label}`}
+              className={[
+                "rounded-md border p-3 md:col-span-2",
+                isImproved
+                  ? "border-[#b7d8d6] bg-[#f6fbfa]"
+                  : "border-[var(--border)] bg-[var(--surface-subtle)]",
+              ].join(" ")}
+            >
+              <p className="text-xs font-semibold text-[var(--muted)]">
+                {displayLabel}
+              </p>
+              {section.english ? (
+                <p
+                  className={[
+                    "mt-2 text-sm leading-6 text-[var(--foreground)]",
+                    isImproved ? "font-semibold" : "font-medium",
+                  ].join(" ")}
+                >
+                  {section.english}
+                </p>
+              ) : null}
+              {section.chinese ? (
+                <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+                  {section.chinese}
+                </p>
+              ) : null}
+              {section.note ? (
+                <p className="mt-2 rounded-md bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+                  {section.note}
+                </p>
+              ) : null}
+            </article>
+          );
+        })}
+      </div>
+
+      <SupportCueVocabularyBlock result={result} />
+    </section>
+  );
+}
+
 function SupportCueResultPanel({
   errorMessage,
   isLoading,
@@ -615,6 +780,16 @@ function SupportCueResultPanel({
         </p>
       </section>
     ) : null;
+  }
+
+  if (isBetterPhraseResult(result)) {
+    return (
+      <BetterPhraseResultPanel
+        errorMessage={errorMessage}
+        isLoading={isLoading}
+        result={result}
+      />
+    );
   }
 
   return (
@@ -674,34 +849,7 @@ function SupportCueResultPanel({
         ))}
       </div>
 
-      {result.vocabulary && result.vocabulary.length > 0 ? (
-        <div className="mt-3 rounded-md border border-[var(--border)] p-3">
-          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-            高级词汇
-          </p>
-          <div className="mt-3 grid gap-2 md:grid-cols-2">
-            {result.vocabulary.map((item) => (
-              <div
-                key={`${result.id}-${item.term}`}
-                className="rounded-md bg-[var(--surface-subtle)] p-3"
-              >
-                <p className="text-sm font-semibold text-[var(--foreground)]">
-                  {item.term}
-                </p>
-                <p className="mt-1 text-sm text-[var(--primary-strong)]">
-                  {item.phonetic}
-                </p>
-                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                  {item.chinese}
-                </p>
-                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                  {item.example}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
+      <SupportCueVocabularyBlock result={result} />
     </section>
   );
 }

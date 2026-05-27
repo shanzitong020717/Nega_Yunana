@@ -74,23 +74,25 @@ const mockSuggestedAnswerPayload = {
 const mockBetterPhrasePayload = {
   cueResult: {
     id: "support_better_phrase",
-    title: "更自然表达分析",
-    badge: "AI 分析",
+    title: "Better Phrase Coaching",
+    badge: "Better Phrase",
     sections: [
       {
-        label: "AI 客户上下文",
-        english: "Can you detail how data is encrypted both at rest and in transit?",
+        label: "ANALYSIS",
+        english:
+          "Your current sentence has good content, but it needs clearer business wording.",
+        chinese:
+          "你当前的句子内容方向是对的，但商务表达还可以更清晰。",
+        note: "Focus on clarity and correctness in business presentations.",
       },
       {
-        label: "你的原句",
-        english: "We can help translate meetings and make communication better.",
-      },
-      {
-        label: "优化建议",
+        label: "IMPROVED SENTENCE",
         english:
           "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
         chinese:
           "在技术评审中，我们可以先梳理数据流，并和你们 IT 团队确认安全要求。",
+        note:
+          "This version sounds more specific and professional for a business meeting.",
       },
     ],
     vocabulary: [
@@ -630,15 +632,17 @@ describe("RealtimeRoom mock UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
 
     expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
-    expect(screen.getByText("AI 客户上下文")).toBeInTheDocument();
-    expect(screen.getByText("你的原句")).toBeInTheDocument();
+    expect(screen.queryByText("Better Phrase Coaching")).not.toBeInTheDocument();
+    expect(screen.queryByText("Better Phrase")).not.toBeInTheDocument();
+    expect(screen.queryByText("ANALYSIS")).not.toBeInTheDocument();
+    expect(screen.queryByText("IMPROVED SENTENCE")).not.toBeInTheDocument();
+    expect(screen.getByText("原句分析")).toBeInTheDocument();
+    expect(screen.getByText("改进后句子")).toBeInTheDocument();
     expect(
       screen.getByText(
         "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
       ),
     ).toBeInTheDocument();
-    expect(screen.queryByText("优化建议")).not.toBeInTheDocument();
-    expect(screen.getByText("改进后句子")).toBeInTheDocument();
     expect(screen.getByText("高级词汇")).toBeInTheDocument();
     expect(screen.getByText("technical review")).toBeInTheDocument();
     expect(screen.getByText("security requirements")).toBeInTheDocument();
@@ -679,10 +683,10 @@ describe("RealtimeRoom mock UI", () => {
     const recommendedSection = (await screen.findByText("改进后句子")).closest(
       "article",
     );
-    const contextSection = screen.getByText("AI 客户上下文").closest("article");
+    const analysisSection = screen.getByText("原句分析").closest("article");
 
     expect(recommendedSection).toHaveClass("md:col-span-2");
-    expect(contextSection).not.toHaveClass("md:col-span-2");
+    expect(analysisSection).toHaveClass("md:col-span-2");
   });
 
   it("shows support results in switchable tabs instead of stacking panels", async () => {
