@@ -72,7 +72,7 @@ describe("generateSmartGuidance", () => {
       expect.objectContaining({
         model: "deepseek-v4-flash",
         schemaName: "smart guidance",
-        timeoutMs: 8000,
+        timeoutMs: 15_000,
       }),
     );
     const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;

@@ -79,6 +79,7 @@ describe("generateSuggestedAnswer", () => {
       },
     });
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SUBTITLE_DEEPSEEK_MODEL", "deepseek-v4-flash");
 
     const suggestion = await generateSuggestedAnswer({
       practiceSession: {
@@ -117,6 +118,13 @@ describe("generateSuggestedAnswer", () => {
     ]);
     expect(suggestion.vocabulary.map((item) => item.term)).not.toEqual(
       expect.arrayContaining(["workflow fit", "pilot scope"]),
+    );
+    expect(generateTextJSONMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        model: "deepseek-v4-flash",
+        schemaName: "suggested answer",
+        timeoutMs: 20_000,
+      }),
     );
   });
 
@@ -158,7 +166,7 @@ describe("generateSuggestedAnswer", () => {
     expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaName: "suggested answer",
-        timeoutMs: 6000,
+        timeoutMs: 20_000,
       }),
     );
   });

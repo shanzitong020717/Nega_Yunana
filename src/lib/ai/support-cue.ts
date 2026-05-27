@@ -35,6 +35,9 @@ type GenerateSupportCueInput = {
 
 type GenerateSmartGuidanceInput = Omit<GenerateSupportCueInput, "cue">;
 
+const SUPPORT_CUE_TIMEOUT_MS = 20_000;
+const SMART_GUIDANCE_TIMEOUT_MS = 15_000;
+
 function shouldUseMockMode(input: { mockMode?: boolean }) {
   return (
     input.mockMode === true ||
@@ -77,6 +80,15 @@ function practiceFocus(input: GenerateSupportCueInput | GenerateSmartGuidanceInp
 function smartGuidanceTextModel() {
   return (
     process.env.SMART_GUIDANCE_TEXT_MODEL?.trim() ||
+    process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
+    process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
+    undefined
+  );
+}
+
+function supportCueTextModel() {
+  return (
+    process.env.SUPPORT_CUE_TEXT_MODEL?.trim() ||
     process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
     process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
     undefined
@@ -416,8 +428,9 @@ export async function generateSupportCue(
       await generateTextJSON({
         prompt: buildSupportCuePrompt(input),
         schemaName: "support cue",
+        model: supportCueTextModel(),
         maxTokens: 2200,
-        timeoutMs: 6000,
+        timeoutMs: SUPPORT_CUE_TIMEOUT_MS,
       }),
     );
   } catch (error) {
@@ -445,7 +458,7 @@ export async function generateSmartGuidance(
           schemaName: "smart guidance",
           model: smartGuidanceTextModel(),
           maxTokens: 1100,
-          timeoutMs: 8000,
+          timeoutMs: SMART_GUIDANCE_TIMEOUT_MS,
         }),
       ),
     );

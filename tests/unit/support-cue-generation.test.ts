@@ -72,6 +72,7 @@ describe("generateSupportCue", () => {
       ],
     });
     vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("SUBTITLE_DEEPSEEK_MODEL", "deepseek-v4-flash");
 
     const result = await generateSupportCue({
       cue: "Ask a Discovery Question",
@@ -98,8 +99,9 @@ describe("generateSupportCue", () => {
     expect(result.sections[1]?.english).toContain("deployment constraints");
     expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        model: "deepseek-v4-flash",
         schemaName: "support cue",
-        timeoutMs: 6000,
+        timeoutMs: 20_000,
       }),
     );
     const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;

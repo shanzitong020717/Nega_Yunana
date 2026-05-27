@@ -34,11 +34,22 @@ export type GenerateSuggestedAnswerInput = {
   transcriptTurns: TranscriptTurnInput[];
 };
 
+const SUGGESTED_ANSWER_TIMEOUT_MS = 20_000;
+
 function shouldUseMockMode(input: Pick<GenerateSuggestedAnswerInput, "mockMode">) {
   return (
     input.mockMode === true ||
     process.env.AI_MOCK_MODE === "true" ||
     process.env.NODE_ENV === "test"
+  );
+}
+
+function suggestedAnswerTextModel() {
+  return (
+    process.env.SUGGESTED_ANSWER_TEXT_MODEL?.trim() ||
+    process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
+    process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
+    undefined
   );
 }
 
@@ -827,8 +838,9 @@ export async function generateSuggestedAnswer(
           await generateTextJSON({
             prompt: buildSuggestedAnswerPrompt(input),
             schemaName: "suggested answer",
+            model: suggestedAnswerTextModel(),
             maxTokens: 2400,
-            timeoutMs: 6000,
+            timeoutMs: SUGGESTED_ANSWER_TIMEOUT_MS,
           }),
         ),
         input,
