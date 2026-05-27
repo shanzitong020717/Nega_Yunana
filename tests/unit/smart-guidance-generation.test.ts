@@ -83,25 +83,27 @@ describe("generateSmartGuidance", () => {
     expect(prompt).toContain("Recent transcript");
   });
 
-  it("does not silently return canned guidance when the production text model fails", async () => {
+  it("returns context-derived guidance when the production text model fails", async () => {
     generateTextJSONMock.mockRejectedValueOnce(new Error("model timeout"));
     vi.stubEnv("NODE_ENV", "production");
 
-    await expect(
-      generateSmartGuidance({
-        persona,
-        practiceSession,
-        transcriptTurns: [
-          {
-            speaker: "ai_customer",
-            text: "Which use cases are most successful for field service?",
-            timestamp: 0,
-            metadata: {},
-          },
-        ],
-      }),
-    ).rejects.toThrow("智能建议 AI 分析失败");
+    const guidance = await generateSmartGuidance({
+      persona,
+      practiceSession,
+      transcriptTurns: [
+        {
+          speaker: "ai_customer",
+          text: "Which use cases are most successful for field service?",
+          timestamp: 0,
+          metadata: {},
+        },
+      ],
+    });
     vi.unstubAllEnvs();
+
+    expect(guidance.currentJudgment).toContain("客户刚提出新问题");
+    expect(guidance.nextStep).toContain("确认问题");
+    expect(guidance.sayThis).toContain("priority");
   });
 
   it("removes garbled speech-recognition snippets from Chinese guidance fields", async () => {

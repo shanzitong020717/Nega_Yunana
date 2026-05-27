@@ -7,6 +7,7 @@ import {
 } from "@/lib/ai/text-client";
 import type { PracticeSessionRecord } from "@/lib/practice/practice-session-store";
 import type { TranscriptTurnInput } from "@/lib/validation/practice";
+import { phraseCategories, type PhraseCategory } from "@/data/seed-phrases";
 import {
   suggestedAnswerCoreSchema,
   suggestedAnswerRecordSchema,
@@ -66,6 +67,41 @@ function personaEnglishDescriptor(personaId: string) {
 }
 
 type SuggestedVocabularyItem = SuggestedAnswerCore["vocabulary"][number];
+type SuggestedReplyItem = SuggestedAnswerCore["suggestedReplies"][number];
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function stringFrom(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function stringArrayFrom(value: unknown, fallback: string[]) {
+  if (!Array.isArray(value)) {
+    return fallback;
+  }
+
+  const strings = value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return strings.length > 0 ? strings : fallback;
+}
+
+function isValidPhraseCategory(value: unknown): value is PhraseCategory {
+  return (
+    typeof value === "string" &&
+    phraseCategories.includes(value as PhraseCategory)
+  );
+}
+
+function textIncludesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+}
 
 const vocabularyPatterns: SuggestedVocabularyItem[] = [
   {
@@ -723,6 +759,326 @@ function buildFallbackContextBreakdown(
   };
 }
 
+function validPhraseCategoryForContext(
+  input: GenerateSuggestedAnswerInput,
+  rawCategory: unknown,
+): PhraseCategory {
+  if (isValidPhraseCategory(rawCategory)) {
+    return rawCategory;
+  }
+
+  const context = [
+    input.latestAiTurn.text,
+    ...input.practiceSession.trainingFocus,
+    ...input.practiceSession.focusTags,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  if (
+    textIncludesAny(context, [
+      "application",
+      "scenario",
+      "use case",
+      "应用",
+      "场景",
+    ])
+  ) {
+    return "产品应用场景";
+  }
+
+  if (
+    textIncludesAny(context, [
+      "advantage",
+      "disadvantage",
+      "pros",
+      "cons",
+      "优点",
+      "缺点",
+    ])
+  ) {
+    return "产品优点与缺点";
+  }
+
+  if (
+    textIncludesAny(context, [
+      "competitor",
+      "compared",
+      "comparison",
+      "alternative",
+      "phone",
+      "difference",
+      "竞品",
+      "差异",
+      "替代",
+    ])
+  ) {
+    return "竞品差异与替代方案对比";
+  }
+
+  if (
+    textIncludesAny(context, [
+      "parameter",
+      "spec",
+      "specification",
+      "model",
+      "参数",
+      "规格",
+    ])
+  ) {
+    return "产品详细参数";
+  }
+
+  if (
+    textIncludesAny(context, [
+      "price",
+      "pricing",
+      "cost",
+      "budget",
+      "pilot",
+      "roi",
+      "成本",
+      "价格",
+      "试点",
+    ])
+  ) {
+    return "Pricing & Pilot";
+  }
+
+  if (
+    textIncludesAny(context, [
+      "deployment",
+      "cloud",
+      "on-premise",
+      "on premise",
+      "security",
+      "privacy",
+      "encrypt",
+      "integration",
+      "部署",
+      "安全",
+      "隐私",
+      "集成",
+    ])
+  ) {
+    return "Objection Handling";
+  }
+
+  return "Business Value";
+}
+
+function coerceSuggestedReplies(
+  rawReplies: unknown,
+  fallback: SuggestedAnswerCore,
+) {
+  if (!Array.isArray(rawReplies)) {
+    return fallback.suggestedReplies;
+  }
+
+  const fallbackReply = fallback.suggestedReplies[0];
+  const replies = rawReplies
+    .map((item): SuggestedReplyItem | null => {
+      const record = asRecord(item);
+      const english = stringFrom(record.english, fallbackReply.english);
+      const chinese = stringFrom(record.chinese, fallbackReply.chinese);
+      const reason = stringFrom(record.reason, fallbackReply.reason);
+
+      if (!english || !chinese) {
+        return null;
+      }
+
+      return { english, chinese, reason };
+    })
+    .filter((item): item is SuggestedReplyItem => Boolean(item))
+    .slice(0, 3);
+
+  return replies.length > 0 ? replies : fallback.suggestedReplies;
+}
+
+function coerceVocabularyItems(rawVocabulary: unknown) {
+  if (!Array.isArray(rawVocabulary)) {
+    return [];
+  }
+
+  return rawVocabulary
+    .map((item): SuggestedVocabularyItem | null => {
+      const record = asRecord(item);
+      const term = stringFrom(record.term, "");
+
+      if (!term) {
+        return null;
+      }
+
+      return {
+        term,
+        phonetic: stringFrom(record.phonetic, phraseToFallbackPhonetic(term)),
+        chinese: stringFrom(record.chinese, phraseToFallbackChinese(term)),
+        example: stringFrom(record.example, term),
+      };
+    })
+    .filter((item): item is SuggestedVocabularyItem => Boolean(item));
+}
+
+function sourceFrom(value: unknown) {
+  return value === "built_in" ||
+    value === "material" ||
+    value === "review" ||
+    value === "user_added"
+    ? value
+    : "review";
+}
+
+function masteryStatusFrom(value: unknown) {
+  return value === "new" ||
+    value === "needs_practice" ||
+    value === "reviewing" ||
+    value === "mastered"
+    ? value
+    : "needs_practice";
+}
+
+function optionalStringFrom(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function uniqueStrings(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function repairSuggestedAnswerCore(
+  rawValue: unknown,
+  input: GenerateSuggestedAnswerInput,
+): SuggestedAnswerCore {
+  const parsed = suggestedAnswerCoreSchema.safeParse(rawValue);
+
+  if (parsed.success) {
+    return normalizeSuggestedAnswerCore(parsed.data, input);
+  }
+
+  const raw = asRecord(rawValue);
+  const fallback = generateMockSuggestedAnswer(input);
+  const rawAiQuestion = asRecord(raw.aiQuestion);
+  const rawResponseStrategy = asRecord(raw.responseStrategy);
+  const rawContextBreakdown = asRecord(raw.contextBreakdown);
+  const rawLogicBreakdown = asRecord(raw.logicBreakdown);
+  const rawPhrasebookEntry = asRecord(raw.phrasebookEntry);
+  const suggestedReplies = coerceSuggestedReplies(
+    raw.suggestedReplies,
+    fallback,
+  );
+  const vocabulary = coerceVocabularyItems(raw.vocabulary);
+  const firstReply = suggestedReplies[0] ?? fallback.suggestedReplies[0];
+  const personaDescriptor = personaEnglishDescriptor(
+    input.practiceSession.personaId,
+  );
+  const productPoint =
+    input.materialBrief?.productPoints[0] ?? "Rokid smart glasses";
+
+  return normalizeSuggestedAnswerCore(
+    suggestedAnswerCoreSchema.parse({
+      aiQuestion: {
+        english: stringFrom(rawAiQuestion.english, input.latestAiTurn.text),
+        translationZh: stringFrom(
+          rawAiQuestion.translationZh,
+          input.latestAiTurn.translationZh ??
+            fallback.aiQuestion.translationZh,
+        ),
+      },
+      analysis: stringFrom(raw.analysis, fallback.analysis),
+      responseStrategy: {
+        english: stringFrom(
+          rawResponseStrategy.english,
+          fallback.responseStrategy.english,
+        ),
+        chinese: stringFrom(
+          rawResponseStrategy.chinese,
+          fallback.responseStrategy.chinese,
+        ),
+      },
+      contextBreakdown: {
+        conversationStateZh: stringFrom(
+          rawContextBreakdown.conversationStateZh,
+          fallback.contextBreakdown.conversationStateZh,
+        ),
+        customerQuestionReasonZh: stringFrom(
+          rawContextBreakdown.customerQuestionReasonZh,
+          fallback.contextBreakdown.customerQuestionReasonZh,
+        ),
+        priorUserAnswerZh: stringFrom(
+          rawContextBreakdown.priorUserAnswerZh,
+          fallback.contextBreakdown.priorUserAnswerZh,
+        ),
+        missingInformationZh: stringFrom(
+          rawContextBreakdown.missingInformationZh,
+          fallback.contextBreakdown.missingInformationZh,
+        ),
+        responseBoundaryZh: stringFrom(
+          rawContextBreakdown.responseBoundaryZh,
+          fallback.contextBreakdown.responseBoundaryZh,
+        ),
+      },
+      logicBreakdown: {
+        surfaceMeaningZh: stringFrom(
+          rawLogicBreakdown.surfaceMeaningZh,
+          fallback.logicBreakdown.surfaceMeaningZh,
+        ),
+        customerIntentZh: stringFrom(
+          rawLogicBreakdown.customerIntentZh,
+          fallback.logicBreakdown.customerIntentZh,
+        ),
+        informationNeededZh: stringFrom(
+          rawLogicBreakdown.informationNeededZh,
+          fallback.logicBreakdown.informationNeededZh,
+        ),
+        responseFocusZh: stringFrom(
+          rawLogicBreakdown.responseFocusZh,
+          fallback.logicBreakdown.responseFocusZh,
+        ),
+      },
+      suggestedReplies,
+      vocabulary:
+        vocabulary.length >= 2
+          ? vocabulary
+          : normalizeVocabularyItems(vocabulary, input, suggestedReplies),
+      phrasebookEntry: {
+        category: validPhraseCategoryForContext(
+          input,
+          rawPhrasebookEntry.category,
+        ),
+        english: normalizeEnglishText(
+          stringFrom(rawPhrasebookEntry.english, firstReply.english),
+          input,
+          firstReply.english,
+        ),
+        chinese: stringFrom(rawPhrasebookEntry.chinese, firstReply.chinese),
+        useCase: stringFrom(
+          rawPhrasebookEntry.useCase,
+          `Suggested answer for a ${personaDescriptor} during live Rokid practice.`,
+        ),
+        simpleVersion: optionalStringFrom(rawPhrasebookEntry.simpleVersion),
+        professionalVersion: optionalStringFrom(
+          rawPhrasebookEntry.professionalVersion,
+        ) ?? firstReply.english,
+        relatedProductPoint:
+          optionalStringFrom(rawPhrasebookEntry.relatedProductPoint) ??
+          productPoint,
+        relatedObjection:
+          optionalStringFrom(rawPhrasebookEntry.relatedObjection) ??
+          input.latestAiTurn.text,
+        tags: uniqueStrings([
+          ...stringArrayFrom(rawPhrasebookEntry.tags, []),
+          "suggested-answer",
+          "live-coaching",
+          input.practiceSession.personaId,
+        ]),
+        source: sourceFrom(rawPhrasebookEntry.source),
+        masteryStatus: masteryStatusFrom(rawPhrasebookEntry.masteryStatus),
+      },
+    }),
+    input,
+  );
+}
+
 function generateMockSuggestedAnswer(
   input: GenerateSuggestedAnswerInput,
 ): SuggestedAnswerCore {
@@ -833,21 +1189,19 @@ export async function generateSuggestedAnswer(
     }
 
     try {
-      core = normalizeSuggestedAnswerCore(
-        suggestedAnswerCoreSchema.parse(
-          await generateTextJSON({
-            prompt: buildSuggestedAnswerPrompt(input),
-            schemaName: "suggested answer",
-            model: suggestedAnswerTextModel(),
-            maxTokens: 2400,
-            timeoutMs: SUGGESTED_ANSWER_TIMEOUT_MS,
-          }),
-        ),
+      core = repairSuggestedAnswerCore(
+        await generateTextJSON({
+          prompt: buildSuggestedAnswerPrompt(input),
+          schemaName: "suggested answer",
+          model: suggestedAnswerTextModel(),
+          maxTokens: 2400,
+          timeoutMs: SUGGESTED_ANSWER_TIMEOUT_MS,
+        }),
         input,
       );
     } catch (error) {
       console.warn("Suggested answer text model failed.", error);
-      throw new Error("建议回答 AI 生成失败，请稍后重试。");
+      core = generateMockSuggestedAnswer(input);
     }
   }
 

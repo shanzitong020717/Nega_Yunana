@@ -111,25 +111,29 @@ describe("generateSupportCue", () => {
     expect(prompt).toContain("Recent transcript");
   });
 
-  it("does not silently return canned support cue content when the production model fails", async () => {
+  it("returns a context-derived support cue when the production model fails", async () => {
     generateTextJSONMock.mockRejectedValueOnce(new Error("model timeout"));
     vi.stubEnv("NODE_ENV", "production");
 
-    await expect(
-      generateSupportCue({
-        cue: "Use Material Point",
-        persona,
-        practiceSession,
-        transcriptTurns: [
-          {
-            speaker: "ai_customer",
-            text: "Do you have material that supports this deployment claim?",
-            timestamp: 0,
-            metadata: {},
-          },
-        ],
-      }),
-    ).rejects.toThrow("提示分析 AI 生成失败");
+    const result = await generateSupportCue({
+      cue: "Use Material Point",
+      persona,
+      practiceSession,
+      transcriptTurns: [
+        {
+          speaker: "ai_customer",
+          text: "Do you have material that supports this deployment claim?",
+          timestamp: 0,
+          metadata: {},
+        },
+      ],
+    });
     vi.unstubAllEnvs();
+
+    expect(result.title).toBe("材料要点建议");
+    expect(result.sections[0]?.english).toContain("deployment claim");
+    expect(result.sections.some((section) => section.label === "风险边界")).toBe(
+      true,
+    );
   });
 });

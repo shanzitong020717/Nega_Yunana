@@ -435,7 +435,7 @@ export async function generateSupportCue(
     );
   } catch (error) {
     console.warn("Support cue text model failed.", error);
-    throw new Error("提示分析 AI 生成失败，请稍后重试。");
+    return fallbackSupportCue(input);
   }
 }
 
@@ -464,6 +464,6 @@ export async function generateSmartGuidance(
     );
   } catch (error) {
     console.warn("Smart guidance text model failed.", error);
-    throw new Error("智能建议 AI 分析失败，请稍后重试。");
+    return fallbackSmartGuidance(input);
   }
 }
