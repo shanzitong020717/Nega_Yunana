@@ -153,6 +153,14 @@ function supportResultTabId(type: SupportResultTabType) {
   return `support-result-${type}`;
 }
 
+function isRecommendedPhraseSection(section: SupportCueResultSection) {
+  return (
+    section.label === "推荐说法" ||
+    section.label === "更自然表达" ||
+    section.label === "改进后句子"
+  );
+}
+
 const DEFAULT_INPUT_AUDIO_SAMPLE_RATE = 24_000;
 const DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
@@ -623,7 +631,10 @@ function SupportCueResultPanel({
         {result.sections.map((section) => (
           <article
             key={`${result.id}-${section.label}`}
-            className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3"
+            className={[
+              "rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3",
+              isRecommendedPhraseSection(section) ? "md:col-span-2" : "",
+            ].join(" ")}
           >
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
               {section.label}

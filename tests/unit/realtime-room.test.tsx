@@ -86,7 +86,7 @@ const mockBetterPhrasePayload = {
         english: "We can help translate meetings and make communication better.",
       },
       {
-        label: "更自然表达",
+        label: "改进后句子",
         english:
           "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
         chinese:
@@ -640,6 +640,47 @@ describe("RealtimeRoom mock UI", () => {
     expect(screen.getByText("高级词汇")).toBeInTheDocument();
     expect(screen.getByText("technical review")).toBeInTheDocument();
     expect(screen.getByText("security requirements")).toBeInTheDocument();
+  });
+
+  it("renders the better phrase recommended wording as a full-width section", async () => {
+    installSupportResultFetchMock();
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_better_phrase_full_width"
+        initialTranscriptTurns={[
+          {
+            id: "turn_ai_recommended_wording",
+            speaker: "ai_customer",
+            text: "Can you detail how data is encrypted both at rest and in transit?",
+            translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+            timestamp: 0,
+          },
+          {
+            id: "turn_user_recommended_wording",
+            speaker: "user",
+            text: "We can help translate meetings and make communication better.",
+            timestamp: 8,
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+
+    const recommendedSection = (await screen.findByText("改进后句子")).closest(
+      "article",
+    );
+    const contextSection = screen.getByText("AI 客户上下文").closest("article");
+
+    expect(recommendedSection).toHaveClass("md:col-span-2");
+    expect(contextSection).not.toHaveClass("md:col-span-2");
   });
 
   it("shows support results in switchable tabs instead of stacking panels", async () => {
