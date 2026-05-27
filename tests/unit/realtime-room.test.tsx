@@ -86,7 +86,7 @@ const mockBetterPhrasePayload = {
         english: "We can help translate meetings and make communication better.",
       },
       {
-        label: "改进后句子",
+        label: "优化建议",
         english:
           "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
         chinese:
@@ -637,6 +637,8 @@ describe("RealtimeRoom mock UI", () => {
         "For a technical review, we can first map the data flow and confirm security requirements with your IT team.",
       ),
     ).toBeInTheDocument();
+    expect(screen.queryByText("优化建议")).not.toBeInTheDocument();
+    expect(screen.getByText("改进后句子")).toBeInTheDocument();
     expect(screen.getByText("高级词汇")).toBeInTheDocument();
     expect(screen.getByText("technical review")).toBeInTheDocument();
     expect(screen.getByText("security requirements")).toBeInTheDocument();

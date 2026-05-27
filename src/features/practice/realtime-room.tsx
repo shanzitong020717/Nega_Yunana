@@ -153,11 +153,27 @@ function supportResultTabId(type: SupportResultTabType) {
   return `support-result-${type}`;
 }
 
+const recommendedPhraseSectionLabels = new Set([
+  "推荐说法",
+  "更自然表达",
+  "改进后句子",
+  "改进后的建议",
+  "优化建议",
+  "改进建议",
+  "Recommended improved sentence",
+  "Improved sentence",
+  "Recommendation",
+]);
+
+function supportCueSectionDisplayLabel(section: SupportCueResultSection) {
+  return recommendedPhraseSectionLabels.has(section.label)
+    ? "改进后句子"
+    : section.label;
+}
+
 function isRecommendedPhraseSection(section: SupportCueResultSection) {
   return (
-    section.label === "推荐说法" ||
-    section.label === "更自然表达" ||
-    section.label === "改进后句子"
+    supportCueSectionDisplayLabel(section) === "改进后句子"
   );
 }
 
@@ -637,7 +653,7 @@ function SupportCueResultPanel({
             ].join(" ")}
           >
             <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              {section.label}
+              {supportCueSectionDisplayLabel(section)}
             </p>
             {section.english ? (
               <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
