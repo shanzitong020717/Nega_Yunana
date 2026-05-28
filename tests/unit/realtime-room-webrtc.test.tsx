@@ -247,6 +247,9 @@ describe("RealtimeRoom browser voice connection", () => {
     await waitFor(() => {
       expect(processors).toHaveLength(1);
     });
+    expect(screen.getByRole("status")).toHaveClass("min-h-10");
+    expect(screen.getByRole("status")).toHaveClass("py-2");
+    expect(screen.getByRole("status")).not.toHaveClass("py-3");
 
     processors[0]?.onaudioprocess?.({
       inputBuffer: {

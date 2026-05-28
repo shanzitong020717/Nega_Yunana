@@ -2005,7 +2005,8 @@ export function RealtimeRoom({
             {systemNotice ? (
               <p
                 role="status"
-                className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-3 text-sm leading-6 text-[var(--muted)]"
+                title={systemNotice}
+                className="flex min-h-10 items-center truncate rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] px-3 py-2 text-xs font-medium leading-5 text-[var(--muted)]"
               >
                 {systemNotice}
               </p>
