@@ -1045,6 +1045,14 @@ describe("RealtimeRoom mock UI", () => {
                 reason:
                   "It acknowledges the concern, avoids unsupported claims, and moves the conversation to a technical review.",
               },
+              {
+                english:
+                  "Before I give a final deployment answer, could we review your IT security requirements together?",
+                chinese:
+                  "在我给出最终部署答案前，我们可以一起确认你们的 IT 安全要求吗？",
+                reason:
+                  "It is safer when the learner needs more customer context before making a claim.",
+              },
             ],
             vocabulary: [
               {
@@ -1113,7 +1121,18 @@ describe("RealtimeRoom mock UI", () => {
         "That is an important security question. For a pilot, we can first map the data flow with your IT team and confirm encryption requirements before deployment.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "建议回答" })).toBeInTheDocument();
+    const workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    expect(
+      within(workspace).getByRole("heading", { name: "核心救场" }),
+    ).toBeInTheDocument();
+    expect(within(workspace).getByText("直接这样回答")).toBeInTheDocument();
+    expect(within(workspace).queryByText("推荐回复")).not.toBeInTheDocument();
+    expect(within(workspace).getByText("备用说法")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Before I give a final deployment answer, could we review your IT security requirements together?",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("上下文解析")).toBeInTheDocument();
     expect(screen.getByText("当前对话正在围绕部署方式和安全要求展开。")).toBeInTheDocument();
     expect(

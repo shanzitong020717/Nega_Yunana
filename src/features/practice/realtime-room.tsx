@@ -439,7 +439,7 @@ function SuggestedAnswerPanel({
             aria-hidden="true"
           />
           <h2 className="text-base font-semibold text-[var(--foreground)]">
-            建议回答
+            核心救场
           </h2>
         </div>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
@@ -456,7 +456,7 @@ function SuggestedAnswerPanel({
         className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
       >
         <h2 className="text-base font-semibold text-[var(--foreground)]">
-          建议回答
+          核心救场
         </h2>
         <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
           {errorMessage}
@@ -464,6 +464,24 @@ function SuggestedAnswerPanel({
       </section>
     ) : null;
   }
+
+  const [primaryReply, ...alternativeReplies] = suggestion.suggestedReplies;
+  const contextItems = [
+    ["当前对话", suggestion.contextBreakdown.conversationStateZh],
+    [
+      "客户为什么现在问",
+      suggestion.contextBreakdown.customerQuestionReasonZh,
+    ],
+    ["前文回答", suggestion.contextBreakdown.priorUserAnswerZh],
+    ["当前缺口", suggestion.contextBreakdown.missingInformationZh],
+    ["回答边界", suggestion.contextBreakdown.responseBoundaryZh],
+  ];
+  const logicItems = [
+    ["表层语义", suggestion.logicBreakdown.surfaceMeaningZh],
+    ["客户目的", suggestion.logicBreakdown.customerIntentZh],
+    ["想确认的信息", suggestion.logicBreakdown.informationNeededZh],
+    ["回应重点", suggestion.logicBreakdown.responseFocusZh],
+  ];
 
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4">
@@ -474,7 +492,7 @@ function SuggestedAnswerPanel({
             aria-hidden="true"
           />
           <h2 className="text-base font-semibold text-[var(--foreground)]">
-            建议回答
+            核心救场
           </h2>
         </div>
         <span className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]">
@@ -482,10 +500,59 @@ function SuggestedAnswerPanel({
         </span>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1.2fr]">
-        <article className="rounded-md border border-[var(--border)] bg-[var(--surface-subtle)] p-3">
-          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-            AI 客户原句
+      {primaryReply ? (
+        <article
+          aria-label="直接这样回答"
+          className="mt-4 rounded-md border border-[#b7d8d6] bg-[#f6fbfa] p-4"
+        >
+          <p className="text-sm font-semibold text-[var(--primary-strong)]">
+            直接这样回答
+          </p>
+          <p className="mt-3 text-base font-semibold leading-7 text-[var(--foreground)]">
+            {primaryReply.english}
+          </p>
+          <p className="mt-3 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+            {primaryReply.chinese}
+          </p>
+          <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm leading-6 text-[var(--muted)]">
+            {primaryReply.reason}
+          </p>
+        </article>
+      ) : null}
+
+      {alternativeReplies.length > 0 ? (
+        <section className="mt-3 rounded-md border border-[var(--border)] p-3">
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            备用说法
+          </p>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {alternativeReplies.map((reply, index) => (
+              <article
+                key={reply.english}
+                className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
+              >
+                <p className="text-xs font-semibold text-[var(--primary-strong)]">
+                  备选 {index + 1}
+                </p>
+                <p className="mt-1 text-sm font-medium leading-6 text-[var(--foreground)]">
+                  {reply.english}
+                </p>
+                <p className="mt-2 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+                  {reply.chinese}
+                </p>
+                <p className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                  {reply.reason}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <article className="rounded-md border border-[var(--border)] p-3">
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            客户刚才问什么
           </p>
           <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
             {suggestion.aiQuestion.english}
@@ -496,8 +563,8 @@ function SuggestedAnswerPanel({
         </article>
 
         <article className="rounded-md border border-[var(--border)] p-3">
-          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-            如何回应
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            回应策略
           </p>
           <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
             {suggestion.responseStrategy.english}
@@ -508,87 +575,59 @@ function SuggestedAnswerPanel({
         </article>
       </div>
 
-      <article className="mt-3 rounded-md border border-[var(--border)] p-3">
-        <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-          上下文解析
-        </p>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {[
-            ["当前对话", suggestion.contextBreakdown.conversationStateZh],
-            [
-              "客户为什么现在问",
-              suggestion.contextBreakdown.customerQuestionReasonZh,
-            ],
-            ["前文回答", suggestion.contextBreakdown.priorUserAnswerZh],
-            ["当前缺口", suggestion.contextBreakdown.missingInformationZh],
-            ["回答边界", suggestion.contextBreakdown.responseBoundaryZh],
-          ].map(([label, content]) => (
-            <div
-              key={label}
-              className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
-            >
-              <p className="text-xs font-semibold text-[var(--primary-strong)]">
-                {label}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                {content}
-              </p>
-            </div>
-          ))}
-        </div>
-      </article>
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <article className="rounded-md border border-[var(--border)] p-3">
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            上下文解析
+          </p>
+          <div className="mt-3 grid gap-2">
+            {contextItems.map(([label, content]) => (
+              <div
+                key={label}
+                className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
+              >
+                <p className="text-xs font-semibold text-[var(--primary-strong)]">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                  {content}
+                </p>
+              </div>
+            ))}
+          </div>
+        </article>
 
-      <article className="mt-3 rounded-md border border-[var(--border)] p-3">
-        <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-          语句逻辑拆解
-        </p>
-        <div className="mt-3 grid gap-2 md:grid-cols-2">
-          {[
-            ["表层语义", suggestion.logicBreakdown.surfaceMeaningZh],
-            ["客户目的", suggestion.logicBreakdown.customerIntentZh],
-            ["想确认的信息", suggestion.logicBreakdown.informationNeededZh],
-            ["回应重点", suggestion.logicBreakdown.responseFocusZh],
-          ].map(([label, content]) => (
-            <div
-              key={label}
-              className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
-            >
-              <p className="text-xs font-semibold text-[var(--primary-strong)]">
-                {label}
-              </p>
-              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
-                {content}
-              </p>
-            </div>
-          ))}
-        </div>
-      </article>
-
-      <div className="mt-3 grid gap-3">
-        {suggestion.suggestedReplies.map((reply) => (
-          <article
-            key={reply.english}
-            className="rounded-md border border-[var(--border)] p-3"
-          >
-            <p className="text-xs font-semibold uppercase text-[var(--muted)]">
-              推荐回复
-            </p>
-            <p className="mt-2 text-sm font-semibold leading-6 text-[var(--foreground)]">
-              {reply.english}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
-              {reply.chinese}
-            </p>
-            <p className="mt-2 rounded-md bg-[var(--surface-subtle)] px-3 py-2 text-sm leading-6 text-[var(--muted)]">
-              {reply.reason}
-            </p>
-          </article>
-        ))}
+        <article className="rounded-md border border-[var(--border)] p-3">
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            语句逻辑拆解
+          </p>
+          <div className="mt-3 grid gap-2">
+            {logicItems.map(([label, content]) => (
+              <div
+                key={label}
+                className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
+              >
+                <p className="text-xs font-semibold text-[var(--primary-strong)]">
+                  {label}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                  {content}
+                </p>
+              </div>
+            ))}
+          </div>
+        </article>
       </div>
+
+      {suggestion.analysis ? (
+        <p className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+          {suggestion.analysis}
+        </p>
+      ) : null}
 
       {suggestion.vocabulary.length > 0 ? (
         <div className="mt-3 rounded-md border border-[var(--border)] p-3">
-          <p className="text-xs font-semibold uppercase text-[var(--muted)]">
+          <p className="text-sm font-semibold text-[var(--foreground)]">
             高级词汇
           </p>
           <div className="mt-3 grid gap-2 md:grid-cols-2">
