@@ -73,6 +73,7 @@ export function SupportResultWorkspace({
 
   const activeTab =
     tabs.find((tab) => tab.id === activeTabId) ?? tabs[tabs.length - 1];
+  const isActiveTabRefreshing = activeTab?.status === "loading";
 
   return (
     <section
@@ -89,14 +90,28 @@ export function SupportResultWorkspace({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {activeTab?.status === "error" ? (
+          {activeTab ? (
             <button
               type="button"
+              aria-label="刷新当前模块"
+              disabled={isActiveTabRefreshing}
               onClick={() => onRetryTab(activeTab.id)}
-              className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 text-xs font-medium text-[#8a5a05] transition hover:border-[var(--warning)]"
+              className={[
+                "inline-flex min-h-9 items-center gap-2 rounded-md border px-3 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+                activeTab.status === "error"
+                  ? "border-[#f4d39a] bg-[#fff8ed] text-[#8a5a05] hover:border-[var(--warning)]"
+                  : "border-[#b7d8d6] bg-[#e7f4f2] text-[var(--primary-strong)] hover:border-[var(--primary)] hover:bg-[#d9eeeb]",
+                isActiveTabRefreshing ? "cursor-not-allowed opacity-70" : "",
+              ].join(" ")}
             >
-              <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
-              重新生成
+              <RefreshCw
+                className={[
+                  "h-3.5 w-3.5",
+                  isActiveTabRefreshing ? "animate-spin" : "",
+                ].join(" ")}
+                aria-hidden="true"
+              />
+              刷新当前模块
             </button>
           ) : null}
           <button

@@ -851,6 +851,129 @@ describe("RealtimeRoom mock UI", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("refreshes the active rescue answer module with the current transcript", async () => {
+    const fetchMock = installSupportResultFetchMock();
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_refresh",
+        speaker: "ai_customer",
+        text: "Which customer scenario should we focus on first?",
+        translationZh: "我们应该先聚焦哪个客户场景？",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_refresh",
+        speaker: "user",
+        text: "Let's discuss manufacturing maintenance first.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_refresh_suggested_answer"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "建议回答" }));
+    expect(
+      await screen.findByRole("tabpanel", { name: "建议回答" }),
+    ).toBeInTheDocument();
+
+    const workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    fireEvent.click(within(workspace).getByRole("button", { name: "刷新当前模块" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(([url]) =>
+          String(url).includes("/suggested-answer"),
+        ),
+      ).toHaveLength(2);
+    });
+
+    const [, refreshRequest] = fetchMock.mock.calls
+      .filter(([url]) => String(url).includes("/suggested-answer"))
+      .at(-1) ?? [];
+    const refreshBody = JSON.parse(String(refreshRequest?.body));
+    expect(refreshBody.latestAiTurn.text).toBe(
+      "Which customer scenario should we focus on first?",
+    );
+    expect(refreshBody.transcriptTurns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          speaker: "user",
+          text: "Let's discuss manufacturing maintenance first.",
+        }),
+      ]),
+    );
+  });
+
+  it("refreshes the active support cue module instead of only failed modules", async () => {
+    const fetchMock = installSupportResultFetchMock();
+    const initialTranscriptTurns: TranscriptTurn[] = [
+      {
+        id: "turn_ai_better_refresh",
+        speaker: "ai_customer",
+        text: "Can you give a clearer answer about deployment?",
+        translationZh: "你能更清楚地回答部署问题吗？",
+        timestamp: 0,
+      },
+      {
+        id: "turn_user_better_refresh",
+        speaker: "user",
+        text: "We can maybe do cloud or local.",
+        timestamp: 8,
+      },
+    ];
+    const RealtimeRoomWithInitialTurns = RealtimeRoom as typeof RealtimeRoom & ((
+      props: Parameters<typeof RealtimeRoom>[0] & {
+        initialTranscriptTurns: TranscriptTurn[];
+      },
+    ) => ReactElement);
+
+    render(
+      <RealtimeRoomWithInitialTurns
+        sessionId="session_refresh_better_phrase"
+        initialTranscriptTurns={initialTranscriptTurns}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开提示面板" }));
+    fireEvent.click(screen.getByRole("button", { name: "换个更自然表达" }));
+    expect(await screen.findByText("更自然表达分析")).toBeInTheDocument();
+
+    const workspace = screen.getByRole("region", { name: "辅助结果工作区" });
+    fireEvent.click(within(workspace).getByRole("button", { name: "刷新当前模块" }));
+
+    await waitFor(() => {
+      expect(
+        fetchMock.mock.calls.filter(([url]) =>
+          String(url).includes("/support-cue"),
+        ),
+      ).toHaveLength(2);
+    });
+
+    const [, refreshRequest] = fetchMock.mock.calls
+      .filter(([url]) => String(url).includes("/support-cue"))
+      .at(-1) ?? [];
+    expect(JSON.parse(String(refreshRequest?.body))).toMatchObject({
+      cue: "Better Phrase",
+      transcriptTurns: expect.arrayContaining([
+        expect.objectContaining({
+          speaker: "user",
+          text: "We can maybe do cloud or local.",
+        }),
+      ]),
+    });
+  });
+
   it("uses the learner-selected persona and voice pack for realtime session creation", async () => {
     Object.defineProperty(navigator, "mediaDevices", {
       configurable: true,
