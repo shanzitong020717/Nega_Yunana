@@ -131,6 +131,10 @@ const mockDiscoveryPayload = {
         label: "建议原因",
         chinese: "这个问题能把客户需求推进到试点目标和评估标准。",
       },
+      {
+        label: "后续判断",
+        chinese: "如果客户提到成本、效率或安全，再进入对应价值证明。",
+      },
     ],
     vocabulary: [
       {
@@ -165,6 +169,13 @@ const mockMaterialPointPayload = {
           "Use verified material points and mark unsupported deployment details as items for IT confirmation.",
         chinese:
           "引用已验证材料要点，并把未确认部署细节标记为需要 IT 确认的事项。",
+      },
+      {
+        label: "使用方式",
+        english:
+          "Based on the material, this point is most useful when the customer asks about multilingual meeting flow.",
+        chinese:
+          "基于材料，当客户询问多语言会议流程时，这个要点最适合引用。",
       },
       {
         label: "风险边界",
@@ -474,7 +485,11 @@ describe("RealtimeRoom mock UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "问一个探索问题" }));
 
     expect(await screen.findByText("探索问题建议")).toBeInTheDocument();
-    expect(screen.getByText("推荐问题")).toBeInTheDocument();
+    expect(screen.getByText("下一句可以问")).toBeInTheDocument();
+    expect(screen.getByText("为什么这样问")).toBeInTheDocument();
+    expect(screen.getByText("客户意图")).toBeInTheDocument();
+    expect(screen.getByText("问完看什么")).toBeInTheDocument();
+    expect(screen.queryByText("推荐问题")).not.toBeInTheDocument();
     expect(
       screen.getByText("What does a successful pilot look like for your team?"),
     ).toBeInTheDocument();
@@ -483,7 +498,11 @@ describe("RealtimeRoom mock UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "使用材料要点" }));
 
     expect(await screen.findByText("材料要点建议")).toBeInTheDocument();
-    expect(screen.getByText("可引用要点")).toBeInTheDocument();
+    expect(screen.getByText("现在最适合引用")).toBeInTheDocument();
+    expect(screen.getByText("怎么接上话")).toBeInTheDocument();
+    expect(screen.getByText("材料依据")).toBeInTheDocument();
+    expect(screen.getByText("不要越界")).toBeInTheDocument();
+    expect(screen.queryByText("可引用要点")).not.toBeInTheDocument();
     expect(
       screen.getByText("不要补充材料中没有确认的价格、认证或部署承诺。"),
     ).toBeInTheDocument();

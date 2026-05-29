@@ -109,6 +109,12 @@ describe("generateSupportCue", () => {
     expect(prompt).toContain("Can you clarify the deployment options?");
     expect(prompt).toContain("We support different deployment needs.");
     expect(prompt).toContain("Recent transcript");
+    expect(prompt).toContain(
+      "For Ask a Discovery Question: include a recommended question, why it works, customer intent, and what signal to listen for after asking.",
+    );
+    expect(prompt).toContain(
+      "For Use Material Point: include the material-backed point, how to connect it to the conversation, material basis, and a risk boundary.",
+    );
   });
 
   it("returns a context-derived support cue when the production model fails", async () => {

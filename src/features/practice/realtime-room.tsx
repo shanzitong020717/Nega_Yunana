@@ -211,6 +211,74 @@ function isRecommendedPhraseSection(section: SupportCueResultSection) {
   );
 }
 
+function supportCueLabelIncludes(
+  section: SupportCueResultSection,
+  labels: string[],
+) {
+  const labelKey = normalizeSupportCueLabelKey(section.label);
+
+  return labels.some((label) =>
+    labelKey.includes(normalizeSupportCueLabelKey(label)),
+  );
+}
+
+function findSupportCueSection(
+  sections: SupportCueResultSection[],
+  labels: string[],
+) {
+  return sections.find((section) => supportCueLabelIncludes(section, labels));
+}
+
+function firstSpeakableSupportCueSection(sections: SupportCueResultSection[]) {
+  return sections.find((section) => section.english?.trim());
+}
+
+function sectionHasVisibleContent(section?: SupportCueResultSection) {
+  return Boolean(
+    section?.english?.trim() || section?.chinese?.trim() || section?.note?.trim(),
+  );
+}
+
+function isDiscoveryQuestionResult(result: SupportCueResult) {
+  const normalizedTitle = normalizeSupportCueLabelKey(
+    `${result.title} ${result.badge}`,
+  );
+
+  return (
+    normalizedTitle.includes("探索") ||
+    normalizedTitle.includes("discovery") ||
+    Boolean(
+      findSupportCueSection(result.sections, [
+        "推荐问题",
+        "探索问题",
+        "建议问题",
+        "下一句可以问",
+        "recommended question",
+      ]),
+    )
+  );
+}
+
+function isMaterialPointResult(result: SupportCueResult) {
+  const normalizedTitle = normalizeSupportCueLabelKey(
+    `${result.title} ${result.badge}`,
+  );
+
+  return (
+    normalizedTitle.includes("材料") ||
+    normalizedTitle.includes("material") ||
+    Boolean(
+      findSupportCueSection(result.sections, [
+        "可引用要点",
+        "材料要点",
+        "材料证据",
+        "现在最适合引用",
+        "material point",
+      ]),
+    )
+  );
+}
+
 const DEFAULT_INPUT_AUDIO_SAMPLE_RATE = 24_000;
 const DEFAULT_OUTPUT_AUDIO_SAMPLE_RATE = 24_000;
 const INPUT_AUDIO_BUFFER_SIZE = 4096;
@@ -790,6 +858,295 @@ function BetterPhraseResultPanel({
   );
 }
 
+function SupportCuePrimaryActionCard({
+  label,
+  section,
+}: {
+  label: string;
+  section: SupportCueResultSection;
+}) {
+  return (
+    <article
+      aria-label={label}
+      className="mt-4 rounded-md border border-[#b7d8d6] bg-[#f6fbfa] p-4"
+    >
+      <p className="text-sm font-semibold text-[var(--primary-strong)]">
+        {label}
+      </p>
+      {section.english ? (
+        <p className="mt-3 text-base font-semibold leading-7 text-[var(--foreground)]">
+          {section.english}
+        </p>
+      ) : null}
+      {section.chinese ? (
+        <p className="mt-3 border-l-2 border-[var(--primary)] pl-3 text-sm leading-6 text-[var(--muted)]">
+          {section.chinese}
+        </p>
+      ) : null}
+      {section.note ? (
+        <p className="mt-3 rounded-md bg-white px-3 py-2 text-sm leading-6 text-[var(--muted)]">
+          {section.note}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function SupportCueInfoBlock({
+  label,
+  section,
+}: {
+  label: string;
+  section?: SupportCueResultSection;
+}) {
+  if (!sectionHasVisibleContent(section)) {
+    return null;
+  }
+
+  return (
+    <article className="rounded-md bg-white p-3">
+      <p className="text-xs font-semibold text-[var(--primary-strong)]">
+        {label}
+      </p>
+      {section?.english ? (
+        <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+          {section.english}
+        </p>
+      ) : null}
+      {section?.chinese ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          {section.chinese}
+        </p>
+      ) : null}
+      {section?.note ? (
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          {section.note}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function SupportCueSafetyNote({
+  label = "不要越界",
+  section,
+}: {
+  label?: string;
+  section?: SupportCueResultSection;
+}) {
+  if (!sectionHasVisibleContent(section)) {
+    return null;
+  }
+
+  return (
+    <article className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2">
+      <p className="text-xs font-semibold text-[#8a5a05]">{label}</p>
+      {section?.english ? (
+        <p className="mt-2 text-sm font-medium leading-6 text-[var(--foreground)]">
+          {section.english}
+        </p>
+      ) : null}
+      {section?.chinese ? (
+        <p className="mt-2 text-sm leading-6 text-[#8a5a05]">
+          {section.chinese}
+        </p>
+      ) : null}
+      {section?.note ? (
+        <p className="mt-2 text-sm leading-6 text-[#8a5a05]">
+          {section.note}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function SupportCueActionHeader({
+  badge,
+  isLoading,
+  subtitle,
+  title,
+}: {
+  badge: string;
+  isLoading: boolean;
+  subtitle: string;
+  title: string;
+}) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <div className="flex items-center gap-2">
+          <BookOpenCheck
+            className="h-5 w-5 text-[var(--primary)]"
+            aria-hidden="true"
+          />
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            {title}
+          </h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+          {subtitle}
+        </p>
+      </div>
+      <span className="rounded-md border border-[#b7d8d6] bg-[#e7f4f2] px-2.5 py-1 text-xs font-medium text-[var(--primary-strong)]">
+        {isLoading ? "AI 生成中" : badge}
+      </span>
+    </div>
+  );
+}
+
+function DiscoveryQuestionResultPanel({
+  errorMessage,
+  isLoading,
+  result,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  result: SupportCueResult;
+}) {
+  const primarySection =
+    findSupportCueSection(result.sections, [
+      "推荐问题",
+      "探索问题",
+      "建议问题",
+      "下一句可以问",
+      "recommended question",
+    ]) ?? firstSpeakableSupportCueSection(result.sections);
+  const reasonSection = findSupportCueSection(result.sections, [
+    "建议原因",
+    "为什么",
+    "why",
+  ]);
+  const intentSection = findSupportCueSection(result.sections, [
+    "客户意图",
+    "AI 客户上下文",
+    "客户上下文",
+    "customer intent",
+    "context",
+  ]);
+  const followUpSection = findSupportCueSection(result.sections, [
+    "后续判断",
+    "下一步",
+    "问完看什么",
+    "follow-up",
+    "signal",
+  ]);
+  const safetySection = findSupportCueSection(result.sections, [
+    "风险边界",
+    "不要越界",
+    "boundary",
+    "risk",
+  ]);
+
+  return (
+    <section
+      aria-live="polite"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+    >
+      <SupportCueActionHeader
+        badge={result.badge}
+        isLoading={isLoading}
+        subtitle="先问出客户真实目标，再决定该讲价值、材料还是下一步。"
+        title="探索问题建议"
+      />
+
+      {errorMessage ? (
+        <p className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      {primarySection ? (
+        <SupportCuePrimaryActionCard
+          label="下一句可以问"
+          section={primarySection}
+        />
+      ) : null}
+
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
+        <SupportCueInfoBlock label="为什么这样问" section={reasonSection} />
+        <SupportCueInfoBlock label="客户意图" section={intentSection} />
+        <SupportCueInfoBlock label="问完看什么" section={followUpSection} />
+      </div>
+
+      <SupportCueSafetyNote label="注意边界" section={safetySection} />
+      <SupportCueVocabularyBlock result={result} />
+    </section>
+  );
+}
+
+function MaterialPointResultPanel({
+  errorMessage,
+  isLoading,
+  result,
+}: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  result: SupportCueResult;
+}) {
+  const primarySection =
+    findSupportCueSection(result.sections, [
+      "可引用要点",
+      "材料要点",
+      "材料证据",
+      "现在最适合引用",
+      "material point",
+    ]) ?? firstSpeakableSupportCueSection(result.sections);
+  const usageSection = findSupportCueSection(result.sections, [
+    "使用方式",
+    "推荐说法",
+    "怎么接上话",
+    "how to use",
+  ]);
+  const basisSection = findSupportCueSection(result.sections, [
+    "材料依据",
+    "材料证据",
+    "AI 客户上下文",
+    "客户上下文",
+    "source",
+  ]);
+  const boundarySection = findSupportCueSection(result.sections, [
+    "风险边界",
+    "不要越界",
+    "boundary",
+    "risk",
+  ]);
+
+  return (
+    <section
+      aria-live="polite"
+      className="rounded-md border border-[var(--border)] bg-[var(--surface)] p-4"
+    >
+      <SupportCueActionHeader
+        badge={result.badge}
+        isLoading={isLoading}
+        subtitle="只引用材料和上下文支持的内容，把未确认信息留给后续确认。"
+        title="材料要点建议"
+      />
+
+      {errorMessage ? (
+        <p className="mt-3 rounded-md border border-[#f4d39a] bg-[#fff8ed] px-3 py-2 text-sm leading-6 text-[#8a5a05]">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      {primarySection ? (
+        <SupportCuePrimaryActionCard
+          label="现在最适合引用"
+          section={primarySection}
+        />
+      ) : null}
+
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        <SupportCueInfoBlock label="怎么接上话" section={usageSection} />
+        <SupportCueInfoBlock label="材料依据" section={basisSection} />
+      </div>
+
+      <SupportCueSafetyNote label="不要越界" section={boundarySection} />
+      <SupportCueVocabularyBlock result={result} />
+    </section>
+  );
+}
+
 function SupportCueResultPanel({
   errorMessage,
   isLoading,
@@ -824,6 +1181,26 @@ function SupportCueResultPanel({
   if (isBetterPhraseResult(result)) {
     return (
       <BetterPhraseResultPanel
+        errorMessage={errorMessage}
+        isLoading={isLoading}
+        result={result}
+      />
+    );
+  }
+
+  if (isDiscoveryQuestionResult(result)) {
+    return (
+      <DiscoveryQuestionResultPanel
+        errorMessage={errorMessage}
+        isLoading={isLoading}
+        result={result}
+      />
+    );
+  }
+
+  if (isMaterialPointResult(result)) {
+    return (
+      <MaterialPointResultPanel
         errorMessage={errorMessage}
         isLoading={isLoading}
         result={result}
