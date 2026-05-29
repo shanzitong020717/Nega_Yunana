@@ -36,6 +36,7 @@ export type GenerateSuggestedAnswerInput = {
 };
 
 const SUGGESTED_ANSWER_TIMEOUT_MS = 20_000;
+const MAX_SUGGESTED_ANSWER_VOCABULARY_ITEMS = 4;
 
 function shouldUseMockMode(input: Pick<GenerateSuggestedAnswerInput, "mockMode">) {
   return (
@@ -330,6 +331,41 @@ const fillerVocabularyWords = new Set([
   "you",
 ]);
 
+const genericStandaloneVocabularyWords = new Set([
+  "application",
+  "business",
+  "caption",
+  "captions",
+  "customer",
+  "data",
+  "field",
+  "glasses",
+  "meeting",
+  "meetings",
+  "pilot",
+  "problem",
+  "product",
+  "scenario",
+  "segment",
+  "smart",
+  "support",
+  "target",
+  "team",
+  "translation",
+  "workflow",
+]);
+
+const specializedStandaloneVocabularyWords = new Set([
+  "diagnostics",
+  "encryption",
+  "hands-free",
+  "integration",
+  "maintenance",
+  "on-premise",
+  "roi",
+  "schematics",
+]);
+
 const meaningfulVocabularyKeywords = new Set([
   "application",
   "business",
@@ -434,6 +470,16 @@ function isUsefulVocabularyTerm(term: string) {
 
   if (words.length > 4 || words.length === 0) {
     return false;
+  }
+
+  if (words.length === 1) {
+    const word = words[0];
+
+    if (genericStandaloneVocabularyWords.has(word)) {
+      return false;
+    }
+
+    return specializedStandaloneVocabularyWords.has(word);
   }
 
   if (words.some((word) => fillerVocabularyWords.has(word))) {
@@ -541,7 +587,7 @@ function normalizeVocabularyItems(
     deriveVocabularyFromContext(input, suggestedReplies).forEach(addVocabularyItem);
   }
 
-  return normalizedVocabulary.slice(0, Math.max(normalizedVocabulary.length, 2));
+  return normalizedVocabulary.slice(0, MAX_SUGGESTED_ANSWER_VOCABULARY_ITEMS);
 }
 
 function deriveVocabularyFromContext(
@@ -589,7 +635,7 @@ function deriveVocabularyFromContext(
     ].forEach(addVocabularyItem);
   }
 
-  return vocabulary.slice(0, Math.max(vocabulary.length, 2));
+  return vocabulary.slice(0, MAX_SUGGESTED_ANSWER_VOCABULARY_ITEMS);
 }
 
 function withoutChineseCharacters(text: string, fallback: string) {
@@ -1036,10 +1082,7 @@ function repairSuggestedAnswerCore(
         ),
       },
       suggestedReplies,
-      vocabulary:
-        vocabulary.length >= 2
-          ? vocabulary
-          : normalizeVocabularyItems(vocabulary, input, suggestedReplies),
+      vocabulary: normalizeVocabularyItems(vocabulary, input, suggestedReplies),
       phrasebookEntry: {
         category: validPhraseCategoryForContext(
           input,
@@ -1159,14 +1202,14 @@ function buildSuggestedAnswerPrompt(input: GenerateSuggestedAnswerInput) {
     "Use the same reasoning process as other live support panels: recent context -> customer intent -> learner need -> recommended action -> safe boundary. The answer must be consistent with the same conversation state.",
     "Ground the analysis in the latest transcript. Do not return canned security, deployment, ROI, or pilot language unless the current conversation actually supports it.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, encryption guarantees, or contract terms not provided in the material. If details are unknown, suggest a safe answer that proposes confirmation or technical review.",
-    "JSON shape: aiQuestion { english, translationZh }, analysis, responseStrategy { english, chinese }, contextBreakdown { conversationStateZh, customerQuestionReasonZh, priorUserAnswerZh, missingInformationZh, responseBoundaryZh }, logicBreakdown { surfaceMeaningZh, customerIntentZh, informationNeededZh, responseFocusZh }, suggestedReplies array of 1-3 items { english, chinese, reason }, vocabulary array of at least 2 items with no upper limit { term, phonetic, chinese, example }, phrasebookEntry.",
+    "JSON shape: aiQuestion { english, translationZh }, analysis, responseStrategy { english, chinese }, contextBreakdown { conversationStateZh, customerQuestionReasonZh, priorUserAnswerZh, missingInformationZh, responseBoundaryZh }, logicBreakdown { surfaceMeaningZh, customerIntentZh, informationNeededZh, responseFocusZh }, suggestedReplies array of 1-3 items { english, chinese, reason }, vocabulary array of 2-4 high-signal advanced terms { term, phonetic, chinese, example }, phrasebookEntry.",
     "Strict language separation: responseStrategy.english and suggestedReplies[].reason must be English only. responseStrategy.chinese, aiQuestion.translationZh, every contextBreakdown field, and every logicBreakdown field must be Chinese only.",
     "Do not put Chinese persona labels, Chinese focus tags, or mixed-language fragments inside English fields. Use English role descriptions such as technical buyer, enterprise buyer, procurement manager, channel partner, or executive decision maker.",
     "The contextBreakdown should explain the conversational context, not only the latest sentence: what the conversation is about, why the customer asks now, what the learner already said, what information is still missing, and what answer boundaries or risks matter.",
     "The logicBreakdown should explain the customer's sentence logic: surface meaning, underlying intent, information they want, and the response focus.",
     "phrasebookEntry must use one valid category and source='review', masteryStatus='needs_practice', and tags including suggested-answer and live-coaching.",
-    "Vocabulary must include at least 2 advanced words or phrases from the AI question or suggested reply, and there is no maximum item limit. Include phonetic notation in slashes.",
-    "Vocabulary must be generated for this exact conversation. Do not output generic filler terms like workflow fit, pilot scope, technical review, or business value unless those exact ideas are central to the latest question or suggested reply.",
+    "Vocabulary must include 2-4 advanced words or phrases from the AI question or suggested reply. Include phonetic notation in slashes.",
+    "Vocabulary must be generated for this exact conversation. Prefer specific multi-word business expressions over ordinary standalone words. Do not output generic standalone terms like customer, business, data, support, product, team, pilot, or scenario. Do not output generic filler terms like workflow fit, pilot scope, technical review, or business value unless those exact ideas are central to the latest question or suggested reply.",
     `Practice session: ${JSON.stringify(input.practiceSession)}`,
     `Persona: ${JSON.stringify(input.persona)}`,
     `Material brief: ${JSON.stringify(input.materialBrief ?? {})}`,

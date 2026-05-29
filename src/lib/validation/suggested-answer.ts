@@ -60,7 +60,7 @@ export const suggestedAnswerCoreSchema = z.object({
   contextBreakdown: suggestedContextBreakdownSchema,
   logicBreakdown: suggestedLogicBreakdownSchema,
   suggestedReplies: z.array(suggestedReplySchema).min(1).max(3),
-  vocabulary: z.array(suggestedVocabularySchema).min(2).default([]),
+  vocabulary: z.array(suggestedVocabularySchema).min(2).max(4).default([]),
   phrasebookEntry: createPhraseInputSchema,
 });
 

@@ -131,6 +131,175 @@ describe("generateSuggestedAnswer", () => {
     );
   });
 
+  it("filters ordinary model vocabulary and keeps core rescue vocabulary concise", async () => {
+    generateTextJSONMock.mockResolvedValueOnce({
+      aiQuestion: {
+        english:
+          "Can you explain how your deployment setup handles security requirements?",
+        translationZh: "你能解释你们的部署方案如何处理安全要求吗？",
+      },
+      analysis:
+        "This technical buyer needs a bounded security answer with a concrete next step.",
+      responseStrategy: {
+        english:
+          "Acknowledge the security concern, then propose a technical review around deployment requirements.",
+        chinese: "先回应安全顾虑，再建议围绕部署要求进行技术评审。",
+      },
+      contextBreakdown: {
+        conversationStateZh: "当前对话正在进入部署和安全评估。",
+        customerQuestionReasonZh: "客户想确认方案是否符合企业安全要求。",
+        priorUserAnswerZh: "用户前面还没有解释部署边界。",
+        missingInformationZh: "还缺少客户的部署环境和安全要求。",
+        responseBoundaryZh: "不要承诺未经材料确认的认证、加密等级或部署能力。",
+      },
+      logicBreakdown: {
+        surfaceMeaningZh: "客户在问部署方案如何满足安全要求。",
+        customerIntentZh: "客户想判断是否可以进入技术评估。",
+        informationNeededZh: "客户需要部署边界、安全要求和下一步确认方式。",
+        responseFocusZh: "回应时要把问题推进到技术评审。",
+      },
+      suggestedReplies: [
+        {
+          english:
+            "We can first review your deployment requirements with your IT team, then confirm the security scope before the pilot.",
+          chinese:
+            "我们可以先和你们 IT 团队梳理部署要求，再在试点前确认安全范围。",
+          reason:
+            "It gives a safe next step without overpromising unsupported security details.",
+        },
+      ],
+      vocabulary: [
+        {
+          term: "customer",
+          phonetic: "/ˈkʌstəmər/",
+          chinese: "客户",
+          example: "customer",
+        },
+        {
+          term: "business",
+          phonetic: "/ˈbɪznəs/",
+          chinese: "业务",
+          example: "business",
+        },
+        {
+          term: "data",
+          phonetic: "/ˈdeɪtə/",
+          chinese: "数据",
+          example: "data",
+        },
+        {
+          term: "support",
+          phonetic: "/səˈpɔːrt/",
+          chinese: "支持",
+          example: "support",
+        },
+        {
+          term: "team",
+          phonetic: "/tiːm/",
+          chinese: "团队",
+          example: "team",
+        },
+        {
+          term: "product",
+          phonetic: "/ˈprɑːdʌkt/",
+          chinese: "产品",
+          example: "product",
+        },
+        {
+          term: "deployment requirements",
+          phonetic: "/dɪˈplɔɪmənt rɪˈkwaɪərmənts/",
+          chinese: "部署要求",
+          example: "review your deployment requirements",
+        },
+        {
+          term: "technical review",
+          phonetic: "/ˈteknɪkəl rɪˈvjuː/",
+          chinese: "技术评审",
+          example: "propose a technical review",
+        },
+        {
+          term: "security scope",
+          phonetic: "/sɪˈkjʊrəti skoʊp/",
+          chinese: "安全范围",
+          example: "confirm the security scope before the pilot",
+        },
+        {
+          term: "pilot",
+          phonetic: "/ˈpaɪlət/",
+          chinese: "试点",
+          example: "before the pilot",
+        },
+        {
+          term: "on-premise",
+          phonetic: "/ɑːn ˈpremɪs/",
+          chinese: "本地部署的",
+          example: "cloud or on-premise deployment",
+        },
+      ],
+      phrasebookEntry: {
+        category: "Objection Handling",
+        english:
+          "We can first review your deployment requirements with your IT team, then confirm the security scope before the pilot.",
+        chinese:
+          "我们可以先和你们 IT 团队梳理部署要求，再在试点前确认安全范围。",
+        useCase: "Handle a deployment security question.",
+        tags: ["suggested-answer", "live-coaching"],
+        source: "review",
+        masteryStatus: "needs_practice",
+      },
+    });
+    vi.stubEnv("NODE_ENV", "production");
+
+    const suggestion = await generateSuggestedAnswer({
+      practiceSession: {
+        id: "session_concise_core_rescue_vocabulary",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "objection_handling",
+        mode: "objection_handling",
+        personaId: "technical_lead",
+        voicePackId: "charon-informative",
+        materialId: undefined,
+        prepCardId: undefined,
+        difficulty: "normal",
+        trainingFocus: ["deployment and security"],
+        focusTags: ["部署安全"],
+        sourceObjectionId: undefined,
+        status: "active",
+        createdAt: new Date().toISOString(),
+      },
+      persona: defaultScenarioPack.personas.find(
+        (persona) => persona.id === "technical_lead",
+      )!,
+      latestAiTurn: {
+        speaker: "ai_customer",
+        text: "Can you explain how your deployment setup handles security requirements?",
+        translationZh: "你能解释你们的部署方案如何处理安全要求吗？",
+        timestamp: 0,
+        metadata: {},
+      },
+      transcriptTurns: [],
+    });
+
+    expect(suggestion.vocabulary).toHaveLength(4);
+    expect(suggestion.vocabulary.map((item) => item.term)).toEqual([
+      "deployment requirements",
+      "technical review",
+      "security scope",
+      "on-premise",
+    ]);
+    expect(suggestion.vocabulary.map((item) => item.term)).not.toEqual(
+      expect.arrayContaining([
+        "customer",
+        "business",
+        "data",
+        "support",
+        "team",
+        "product",
+        "pilot",
+      ]),
+    );
+  });
+
   it("repairs malformed phrasebook entries returned by the text model", async () => {
     generateTextJSONMock.mockResolvedValueOnce({
       aiQuestion: {
