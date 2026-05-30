@@ -10,6 +10,7 @@ import {
 import { getCachedReviewAnalytics } from "@/lib/progress/review-analytics-store";
 import {
   buildPresetTodayRecommendationPool,
+  TODAY_RECOMMENDATION_POOL_SIGNATURE,
   TODAY_RECOMMENDATION_POOL_SIZE,
   type TodayRecommendation,
 } from "@/lib/recommendations/today-recommendation";
@@ -103,6 +104,12 @@ function memoryPoolToRecord(pool: TodayRecommendationPoolRecord) {
     activeIndex: clampActiveIndex(pool.activeIndex, pool.items.length),
     items: pool.items,
   };
+}
+
+function hasCurrentRandomPoolSignature(pool: TodayRecommendationPoolRecord) {
+  return pool.items.some((item) =>
+    item.evidence.includes(TODAY_RECOMMENDATION_POOL_SIGNATURE),
+  );
 }
 
 async function buildPoolItems(userId: string) {
@@ -207,7 +214,8 @@ export async function getOrCreateTodayRecommendationPool({
 
   if (
     existingPool &&
-    existingPool.items.length >= TODAY_RECOMMENDATION_POOL_SIZE
+    existingPool.items.length >= TODAY_RECOMMENDATION_POOL_SIZE &&
+    hasCurrentRandomPoolSignature(existingPool)
   ) {
     return memoryPoolToRecord(existingPool);
   }

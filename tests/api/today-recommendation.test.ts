@@ -62,4 +62,30 @@ describe("today recommendation API", () => {
       firstPayload.recommendation?.id,
     );
   });
+
+  it("does not repeat the same configured package across three refreshes", async () => {
+    vi.stubEnv("AI_MOCK_MODE", "false");
+
+    const shownIds: string[] = [];
+
+    for (const requestUrl of [
+      "http://localhost/api/today-recommendation",
+      "http://localhost/api/today-recommendation?refresh=1",
+      "http://localhost/api/today-recommendation?refresh=1",
+      "http://localhost/api/today-recommendation?refresh=1",
+    ]) {
+      const response = await getTodayRecommendation(new Request(requestUrl));
+      const payload = (await response.json()) as {
+        recommendation?: { id: string };
+      };
+
+      expect(response.status).toBe(200);
+      expect(payload.recommendation?.id).toBeTruthy();
+      shownIds.push(payload.recommendation!.id);
+    }
+
+    expect(generateTextJSONMock).not.toHaveBeenCalled();
+    expect(new Set(shownIds.slice(1)).size).toBe(3);
+    expect(new Set(shownIds).size).toBe(4);
+  });
 });

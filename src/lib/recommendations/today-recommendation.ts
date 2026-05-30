@@ -1,16 +1,11 @@
-import { z } from "zod";
-
 import {
   defaultScenarioPack,
   type PracticeGoal,
   type PracticeGoalId,
+  type ScenarioPersona,
+  type VoicePack,
   type VoicePackId,
 } from "@/data/scenario-packs";
-import {
-  generateTextJSON,
-  hasTextAIApiKey,
-  TEXT_ANALYSIS_BOUNDARY,
-} from "@/lib/ai/text-client";
 import type { MemoryItem } from "@/lib/validation/memory";
 import type { ProgressSummary, WeaknessMetric } from "@/lib/progress/weakness-store";
 import type { MaterialProcessingStatus } from "@/lib/materials/material-store";
@@ -66,24 +61,38 @@ export type GenerateTodayRecommendationInput = {
   recentMaterials: MaterialContext[];
   memories: MemoryItem[];
   mockMode?: boolean;
+  random?: () => number;
 };
 
 export const TODAY_RECOMMENDATION_POOL_SIZE = 10;
+export const TODAY_RECOMMENDATION_POOL_SIGNATURE = "random-config-v1";
+const materialFriendlyGoalIds = new Set<PracticeGoalId>([
+  "application_scenarios",
+  "demo_narration",
+  "product_parameters",
+]);
 
-const recommendationPayloadSchema = z.object({
-  title: z.string().min(1).optional(),
-  reason: z.string().min(1),
-  goalId: z.string().min(1),
-  personaId: z.string().min(1),
-  voicePackId: z.string().min(1),
-  materialMode: z
-    .enum(["recent_material", "no_material", "memory_context", "specific_material"])
-    .default("memory_context"),
-  materialId: z.string().min(1).optional(),
-  materialLabel: z.string().min(1).optional(),
-  durationMinutes: z.number().int().min(5).max(20).default(10),
-  evidence: z.array(z.string().min(1)).default([]),
-});
+type RecommendationPayload = {
+  title?: string;
+  reason: string;
+  goalId: string;
+  personaId: string;
+  voicePackId: string;
+  materialMode: TodayRecommendationMaterialMode;
+  materialId?: string;
+  materialLabel?: string;
+  durationMinutes: number;
+  evidence: string[];
+};
+
+type RecommendationCandidate = {
+  goal: PracticeGoal;
+  materialId?: string;
+  materialLabel: string;
+  materialMode: TodayRecommendationMaterialMode;
+  persona: ScenarioPersona;
+  voicePack: VoicePack;
+};
 
 const weaknessGoalMap: Partial<Record<WeaknessMetric["type"], PracticeGoalId>> = {
   feature_only_talk: "application_scenarios",
@@ -97,10 +106,6 @@ const weaknessGoalMap: Partial<Record<WeaknessMetric["type"], PracticeGoalId>> =
   weak_discovery: "customer_qa",
   weak_objection_handling: "privacy_security",
 };
-
-function shouldUseMockMode(mockMode?: boolean) {
-  return mockMode === true || process.env.AI_MOCK_MODE === "true" || !hasTextAIApiKey();
-}
 
 function clampDuration(durationMinutes: number) {
   return Math.min(Math.max(Math.round(durationMinutes), 6), 15);
@@ -133,32 +138,8 @@ function findVoicePack(voicePackId: string, fallbackVoicePackIds: VoicePackId[])
   );
 }
 
-function getConfiguredRecommendationPackages() {
-  return defaultScenarioPack.practiceGoals.map((goal) => {
-    const persona = findPersona(goal.recommendedPersonaIds[0], goal.recommendedPersonaIds);
-    const voicePack = findVoicePack(
-      goal.recommendedVoicePackIds[0],
-      goal.recommendedVoicePackIds,
-    );
-    const materialMode: TodayRecommendationMaterialMode = "memory_context";
-
-    return {
-      id: buildRecommendationId({
-        goalId: goal.id,
-        personaId: persona.id,
-        voicePackId: voicePack.id,
-        materialMode,
-      }),
-      goal,
-      materialMode,
-      persona,
-      voicePack,
-    };
-  });
-}
-
 function normalizeRecommendation(
-  payload: z.infer<typeof recommendationPayloadSchema>,
+  payload: RecommendationPayload,
   source: TodayRecommendation["source"],
 ): TodayRecommendation {
   const goal = findGoal(payload.goalId);
@@ -271,156 +252,46 @@ function isExcludedRecommendation(
   );
 }
 
-function formatProgressContext(progress: ProgressSummary) {
-  const weaknesses = progress.topWeaknesses.length
-    ? progress.topWeaknesses
-    : [];
+function getReadyMaterial(input: GenerateTodayRecommendationInput) {
+  return input.recentMaterials.find(
+    (material) =>
+      material.processingStatus === "ready" &&
+      material.memoryStatus !== "confidential",
+  );
+}
 
-  if (weaknesses.length === 0) {
-    return "No recent weaknesses recorded yet. Recommend a useful first practice based on system memory.";
+function selectMaterialContext(
+  input: GenerateTodayRecommendationInput,
+  goal: PracticeGoal,
+): Pick<
+  RecommendationCandidate,
+  "materialId" | "materialLabel" | "materialMode"
+> {
+  const readyMaterial = getReadyMaterial(input);
+
+  if (readyMaterial && materialFriendlyGoalIds.has(goal.id)) {
+    return {
+      materialId: readyMaterial.id,
+      materialLabel: readyMaterial.name,
+      materialMode: "recent_material",
+    };
   }
 
-  return weaknesses
-    .map(
-      (weakness, index) =>
-        `${index + 1}. ${weakness.label} (${weakness.type}, severity ${weakness.severity}, occurrences ${weakness.occurrences})\nEvidence: ${weakness.evidence}\nRecommended drill: ${weakness.recommendedDrill}`,
-    )
-    .join("\n\n");
-}
-
-function formatMaterialsContext(recentMaterials: MaterialContext[]) {
-  if (recentMaterials.length === 0) {
-    return "No uploaded material is available.";
+  if (
+    input.memories.length > 0 ||
+    input.analytics ||
+    input.progress.topWeaknesses.length > 0
+  ) {
+    return {
+      materialLabel: "系统记忆",
+      materialMode: "memory_context",
+    };
   }
 
-  return recentMaterials
-    .slice(0, 5)
-    .map(
-      (material, index) =>
-        `${index + 1}. id=${material.id}; name=${material.name}; status=${material.processingStatus}; memoryStatus=${material.memoryStatus}; confidential=${material.confidentialMode}; updatedAt=${material.updatedAt}`,
-    )
-    .join("\n");
-}
-
-function formatMemoryContext(memories: MemoryItem[]) {
-  if (memories.length === 0) {
-    return "No long-term memory is available.";
-  }
-
-  return memories
-    .slice(0, 6)
-    .map(
-      (memory, index) =>
-        `${index + 1}. ${memory.title} (${memory.type}, importance ${memory.importance}, confidence ${memory.confidence})\n${memory.summary}`,
-    )
-    .join("\n\n");
-}
-
-function formatReviewAnalyticsContext(
-  analytics?: ReviewAnalyticsSnapshot | null,
-) {
-  if (!analytics) {
-    return "长期复盘: No long-term review analytics available yet.";
-  }
-
-  const mistakes = analytics.recurringMistakes
-    .slice(0, 2)
-    .map(
-      (mistake, index) =>
-        `${index + 1}. ${mistake.title}; count=${mistake.occurrenceCount}; drill=${mistake.recommendedDrill}`,
-    )
-    .join("\n");
-  const growth = analytics.topGrowthSignals
-    .slice(0, 2)
-    .map((signal, index) => `${index + 1}. ${signal.title}: ${signal.summaryZh}`)
-    .join("\n");
-
-  return [
-    `长期复盘范围: ${analytics.range}`,
-    `长期复盘总结: ${analytics.summaryZh}`,
-    `长期推荐训练: ${analytics.nextTrainingPlan.title}`,
-    `推荐原因: ${analytics.nextTrainingPlan.reasonZh}`,
-    `推荐重点: ${analytics.nextTrainingPlan.focusTags.join(", ")}`,
-    `经常犯的错误:\n${mistakes || "None"}`,
-    `成长亮点:\n${growth || "None"}`,
-  ].join("\n");
-}
-
-function formatScenarioOptions() {
-  const goals = defaultScenarioPack.practiceGoals
-    .map(
-      (goal) =>
-        `- ${goal.id}: ${goal.label}; defaultFocus=${goal.defaultFocusTags.join(", ")}; recommendedPersonas=${goal.recommendedPersonaIds.join(", ")}; recommendedVoices=${goal.recommendedVoicePackIds.join(", ")}`,
-    )
-    .join("\n");
-  const personas = defaultScenarioPack.personas
-    .map(
-      (persona) =>
-        `- ${persona.id}: ${persona.label}; style=${persona.communicationStyle}; focus=${persona.focusAreas.join(", ")}`,
-    )
-    .join("\n");
-  const voices = defaultScenarioPack.voicePacks
-    .map(
-      (voicePack) =>
-        `- ${voicePack.id}: ${voicePack.name}; providerVoice=${voicePack.providerVoiceName}; style=${voicePack.voiceStyle}; bestFor=${voicePack.bestFor.join(", ")}`,
-    )
-    .join("\n");
-  const configuredPackages = getConfiguredRecommendationPackages()
-    .map(
-      (recommendationPackage) =>
-        `- ${recommendationPackage.id}: ${recommendationPackage.persona.label} · ${recommendationPackage.goal.label}; goalId=${recommendationPackage.goal.id}; personaId=${recommendationPackage.persona.id}; voicePackId=${recommendationPackage.voicePack.id}; materialMode=${recommendationPackage.materialMode}`,
-    )
-    .join("\n");
-
-  return `Practice goals:\n${goals}\n\nCustomer roles:\n${personas}\n\nAI Studio voice packs:\n${voices}\n\nConfigured recommendation packages:\n${configuredPackages}`;
-}
-
-function buildRecommendationPrompt(input: GenerateTodayRecommendationInput) {
-  return `${TEXT_ANALYSIS_BOUNDARY}
-
-You are generating the dashboard card "今日建议你练" for a customized English-speaking practice product for a Rokid overseas sales/solutions user.
-
-Use the learner's real backend context. Pick exactly one practice goal, one customer role, one AI Studio voice pack, material mode, and duration.
-
-Decision rules:
-- Prioritize the most recent/high-severity weakness, but use uploaded material and memory when they make a more useful drill.
-- The recommendation must be specific to Rokid overseas business conversations, not generic English learning.
-- Do not invent unavailable product facts, pricing, certifications, or customer cases.
-- The reason must be Chinese, concise, and explain why this is recommended today based on evidence.
-- Pick IDs only from the options below.
-- Prefer one of the configured recommendation packages below. If this is a refresh and excluded package ids are provided, do not return the same configured package id again today.
-
-${formatScenarioOptions()}
-
-Backend progress context:
-recentTrainingCount=${input.progress.recentTrainingCount}
-${formatProgressContext(input.progress)}
-
-Recent material context:
-${formatMaterialsContext(input.recentMaterials)}
-
-Long-term memory context:
-${formatMemoryContext(input.memories)}
-
-Long-term review analytics context:
-${formatReviewAnalyticsContext(input.analytics)}
-
-Already completed or manually skipped package ids today:
-${input.excludedRecommendationIds?.length ? input.excludedRecommendationIds.join("\n") : "None"}
-
-Return JSON only:
-{
-  "title": "中文标题，格式为：客户角色 · 练习目标",
-  "reason": "中文推荐原因，说明来自哪个复盘/材料/记忆证据",
-  "goalId": "one PracticeGoal id",
-  "personaId": "one Customer role id",
-  "voicePackId": "one AI Studio voice pack id",
-  "materialMode": "recent_material | no_material | memory_context | specific_material",
-  "materialId": "optional material id when using a specific uploaded material",
-  "materialLabel": "中文或材料名",
-  "durationMinutes": 8,
-  "evidence": ["short evidence strings"]
-}`;
+  return {
+    materialLabel: "不使用材料",
+    materialMode: "no_material",
+  };
 }
 
 function buildFallbackRecommendationForGoal(
@@ -436,11 +307,8 @@ function buildFallbackRecommendationForGoal(
     goal.recommendedVoicePackIds[0],
     goal.recommendedVoicePackIds,
   );
-  const recentMaterial = input.recentMaterials.find(
-    (material) =>
-      material.processingStatus === "ready" &&
-      material.memoryStatus !== "confidential",
-  );
+  const materialContext = selectMaterialContext(input, goal);
+  const recentMaterial = getReadyMaterial(input);
   const memory = input.memories[0];
   const evidence = [
     topWeakness?.evidence,
@@ -460,9 +328,9 @@ function buildFallbackRecommendationForGoal(
       goalId: goal.id,
       personaId: persona.id,
       voicePackId: voicePack.id,
-      materialMode: recentMaterial ? "recent_material" : "memory_context",
-      materialId: recentMaterial?.id,
-      materialLabel: recentMaterial?.name ?? "系统记忆",
+      materialMode: materialContext.materialMode,
+      materialId: materialContext.materialId,
+      materialLabel: materialContext.materialLabel,
       durationMinutes: 8,
       evidence,
     },
@@ -500,58 +368,13 @@ function matchingFocusCount(goal: PracticeGoal, focusTags: string[]) {
   return goal.defaultFocusTags.filter((tag) => normalizedFocusTags.has(tag)).length;
 }
 
-function scorePresetGoal(
-  goal: PracticeGoal,
-  input: GenerateTodayRecommendationInput,
-  baseIndex: number,
-) {
-  const topWeakness = input.progress.topWeaknesses[0];
-  const preferredGoalId = topWeakness
-    ? weaknessGoalMap[topWeakness.type]
-    : undefined;
-  const weaknessFocusTags = input.progress.topWeaknesses.flatMap((weakness) => [
-    weakness.label,
-    weakness.recommendedDrill,
-  ]);
-  const analyticsFocusTags =
-    input.analytics?.nextTrainingPlan.focusTags ??
-    input.analytics?.recurringMistakes.flatMap((mistake) => [
-      mistake.title,
-      mistake.recommendedDrill,
-    ]) ??
-    [];
-  const hasReadyMaterial = input.recentMaterials.some(
-    (material) =>
-      material.processingStatus === "ready" &&
-      material.memoryStatus !== "confidential",
-  );
-
-  return (
-    100 -
-    baseIndex +
-    (goal.id === preferredGoalId ? 500 : 0) +
-    matchingFocusCount(goal, weaknessFocusTags) * 40 +
-    matchingFocusCount(goal, analyticsFocusTags) * 50 +
-    (hasReadyMaterial &&
-    ["application_scenarios", "demo_narration", "product_parameters"].includes(
-      goal.id,
-    )
-      ? 25
-      : 0)
-  );
-}
-
 function buildPresetRecommendationReason(
   input: GenerateTodayRecommendationInput,
   goal: PracticeGoal,
 ) {
   const topWeakness = input.progress.topWeaknesses[0];
   const analyticsPlan = input.analytics?.nextTrainingPlan;
-  const readyMaterial = input.recentMaterials.find(
-    (material) =>
-      material.processingStatus === "ready" &&
-      material.memoryStatus !== "confidential",
-  );
+  const readyMaterial = getReadyMaterial(input);
 
   if (topWeakness && weaknessGoalMap[topWeakness.type] === goal.id) {
     return `推荐原因：你最近的复盘显示「${topWeakness.label}」需要优先加强，今天先用「${goal.label}」把这个弱点练成可直接复用的商务表达。`;
@@ -566,9 +389,7 @@ function buildPresetRecommendationReason(
 
   if (
     readyMaterial &&
-    ["application_scenarios", "demo_narration", "product_parameters"].includes(
-      goal.id,
-    )
+    materialFriendlyGoalIds.has(goal.id)
   ) {
     return `推荐原因：最近材料「${readyMaterial.name}」适合沉淀成客户可理解的表达，今天用「${goal.label}」练习把材料讲清楚。`;
   }
@@ -580,62 +401,109 @@ function buildPresetRecommendationReason(
   return `推荐原因：今天先用「${goal.label}」覆盖 Rokid 海外商务会谈中的一个高频场景，保持练习节奏并积累复盘数据。`;
 }
 
+function shuffleCandidates(
+  candidates: RecommendationCandidate[],
+  random: () => number,
+) {
+  const result = [...candidates];
+
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(random() * (index + 1));
+    [result[index], result[swapIndex]] = [result[swapIndex], result[index]];
+  }
+
+  return result;
+}
+
+function buildRecommendationCandidates(input: GenerateTodayRecommendationInput) {
+  return defaultScenarioPack.practiceGoals.flatMap((goal) => {
+    const materialContext = selectMaterialContext(input, goal);
+
+    return goal.recommendedPersonaIds.flatMap((personaId) => {
+      const persona = findPersona(personaId, goal.recommendedPersonaIds);
+
+      return goal.recommendedVoicePackIds.map((voicePackId) => ({
+        ...materialContext,
+        goal,
+        persona,
+        voicePack: findVoicePack(voicePackId, goal.recommendedVoicePackIds),
+      }));
+    });
+  });
+}
+
+function buildRecommendationFromCandidate(
+  input: GenerateTodayRecommendationInput,
+  candidate: RecommendationCandidate,
+) {
+  const topWeakness = input.progress.topWeaknesses[0];
+  const analyticsPlan = input.analytics?.nextTrainingPlan;
+  const readyMaterial = getReadyMaterial(input);
+  const memory = input.memories[0];
+  const evidence = [
+    TODAY_RECOMMENDATION_POOL_SIGNATURE,
+    topWeakness?.evidence,
+    analyticsPlan?.reasonZh,
+    memory ? `${memory.title}: ${memory.summary}` : undefined,
+    readyMaterial?.name,
+    ...candidate.goal.defaultFocusTags,
+  ].filter((item): item is string => Boolean(item));
+
+  return normalizeRecommendation(
+    {
+      title: `${candidate.persona.label} · ${candidate.goal.label}`,
+      reason: buildPresetRecommendationReason(input, candidate.goal),
+      goalId: candidate.goal.id,
+      personaId: candidate.persona.id,
+      voicePackId: candidate.voicePack.id,
+      materialMode: candidate.materialMode,
+      materialId: candidate.materialId,
+      materialLabel: candidate.materialLabel,
+      durationMinutes: 8,
+      evidence: Array.from(new Set(evidence)).slice(0, 8),
+    },
+    "fallback",
+  );
+}
+
 export function buildPresetTodayRecommendationPool(
   input: GenerateTodayRecommendationInput,
 ) {
-  return defaultScenarioPack.practiceGoals
-    .map((goal, index) => ({
-      goal,
-      score: scorePresetGoal(goal, input, index),
-    }))
-    .sort((left, right) => right.score - left.score)
-    .slice(0, TODAY_RECOMMENDATION_POOL_SIZE)
-    .map(({ goal }) => {
-      const recommendation = buildFallbackRecommendationForGoal(input, goal.id);
+  const candidates = buildRecommendationCandidates(input);
+  const random = input.random ?? Math.random;
+  const pool: TodayRecommendation[] = [];
+  const selectedPackageKeys = new Set<string>();
 
-      return {
-        ...recommendation,
-        reason: buildPresetRecommendationReason(input, goal),
-        evidence: Array.from(
-          new Set([
-            ...recommendation.evidence,
-            ...goal.defaultFocusTags,
-          ]),
-        ).slice(0, 6),
-      };
-    });
+  for (const candidate of shuffleCandidates(candidates, random)) {
+    const recommendation = buildRecommendationFromCandidate(input, candidate);
+    const packageKey = buildRecommendationPackageKey(recommendation);
+
+    if (
+      selectedPackageKeys.has(packageKey) ||
+      isExcludedRecommendation(recommendation, input.excludedRecommendationIds)
+    ) {
+      continue;
+    }
+
+    selectedPackageKeys.add(packageKey);
+    pool.push(recommendation);
+
+    if (pool.length >= TODAY_RECOMMENDATION_POOL_SIZE) {
+      break;
+    }
+  }
+
+  return pool.length > 0 ? pool : [buildFallbackRecommendation(input)];
 }
 
 export async function generateTodayRecommendation(
   input: GenerateTodayRecommendationInput,
 ): Promise<TodayRecommendation> {
-  if (shouldUseMockMode(input.mockMode)) {
-    return buildFallbackRecommendation(input);
-  }
-
-  try {
-    const payload = await generateTextJSON({
-      schemaName: "today practice recommendation",
-      prompt: buildRecommendationPrompt(input),
-      maxTokens: 1800,
-      timeoutMs: 12_000,
-    });
-    const recommendationPayload = recommendationPayloadSchema.parse(payload);
-
-    const recommendation = normalizeRecommendation(recommendationPayload, "ai");
-
-    if (isExcludedRecommendation(recommendation, input.excludedRecommendationIds)) {
-      return buildFallbackRecommendation(input);
-    }
-
-    return recommendation;
-  } catch {
-    return buildFallbackRecommendation(input);
-  }
+  return buildPresetTodayRecommendationPool(input)[0] ?? buildFallbackRecommendation(input);
 }
 
 export function getTodayRecommendation() {
-  return buildFallbackRecommendation({
+  return buildPresetTodayRecommendationPool({
     progress: {
       recentTrainingCount: 0,
       topWeaknesses: [],
@@ -645,5 +513,5 @@ export function getTodayRecommendation() {
     },
     recentMaterials: [],
     memories: [],
-  });
+  })[0];
 }
