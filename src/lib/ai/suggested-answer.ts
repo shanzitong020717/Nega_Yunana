@@ -39,6 +39,7 @@ const LIVE_COACHING_FAST_TEXT_MODEL = "deepseek-v4-flash";
 const SUGGESTED_ANSWER_TIMEOUT_MS = 12_000;
 const SUGGESTED_ANSWER_MAX_RETRIES = 1;
 const MAX_SUGGESTED_ANSWER_VOCABULARY_ITEMS = 4;
+const REQUIRED_SUGGESTED_REPLY_COUNT = 3;
 
 function shouldUseMockMode(input: Pick<GenerateSuggestedAnswerInput, "mockMode">) {
   return (
@@ -666,12 +667,144 @@ function normalizeEnglishText(
   return withoutChineseCharacters(withoutPersonaLabel, fallback);
 }
 
+function normalizedReplyKey(reply: Pick<SuggestedReplyItem, "english">) {
+  return reply.english
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function fallbackAlternativeReplies(
+  input: GenerateSuggestedAnswerInput,
+): SuggestedReplyItem[] {
+  const question = input.latestAiTurn.text.toLowerCase();
+  const isTechnical =
+    input.practiceSession.personaId.includes("technical") ||
+    textIncludesAny(question, [
+      "deployment",
+      "cloud",
+      "on-premise",
+      "on premise",
+      "security",
+      "privacy",
+      "encrypted",
+      "integration",
+    ]);
+  const isDemo =
+    input.practiceSession.goalId.includes("demo") ||
+    textIncludesAny(question, [
+      "demo",
+      "show",
+      "walk me through",
+      "how it works",
+      "application scenario",
+      "use case",
+    ]);
+
+  if (isTechnical) {
+    return [
+      {
+        english:
+          "Another safe answer is to define the technical review scope with your IT team before confirming deployment details.",
+        chinese:
+          "另一个稳妥说法是，先和你们 IT 团队定义技术评审范围，再确认具体部署细节。",
+        reason:
+          "It gives a clear next step while avoiding unsupported deployment or security promises.",
+      },
+      {
+        english:
+          "You can also say that the right setup depends on their data flow and security requirements, then suggest reviewing those requirements together.",
+        chinese:
+          "也可以说，合适的方案取决于你们的数据流和安全要求，然后建议一起核对这些要求。",
+        reason:
+          "It keeps the answer grounded in the customer's technical context instead of making a broad claim.",
+      },
+    ];
+  }
+
+  if (isDemo) {
+    return [
+      {
+        english:
+          "Another way to start is to frame Rokid through one concrete workflow, then show how the glasses help the user stay hands-free during the task.",
+        chinese:
+          "另一个开场方式是，先用一个具体工作流来介绍 Rokid，再展示眼镜如何帮助用户在任务中保持免手持操作。",
+        reason:
+          "It makes the demo easier to follow because it starts from a real workflow instead of a broad feature list.",
+      },
+      {
+        english:
+          "You can also invite the customer to choose the demo scenario first, so the explanation feels relevant to their team instead of generic.",
+        chinese:
+          "也可以先邀请客户选择演示场景，这样讲解会更贴合他们团队，而不是泛泛介绍。",
+        reason:
+          "It improves engagement by letting the customer shape the scenario before the product explanation.",
+      },
+    ];
+  }
+
+  return [
+    {
+      english:
+        "Another way to answer is to confirm the customer's priority first, then connect Rokid to the most relevant use case before giving details.",
+      chinese:
+        "另一个回答方式是，先确认客户的优先事项，再把 Rokid 连接到最相关的使用场景，然后展开细节。",
+      reason:
+        "It keeps the answer customer-led and prevents the learner from giving a generic product pitch.",
+    },
+    {
+      english:
+        "You can also propose a small next step: align on the key scenario, confirm what needs to be validated, and then discuss a focused pilot.",
+      chinese:
+        "也可以提出一个小的下一步：先对齐关键场景，确认需要验证什么，再讨论聚焦的试点。",
+      reason:
+        "It turns the conversation into a practical path forward without overpromising.",
+    },
+  ];
+}
+
+function ensureSuggestedReplies(
+  replies: SuggestedAnswerCore["suggestedReplies"],
+  input: GenerateSuggestedAnswerInput,
+) {
+  const result: SuggestedReplyItem[] = [];
+  const seen = new Set<string>();
+
+  function addReply(reply: SuggestedReplyItem) {
+    const key = normalizedReplyKey(reply);
+
+    if (!key || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    result.push(reply);
+  }
+
+  replies.forEach(addReply);
+  fallbackAlternativeReplies(input).forEach(addReply);
+
+  return result.slice(0, REQUIRED_SUGGESTED_REPLY_COUNT);
+}
+
 function normalizeSuggestedAnswerCore(
   core: SuggestedAnswerCore,
   input: GenerateSuggestedAnswerInput,
 ): SuggestedAnswerCore {
   const personaDescriptor = personaEnglishDescriptor(
     input.practiceSession.personaId,
+  );
+  const suggestedReplies = ensureSuggestedReplies(
+    core.suggestedReplies.map((reply) => ({
+      ...reply,
+      reason: normalizeEnglishText(
+        reply.reason,
+        input,
+        "It answers the concern safely and moves the conversation toward a concrete next step.",
+      ),
+    })),
+    input,
   );
 
   return suggestedAnswerCoreSchema.parse({
@@ -689,18 +822,11 @@ function normalizeSuggestedAnswerCore(
         "Acknowledge the concern, answer within known facts, and propose a practical next step.",
       ),
     },
-    suggestedReplies: core.suggestedReplies.map((reply) => ({
-      ...reply,
-      reason: normalizeEnglishText(
-        reply.reason,
-        input,
-        "It answers the concern safely and moves the conversation toward a concrete next step.",
-      ),
-    })),
+    suggestedReplies,
     vocabulary: normalizeVocabularyItems(
       core.vocabulary,
       input,
-      core.suggestedReplies,
+      suggestedReplies,
     ),
   });
 }
@@ -1204,7 +1330,8 @@ function buildSuggestedAnswerPrompt(input: GenerateSuggestedAnswerInput) {
     "Use the same reasoning process as other live support panels: recent context -> customer intent -> learner need -> recommended action -> safe boundary. The answer must be consistent with the same conversation state.",
     "Ground the analysis in the latest transcript. Do not return canned security, deployment, ROI, or pilot language unless the current conversation actually supports it.",
     "Do not invent product claims, pricing, accuracy numbers, certifications, encryption guarantees, or contract terms not provided in the material. If details are unknown, suggest a safe answer that proposes confirmation or technical review.",
-    "JSON shape: aiQuestion { english, translationZh }, analysis, responseStrategy { english, chinese }, contextBreakdown { conversationStateZh, customerQuestionReasonZh, priorUserAnswerZh, missingInformationZh, responseBoundaryZh }, logicBreakdown { surfaceMeaningZh, customerIntentZh, informationNeededZh, responseFocusZh }, suggestedReplies array of 1-3 items { english, chinese, reason }, vocabulary array of 2-4 high-signal advanced terms { term, phonetic, chinese, example }, phrasebookEntry.",
+    "JSON shape: aiQuestion { english, translationZh }, analysis, responseStrategy { english, chinese }, contextBreakdown { conversationStateZh, customerQuestionReasonZh, priorUserAnswerZh, missingInformationZh, responseBoundaryZh }, logicBreakdown { surfaceMeaningZh, customerIntentZh, informationNeededZh, responseFocusZh }, suggestedReplies array of exactly 3 items { english, chinese, reason }, vocabulary array of 2-4 high-signal advanced terms { term, phonetic, chinese, example }, phrasebookEntry.",
+    "suggestedReplies must contain exactly 3 different replies: item 1 is the primary direct answer, item 2 is alternative wording 1, and item 3 is alternative wording 2. The two alternatives must use the same card structure but cannot be identical in wording or angle.",
     "Strict language separation: responseStrategy.english and suggestedReplies[].reason must be English only. responseStrategy.chinese, aiQuestion.translationZh, every contextBreakdown field, and every logicBreakdown field must be Chinese only.",
     "Do not put Chinese persona labels, Chinese focus tags, or mixed-language fragments inside English fields. Use English role descriptions such as technical buyer, enterprise buyer, procurement manager, channel partner, or executive decision maker.",
     "The contextBreakdown should explain the conversational context, not only the latest sentence: what the conversation is about, why the customer asks now, what the learner already said, what information is still missing, and what answer boundaries or risks matter.",

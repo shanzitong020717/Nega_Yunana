@@ -114,6 +114,12 @@ describe("generateSuggestedAnswer", () => {
       },
       transcriptTurns: [],
     });
+    expect(suggestion.suggestedReplies).toHaveLength(3);
+    expect(suggestion.suggestedReplies[1]?.english).toBeTruthy();
+    expect(suggestion.suggestedReplies[2]?.english).toBeTruthy();
+    expect(suggestion.suggestedReplies[1]?.english).not.toBe(
+      suggestion.suggestedReplies[2]?.english,
+    );
     expect(suggestion.vocabulary.map((item) => item.term)).toEqual([
       "remote expert guidance",
       "field engineer",

@@ -600,7 +600,7 @@ function SuggestedAnswerPanel({
                 className="rounded-md bg-[var(--surface-subtle)] px-3 py-2"
               >
                 <p className="text-xs font-semibold text-[var(--primary-strong)]">
-                  备选 {index + 1}
+                  备用说法 {index + 1}
                 </p>
                 <p className="mt-1 text-sm font-medium leading-6 text-[var(--foreground)]">
                   {reply.english}

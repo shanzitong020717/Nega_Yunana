@@ -1195,6 +1195,14 @@ describe("RealtimeRoom mock UI", () => {
                 reason:
                   "It is safer when the learner needs more customer context before making a claim.",
               },
+              {
+                english:
+                  "Another safe next step is to define the pilot scope with your IT team before choosing the deployment setup.",
+                chinese:
+                  "另一个稳妥的下一步，是先和你们 IT 团队定义试点范围，再选择部署方式。",
+                reason:
+                  "It gives the learner a second usable option that still avoids unsupported deployment promises.",
+              },
             ],
             vocabulary: [
               {
@@ -1270,9 +1278,16 @@ describe("RealtimeRoom mock UI", () => {
     expect(within(workspace).getByText("直接这样回答")).toBeInTheDocument();
     expect(within(workspace).queryByText("推荐回复")).not.toBeInTheDocument();
     expect(within(workspace).getByText("备用说法")).toBeInTheDocument();
+    expect(within(workspace).getByText("备用说法 1")).toBeInTheDocument();
+    expect(within(workspace).getByText("备用说法 2")).toBeInTheDocument();
     expect(
       screen.getByText(
         "Before I give a final deployment answer, could we review your IT security requirements together?",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Another safe next step is to define the pilot scope with your IT team before choosing the deployment setup.",
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("上下文解析")).toBeInTheDocument();
