@@ -9,12 +9,13 @@ export type TodayRecommendationCacheRecord = {
 };
 
 const cacheKeyPrefix = "today-recommendation";
+const recommendationRolloverHour = 4;
 
 function canUseLocalStorage() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
 }
 
-function localDateKey(date = new Date()) {
+function formatLocalDateKey(date: Date) {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
@@ -22,8 +23,38 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+function localDateKey(date = new Date()) {
+  if (date.getHours() >= recommendationRolloverHour) {
+    return formatLocalDateKey(date);
+  }
+
+  return formatLocalDateKey(
+    new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1),
+  );
+}
+
 export function todayRecommendationCacheKey(date = new Date()) {
   return `${cacheKeyPrefix}:${localDateKey(date)}`;
+}
+
+export function millisecondsUntilNextTodayRecommendationRollover(
+  date = new Date(),
+) {
+  const nextRollover = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    recommendationRolloverHour,
+    0,
+    0,
+    0,
+  );
+
+  if (date.getTime() >= nextRollover.getTime()) {
+    nextRollover.setDate(nextRollover.getDate() + 1);
+  }
+
+  return Math.max(nextRollover.getTime() - date.getTime(), 0);
 }
 
 function isCacheRecord(value: unknown): value is TodayRecommendationCacheRecord {

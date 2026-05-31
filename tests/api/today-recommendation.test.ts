@@ -12,7 +12,10 @@ vi.mock("@/lib/ai/text-client", () => ({
 }));
 
 import { GET as getTodayRecommendation } from "@/app/api/today-recommendation/route";
-import { resetTodayRecommendationPoolsForTest } from "@/lib/recommendations/today-recommendation-pool";
+import {
+  resetTodayRecommendationPoolsForTest,
+  todayRecommendationDateKey,
+} from "@/lib/recommendations/today-recommendation-pool";
 
 describe("today recommendation API", () => {
   afterEach(() => {
@@ -87,5 +90,14 @@ describe("today recommendation API", () => {
     expect(generateTextJSONMock).not.toHaveBeenCalled();
     expect(new Set(shownIds.slice(1)).size).toBe(3);
     expect(new Set(shownIds).size).toBe(4);
+  });
+
+  it("uses 4am Asia Shanghai as the daily pool rollover time", () => {
+    expect(
+      todayRecommendationDateKey(new Date("2026-05-31T19:59:59.000Z")),
+    ).toBe("2026-05-31");
+    expect(
+      todayRecommendationDateKey(new Date("2026-05-31T20:00:00.000Z")),
+    ).toBe("2026-06-01");
   });
 });

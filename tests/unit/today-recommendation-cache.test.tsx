@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TodayPracticeCard } from "@/features/dashboard/today-practice-card";
 import {
   completeTodayRecommendationAndPrefetch,
+  millisecondsUntilNextTodayRecommendationRollover,
   readTodayRecommendationCache,
+  todayRecommendationCacheKey,
   writeTodayRecommendationCache,
 } from "@/lib/recommendations/today-recommendation-cache";
 import type { TodayRecommendation } from "@/lib/recommendations/today-recommendation";
@@ -51,9 +53,32 @@ function recommendationResponse(recommendation: TodayRecommendation) {
 
 describe("today recommendation daily cache", () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     window.localStorage.clear();
+  });
+
+  it("keeps the previous daily cache before 4am and switches at 4am", () => {
+    expect(
+      todayRecommendationCacheKey(new Date(2026, 4, 31, 3, 59, 59)),
+    ).toBe("today-recommendation:2026-05-30");
+    expect(todayRecommendationCacheKey(new Date(2026, 4, 31, 4, 0, 0))).toBe(
+      "today-recommendation:2026-05-31",
+    );
+  });
+
+  it("calculates the next automatic dashboard rollover at 4am", () => {
+    expect(
+      millisecondsUntilNextTodayRecommendationRollover(
+        new Date(2026, 4, 31, 3, 59, 30),
+      ),
+    ).toBe(30_000);
+    expect(
+      millisecondsUntilNextTodayRecommendationRollover(
+        new Date(2026, 4, 31, 4, 1, 0),
+      ),
+    ).toBe(86_340_000);
   });
 
   it("renders the saved daily recommendation immediately without reloading it", () => {
@@ -166,6 +191,36 @@ describe("today recommendation daily cache", () => {
         cachedRecommendation.id,
       );
     });
+    expect(readTodayRecommendationCache()?.recommendation.title).toBe(
+      "企业买家 · 应用场景说明",
+    );
+  });
+
+  it("automatically loads the new daily package after the 4am rollover", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 4, 31, 3, 59, 59));
+
+    const fetchMock = vi.fn().mockResolvedValue(
+      recommendationResponse(refreshedRecommendation),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    writeTodayRecommendationCache(cachedRecommendation);
+
+    render(<TodayPracticeCard />);
+
+    expect(screen.getByText("采购经理 · 竞品差异说明")).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_000);
+    });
+
+    expect(screen.getByText("企业买家 · 应用场景说明")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/today-recommendation",
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
     expect(readTodayRecommendationCache()?.recommendation.title).toBe(
       "企业买家 · 应用场景说明",
     );

@@ -17,6 +17,7 @@ import {
 } from "@/lib/recommendations/today-recommendation";
 import {
   fetchTodayRecommendationPackage,
+  millisecondsUntilNextTodayRecommendationRollover,
   readTodayRecommendationCache,
   writeTodayRecommendationCache,
 } from "@/lib/recommendations/today-recommendation-cache";
@@ -92,6 +93,51 @@ export function TodayPracticeCard({
       controller.abort();
     };
   }, [recommendation]);
+
+  useEffect(() => {
+    let isMounted = true;
+    let controller: AbortController | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    function scheduleNextRollover() {
+      timeoutId = setTimeout(async () => {
+        controller = new AbortController();
+        setIsRefreshing(true);
+        setFailed(false);
+
+        try {
+          const nextRecommendation = await fetchTodayRecommendationPackage({
+            signal: controller.signal,
+          });
+
+          writeTodayRecommendationCache(nextRecommendation);
+          setRecommendation(nextRecommendation);
+          setFailed(false);
+        } catch {
+          if (!controller.signal.aborted && isMounted) {
+            setFailed(true);
+          }
+        } finally {
+          if (isMounted) {
+            setIsRefreshing(false);
+            scheduleNextRollover();
+          }
+        }
+      }, millisecondsUntilNextTodayRecommendationRollover());
+    }
+
+    scheduleNextRollover();
+
+    return () => {
+      isMounted = false;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+
+      controller?.abort();
+    };
+  }, []);
 
   async function refreshRecommendation() {
     const controller = new AbortController();

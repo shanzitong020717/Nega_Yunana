@@ -27,18 +27,54 @@ export type TodayRecommendationPoolRecord = {
 
 const poolRecords = new Map<string, TodayRecommendationPoolRecord>();
 const backendTimeZone = "Asia/Shanghai";
+const dailyPoolRolloverHour = 4;
+const oneDayInMs = 24 * 60 * 60 * 1000;
 
 function canPersistTodayRecommendationPools() {
   return process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
 }
 
-export function todayRecommendationDateKey(date = new Date()) {
-  return new Intl.DateTimeFormat("en-CA", {
+function formatDateKey(year: number, month: number, day: number) {
+  return [
+    `${year}`.padStart(4, "0"),
+    `${month}`.padStart(2, "0"),
+    `${day}`.padStart(2, "0"),
+  ].join("-");
+}
+
+function getTimeZoneDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
     day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
     month: "2-digit",
     timeZone: backendTimeZone,
     year: "numeric",
-  }).format(date);
+  }).formatToParts(date);
+  const partMap = Object.fromEntries(
+    parts.map((part) => [part.type, part.value]),
+  );
+
+  return {
+    day: Number(partMap.day),
+    hour: Number(partMap.hour),
+    month: Number(partMap.month),
+    year: Number(partMap.year),
+  };
+}
+
+export function todayRecommendationDateKey(date = new Date()) {
+  const parts = getTimeZoneDateParts(date);
+  const businessDate =
+    parts.hour < dailyPoolRolloverHour
+      ? new Date(Date.UTC(parts.year, parts.month - 1, parts.day) - oneDayInMs)
+      : new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+
+  return formatDateKey(
+    businessDate.getUTCFullYear(),
+    businessDate.getUTCMonth() + 1,
+    businessDate.getUTCDate(),
+  );
 }
 
 function poolKey(userId: string, dateKey: string) {
@@ -277,6 +313,7 @@ export function resetTodayRecommendationPoolsForTest() {
 export function getTodayRecommendationPoolConfig() {
   return {
     size: TODAY_RECOMMENDATION_POOL_SIZE,
+    rolloverHour: dailyPoolRolloverHour,
     sourceGoals: defaultScenarioPack.practiceGoals.map((goal) => goal.id),
     timeZone: backendTimeZone,
   };
