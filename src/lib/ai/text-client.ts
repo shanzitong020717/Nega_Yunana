@@ -8,6 +8,7 @@ type GenerateTextJSONInput = {
     sessionId?: string;
     userId?: string;
   };
+  fallbackModels?: string[];
   maxRetries?: number;
   maxTokens?: number;
   model?: string;
@@ -96,6 +97,62 @@ function retryDelayFrom(input: GenerateTextJSONInput) {
   }
 
   return Math.max(0, Math.min(2_000, Math.floor(rawDelay)));
+}
+
+function parseModelList(value?: string | string[]) {
+  const rawValues = Array.isArray(value) ? value : value?.split(",");
+
+  return (
+    rawValues
+      ?.map((model) => model.trim())
+      .filter((model): model is string => model.length > 0) ?? []
+  );
+}
+
+function dedupeModels(models: string[]) {
+  const seenModels = new Set<string>();
+
+  return models.filter((model) => {
+    const modelKey = model.toLowerCase();
+    if (seenModels.has(modelKey)) {
+      return false;
+    }
+
+    seenModels.add(modelKey);
+    return true;
+  });
+}
+
+function modelCandidatesFrom(input: GenerateTextJSONInput) {
+  const configuredDefaultModel = getTextAIModel();
+  const primaryModel = input.model ?? configuredDefaultModel;
+  const fallbackModels = [
+    ...parseModelList(input.fallbackModels),
+    ...parseModelList(process.env.TEXT_AI_FALLBACK_MODELS),
+  ];
+
+  if (primaryModel !== configuredDefaultModel) {
+    fallbackModels.push(configuredDefaultModel);
+  }
+
+  return {
+    primaryModel,
+    modelCandidates: dedupeModels([primaryModel, ...fallbackModels]),
+  };
+}
+
+function diagnosticsMetadataWithModelFallback(input: {
+  attemptedModels: string[];
+  finalModel: string;
+  metadata?: Record<string, unknown>;
+  primaryModel: string;
+}) {
+  return {
+    ...input.metadata,
+    attemptedModels: input.attemptedModels,
+    fallbackUsed: input.finalModel !== input.primaryModel,
+    primaryModel: input.primaryModel,
+  };
 }
 
 function wait(ms: number) {
@@ -305,41 +362,72 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
   const maxRetries = retryCountFrom(input);
   const retryDelayMs = retryDelayFrom(input);
   const startedAt = Date.now();
-  const model = input.model ?? getTextAIModel();
+  const { modelCandidates, primaryModel } = modelCandidatesFrom(input);
+  const attemptedModels: string[] = [];
   const feature =
     input.diagnostics?.feature ?? featureFromSchemaName(input.schemaName);
   let attemptCount = 0;
   let lastError: unknown;
+  let lastModel = primaryModel;
 
-  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-    attemptCount = attempt + 1;
+  for (const model of modelCandidates) {
+    lastModel = model;
+    attemptedModels.push(model);
 
-    try {
-      const result = await requestTextJSON(input);
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      attemptCount += 1;
 
-      recordAiCallDiagnostic({
-        attemptCount,
-        durationMs: Date.now() - startedAt,
-        feature,
-        maxRetries,
-        metadata: input.diagnostics?.metadata,
-        model,
-        provider: TEXT_ANALYSIS_PROVIDER_NAME,
-        schemaName: input.schemaName,
-        sessionId: input.diagnostics?.sessionId,
-        status: "success",
-        timeoutMs: input.timeoutMs,
-        userId: input.diagnostics?.userId,
-      });
+      try {
+        const result = await requestTextJSON({
+          ...input,
+          model,
+        });
 
-      return result;
-    } catch (error) {
-      lastError = error;
+        recordAiCallDiagnostic({
+          attemptCount,
+          durationMs: Date.now() - startedAt,
+          feature,
+          maxRetries,
+          metadata: diagnosticsMetadataWithModelFallback({
+            attemptedModels,
+            finalModel: model,
+            metadata: input.diagnostics?.metadata,
+            primaryModel,
+          }),
+          model,
+          provider: TEXT_ANALYSIS_PROVIDER_NAME,
+          schemaName: input.schemaName,
+          sessionId: input.diagnostics?.sessionId,
+          status: "success",
+          timeoutMs: input.timeoutMs,
+          userId: input.diagnostics?.userId,
+        });
 
-      if (
-        attempt >= maxRetries ||
-        !isRetryableTextGenerationError(error)
-      ) {
+        return result;
+      } catch (error) {
+        lastError = error;
+        const hasMoreAttemptsForCurrentModel = attempt < maxRetries;
+        const hasMoreModels =
+          modelCandidates.indexOf(model) < modelCandidates.length - 1;
+        const isRetryableError = isRetryableTextGenerationError(error);
+
+        if (hasMoreAttemptsForCurrentModel && isRetryableError) {
+          console.warn(
+            `${input.schemaName} generation failed on attempt ${attempt + 1} with ${model}; retrying.`,
+            error,
+          );
+          await wait(retryDelayMs);
+          continue;
+        }
+
+        if (hasMoreModels && isRetryableError) {
+          console.warn(
+            `${input.schemaName} generation failed with ${model}; switching fallback model.`,
+            error,
+          );
+          break;
+        }
+
         const classifiedError = classifyTextGenerationError(error);
 
         recordAiCallDiagnostic({
@@ -350,7 +438,12 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
           feature,
           httpStatus: classifiedError.httpStatus,
           maxRetries,
-          metadata: input.diagnostics?.metadata,
+          metadata: diagnosticsMetadataWithModelFallback({
+            attemptedModels,
+            finalModel: model,
+            metadata: input.diagnostics?.metadata,
+            primaryModel,
+          }),
           model,
           provider: TEXT_ANALYSIS_PROVIDER_NAME,
           schemaName: input.schemaName,
@@ -361,13 +454,34 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
         });
         throw error;
       }
-
-      console.warn(
-        `${input.schemaName} generation failed on attempt ${attempt + 1}; retrying.`,
-        error,
-      );
-      await wait(retryDelayMs);
     }
+  }
+
+  if (lastError) {
+    const classifiedError = classifyTextGenerationError(lastError);
+
+    recordAiCallDiagnostic({
+      attemptCount,
+      durationMs: Date.now() - startedAt,
+      errorMessage: classifiedError.errorMessage,
+      errorType: classifiedError.errorType,
+      feature,
+      httpStatus: classifiedError.httpStatus,
+      maxRetries,
+      metadata: diagnosticsMetadataWithModelFallback({
+        attemptedModels,
+        finalModel: lastModel,
+        metadata: input.diagnostics?.metadata,
+        primaryModel,
+      }),
+      model: lastModel,
+      provider: TEXT_ANALYSIS_PROVIDER_NAME,
+      schemaName: input.schemaName,
+      sessionId: input.diagnostics?.sessionId,
+      status: "error",
+      timeoutMs: input.timeoutMs,
+      userId: input.diagnostics?.userId,
+    });
   }
 
   throw lastError instanceof Error

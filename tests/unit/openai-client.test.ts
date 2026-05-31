@@ -182,7 +182,7 @@ describe("openai client environment helpers", () => {
           sessionId: "session_2",
           userId: "user_1",
         },
-        model: "deepseek-v4-flash",
+        model: "deepseek-v4-pro",
         prompt: "Return JSON.",
         schemaName: "suggested answer",
         maxRetries: 1,
@@ -198,6 +198,122 @@ describe("openai client environment helpers", () => {
         feature: "suggested_answer",
         httpStatus: 503,
         maxRetries: 1,
+        model: "deepseek-v4-pro",
+        status: "error",
+      }),
+    ]);
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("falls back to the default text model when the primary model has a transient failure", async () => {
+    resetAiCallDiagnosticsForTests();
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-test");
+    vi.stubEnv("DEEPSEEK_TEXT_MODEL", "deepseek-v4-pro");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: async () => ({
+          error: {
+            message: "flash overloaded",
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: "{\"ok\":true,\"model\":\"fallback\"}",
+              },
+            },
+          ],
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      generateTextJSON({
+        diagnostics: {
+          feature: "support_cue",
+          sessionId: "session_fallback",
+          userId: "user_fallback",
+        },
+        model: "deepseek-v4-flash",
+        prompt: "Return JSON.",
+        schemaName: "support cue",
+        maxRetries: 0,
+      }),
+    ).resolves.toEqual({ ok: true, model: "fallback" });
+
+    const requestBodies = fetchMock.mock.calls.map((call) =>
+      JSON.parse((call[1] as RequestInit).body as string) as { model: string },
+    );
+    expect(requestBodies.map((body) => body.model)).toEqual([
+      "deepseek-v4-flash",
+      "deepseek-v4-pro",
+    ]);
+    expect(listAiCallDiagnostics({ userId: "user_fallback" })).toEqual([
+      expect.objectContaining({
+        attemptCount: 2,
+        feature: "support_cue",
+        metadata: expect.objectContaining({
+          attemptedModels: ["deepseek-v4-flash", "deepseek-v4-pro"],
+          fallbackUsed: true,
+          primaryModel: "deepseek-v4-flash",
+        }),
+        model: "deepseek-v4-pro",
+        status: "success",
+      }),
+    ]);
+
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it("does not switch fallback models for non-retryable authentication errors", async () => {
+    resetAiCallDiagnosticsForTests();
+    vi.stubEnv("DEEPSEEK_API_KEY", "sk-test");
+    vi.stubEnv("DEEPSEEK_TEXT_MODEL", "deepseek-v4-pro");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        error: {
+          message: "invalid api key",
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      generateTextJSON({
+        diagnostics: {
+          feature: "suggested_answer",
+          userId: "user_auth_error",
+        },
+        model: "deepseek-v4-flash",
+        prompt: "Return JSON.",
+        schemaName: "suggested answer",
+        maxRetries: 0,
+      }),
+    ).rejects.toThrow("invalid api key");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(listAiCallDiagnostics({ userId: "user_auth_error" })).toEqual([
+      expect.objectContaining({
+        errorType: "http_error",
+        httpStatus: 401,
+        metadata: expect.objectContaining({
+          attemptedModels: ["deepseek-v4-flash"],
+          fallbackUsed: false,
+          primaryModel: "deepseek-v4-flash",
+        }),
         model: "deepseek-v4-flash",
         status: "error",
       }),
