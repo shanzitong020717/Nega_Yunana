@@ -35,7 +35,9 @@ export type GenerateSuggestedAnswerInput = {
   transcriptTurns: TranscriptTurnInput[];
 };
 
-const SUGGESTED_ANSWER_TIMEOUT_MS = 20_000;
+const LIVE_COACHING_FAST_TEXT_MODEL = "deepseek-v4-flash";
+const SUGGESTED_ANSWER_TIMEOUT_MS = 12_000;
+const SUGGESTED_ANSWER_MAX_RETRIES = 1;
 const MAX_SUGGESTED_ANSWER_VOCABULARY_ITEMS = 4;
 
 function shouldUseMockMode(input: Pick<GenerateSuggestedAnswerInput, "mockMode">) {
@@ -51,7 +53,7 @@ function suggestedAnswerTextModel() {
     process.env.SUGGESTED_ANSWER_TEXT_MODEL?.trim() ||
     process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
     process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
-    undefined
+    LIVE_COACHING_FAST_TEXT_MODEL
   );
 }
 
@@ -1237,14 +1239,17 @@ export async function generateSuggestedAnswer(
           prompt: buildSuggestedAnswerPrompt(input),
           schemaName: "suggested answer",
           model: suggestedAnswerTextModel(),
-          maxTokens: 2400,
+          maxRetries: SUGGESTED_ANSWER_MAX_RETRIES,
+          maxTokens: 1800,
           timeoutMs: SUGGESTED_ANSWER_TIMEOUT_MS,
         }),
         input,
       );
     } catch (error) {
       console.warn("Suggested answer text model failed.", error);
-      core = generateMockSuggestedAnswer(input);
+      throw new Error("建议回答 AI 生成失败：文本模型暂时不可用，请稍后重试。", {
+        cause: error,
+      });
     }
   }
 

@@ -1,9 +1,11 @@
 import { normalizeOpenAIApiKey, normalizeOpenAIBaseURL } from "@/lib/ai/openai-client";
 
 type GenerateTextJSONInput = {
+  maxRetries?: number;
   maxTokens?: number;
   model?: string;
   prompt: string;
+  retryDelayMs?: number;
   schemaName: string;
   timeoutMs?: number;
 };
@@ -11,6 +13,8 @@ type GenerateTextJSONInput = {
 const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
 const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_MAX_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 200;
 
 export const TEXT_ANALYSIS_PROVIDER_NAME = "DeepSeek";
 export const TEXT_ANALYSIS_BOUNDARY =
@@ -56,7 +60,75 @@ function extractJSONContent(content: string) {
   return trimmedContent;
 }
 
-export async function generateTextJSON(input: GenerateTextJSONInput) {
+function retryCountFrom(input: GenerateTextJSONInput) {
+  const configuredRetryCount =
+    input.maxRetries ?? process.env.TEXT_AI_MAX_RETRIES;
+
+  if (configuredRetryCount === undefined || configuredRetryCount === "") {
+    return DEFAULT_MAX_RETRIES;
+  }
+
+  const rawRetryCount = Number(configuredRetryCount);
+  if (!Number.isFinite(rawRetryCount)) {
+    return DEFAULT_MAX_RETRIES;
+  }
+
+  return Math.max(0, Math.min(3, Math.floor(rawRetryCount)));
+}
+
+function retryDelayFrom(input: GenerateTextJSONInput) {
+  const configuredDelay = input.retryDelayMs ?? process.env.TEXT_AI_RETRY_DELAY_MS;
+
+  if (configuredDelay === undefined || configuredDelay === "") {
+    return DEFAULT_RETRY_DELAY_MS;
+  }
+
+  const rawDelay = Number(configuredDelay);
+  if (!Number.isFinite(rawDelay)) {
+    return DEFAULT_RETRY_DELAY_MS;
+  }
+
+  return Math.max(0, Math.min(2_000, Math.floor(rawDelay)));
+}
+
+function wait(ms: number) {
+  return ms > 0
+    ? new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      })
+    : Promise.resolve();
+}
+
+class TextGenerationHTTPError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "TextGenerationHTTPError";
+  }
+}
+
+function isRetryableTextGenerationError(error: unknown) {
+  if (error instanceof TextGenerationHTTPError) {
+    return [408, 409, 429, 500, 502, 503, 504].includes(error.status);
+  }
+
+  if (!(error instanceof Error)) {
+    return true;
+  }
+
+  return (
+    error.name === "AbortError" ||
+    error.message.includes("timed out") ||
+    error.message.includes("fetch failed") ||
+    error.message.includes("network") ||
+    error.message.includes("returned no content") ||
+    error.message.includes("returned invalid JSON")
+  );
+}
+
+async function requestTextJSON(input: GenerateTextJSONInput) {
   const apiKey = configuredTextApiKey();
 
   if (!apiKey) {
@@ -98,15 +170,25 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
       }),
     });
 
-    const payload = (await response.json()) as {
+    let payload: {
       choices?: Array<{ message?: { content?: string } }>;
       error?: { message?: string };
     };
 
-    if (!response.ok) {
+    try {
+      payload = (await response.json()) as typeof payload;
+    } catch (error) {
       throw new Error(
+        `${input.schemaName} generation returned invalid response JSON.`,
+        { cause: error },
+      );
+    }
+
+    if (!response.ok) {
+      throw new TextGenerationHTTPError(
         payload.error?.message ??
           `${input.schemaName} generation failed with status ${response.status}.`,
+        response.status,
       );
     }
 
@@ -116,7 +198,14 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
       throw new Error(`${input.schemaName} generation returned no content.`);
     }
 
-    return JSON.parse(extractJSONContent(content)) as unknown;
+    try {
+      return JSON.parse(extractJSONContent(content)) as unknown;
+    } catch (error) {
+      throw new Error(
+        `${input.schemaName} generation returned invalid JSON content.`,
+        { cause: error },
+      );
+    }
   } catch (error) {
     if (controller?.signal.aborted) {
       throw new Error(
@@ -130,4 +219,35 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
       clearTimeout(timeoutId);
     }
   }
+}
+
+export async function generateTextJSON(input: GenerateTextJSONInput) {
+  const maxRetries = retryCountFrom(input);
+  const retryDelayMs = retryDelayFrom(input);
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      return await requestTextJSON(input);
+    } catch (error) {
+      lastError = error;
+
+      if (
+        attempt >= maxRetries ||
+        !isRetryableTextGenerationError(error)
+      ) {
+        throw error;
+      }
+
+      console.warn(
+        `${input.schemaName} generation failed on attempt ${attempt + 1}; retrying.`,
+        error,
+      );
+      await wait(retryDelayMs);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`${input.schemaName} generation failed.`);
 }

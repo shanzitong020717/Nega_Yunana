@@ -45,7 +45,6 @@ describe("generateSmartGuidance", () => {
         "The key difference is that Rokid keeps the conversation visible and hands-free while people stay in the workflow.",
     });
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("SUBTITLE_DEEPSEEK_MODEL", "deepseek-v4-flash");
 
     const guidance = await generateSmartGuidance({
       persona,
@@ -72,7 +71,8 @@ describe("generateSmartGuidance", () => {
       expect.objectContaining({
         model: "deepseek-v4-flash",
         schemaName: "smart guidance",
-        timeoutMs: 15_000,
+        timeoutMs: 7_000,
+        maxRetries: 1,
       }),
     );
     const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;

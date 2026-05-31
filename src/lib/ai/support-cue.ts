@@ -35,8 +35,10 @@ type GenerateSupportCueInput = {
 
 type GenerateSmartGuidanceInput = Omit<GenerateSupportCueInput, "cue">;
 
-const SUPPORT_CUE_TIMEOUT_MS = 20_000;
-const SMART_GUIDANCE_TIMEOUT_MS = 15_000;
+const LIVE_COACHING_FAST_TEXT_MODEL = "deepseek-v4-flash";
+const SUPPORT_CUE_TIMEOUT_MS = 10_000;
+const SMART_GUIDANCE_TIMEOUT_MS = 7_000;
+const LIVE_COACHING_MAX_RETRIES = 1;
 
 function shouldUseMockMode(input: { mockMode?: boolean }) {
   return (
@@ -82,7 +84,7 @@ function smartGuidanceTextModel() {
     process.env.SMART_GUIDANCE_TEXT_MODEL?.trim() ||
     process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
     process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
-    undefined
+    LIVE_COACHING_FAST_TEXT_MODEL
   );
 }
 
@@ -91,7 +93,7 @@ function supportCueTextModel() {
     process.env.SUPPORT_CUE_TEXT_MODEL?.trim() ||
     process.env.SUPPORT_CUE_FAST_TEXT_MODEL?.trim() ||
     process.env.SUBTITLE_DEEPSEEK_MODEL?.trim() ||
-    undefined
+    LIVE_COACHING_FAST_TEXT_MODEL
   );
 }
 
@@ -429,7 +431,8 @@ export async function generateSupportCue(
         prompt: buildSupportCuePrompt(input),
         schemaName: "support cue",
         model: supportCueTextModel(),
-        maxTokens: 2200,
+        maxRetries: LIVE_COACHING_MAX_RETRIES,
+        maxTokens: 1600,
         timeoutMs: SUPPORT_CUE_TIMEOUT_MS,
       }),
     );
@@ -457,7 +460,8 @@ export async function generateSmartGuidance(
           prompt: buildSmartGuidancePrompt(input),
           schemaName: "smart guidance",
           model: smartGuidanceTextModel(),
-          maxTokens: 1100,
+          maxRetries: LIVE_COACHING_MAX_RETRIES,
+          maxTokens: 800,
           timeoutMs: SMART_GUIDANCE_TIMEOUT_MS,
         }),
       ),

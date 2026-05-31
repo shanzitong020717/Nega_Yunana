@@ -84,7 +84,6 @@ describe("generateSuggestedAnswer", () => {
       },
     });
     vi.stubEnv("NODE_ENV", "production");
-    vi.stubEnv("SUBTITLE_DEEPSEEK_MODEL", "deepseek-v4-flash");
 
     const suggestion = await generateSuggestedAnswer({
       practiceSession: {
@@ -126,7 +125,8 @@ describe("generateSuggestedAnswer", () => {
       expect.objectContaining({
         model: "deepseek-v4-flash",
         schemaName: "suggested answer",
-        timeoutMs: 20_000,
+        timeoutMs: 12_000,
+        maxRetries: 1,
       }),
     );
   });
@@ -409,50 +409,46 @@ describe("generateSuggestedAnswer", () => {
     );
   });
 
-  it("returns a context-derived suggested answer when the production model fails", async () => {
+  it("does not return a canned core rescue answer when the production model fails", async () => {
     generateTextJSONMock.mockRejectedValueOnce(new Error("model unavailable"));
     vi.stubEnv("NODE_ENV", "production");
 
-    const suggestion = await generateSuggestedAnswer({
-      practiceSession: {
-        id: "session_suggested_fallback",
-        scenarioPackId: "rokid-overseas-sales",
-        goalId: "customer_qa",
-        mode: "customer_qa",
-        personaId: "technical_lead",
-        voicePackId: "charon-informative",
-        materialId: undefined,
-        prepCardId: undefined,
-        difficulty: "normal",
-        trainingFocus: ["privacy and security"],
-        focusTags: ["隐私安全"],
-        sourceObjectionId: undefined,
-        status: "active",
-        createdAt: new Date().toISOString(),
-      },
-      persona: defaultScenarioPack.personas.find(
-        (persona) => persona.id === "technical_lead",
-      )!,
-      latestAiTurn: {
-        speaker: "ai_customer",
-        text: "Can you detail how data is encrypted both at rest and in transit?",
-        translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
-        timestamp: 0,
-        metadata: {},
-      },
-      transcriptTurns: [],
-    });
-
-    expect(suggestion.aiQuestion.english).toBe(
-      "Can you detail how data is encrypted both at rest and in transit?",
-    );
-    expect(suggestion.contextBreakdown.conversationStateZh).toContain("安全");
-    expect(suggestion.suggestedReplies[0]?.english).toContain("data flow");
-    expect(suggestion.vocabulary.length).toBeGreaterThanOrEqual(2);
+    await expect(
+      generateSuggestedAnswer({
+        practiceSession: {
+          id: "session_suggested_fallback",
+          scenarioPackId: "rokid-overseas-sales",
+          goalId: "customer_qa",
+          mode: "customer_qa",
+          personaId: "technical_lead",
+          voicePackId: "charon-informative",
+          materialId: undefined,
+          prepCardId: undefined,
+          difficulty: "normal",
+          trainingFocus: ["privacy and security"],
+          focusTags: ["隐私安全"],
+          sourceObjectionId: undefined,
+          status: "active",
+          createdAt: new Date().toISOString(),
+        },
+        persona: defaultScenarioPack.personas.find(
+          (persona) => persona.id === "technical_lead",
+        )!,
+        latestAiTurn: {
+          speaker: "ai_customer",
+          text: "Can you detail how data is encrypted both at rest and in transit?",
+          translationZh: "你能详细说明数据在静态和传输过程中如何加密吗？",
+          timestamp: 0,
+          metadata: {},
+        },
+        transcriptTurns: [],
+      }),
+    ).rejects.toThrow("建议回答 AI 生成失败");
     expect(generateTextJSONMock).toHaveBeenCalledWith(
       expect.objectContaining({
         schemaName: "suggested answer",
-        timeoutMs: 20_000,
+        timeoutMs: 12_000,
+        maxRetries: 1,
       }),
     );
   });
