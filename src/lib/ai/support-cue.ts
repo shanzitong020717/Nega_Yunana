@@ -438,7 +438,11 @@ export async function generateSupportCue(
     );
   } catch (error) {
     console.warn("Support cue text model failed.", error);
-    return fallbackSupportCue(input);
+    const supportCueError = new Error(
+      "提示分析 AI 生成失败：文本模型暂时不可用，请稍后重试。",
+    );
+    (supportCueError as Error & { cause?: unknown }).cause = error;
+    throw supportCueError;
   }
 }
 
