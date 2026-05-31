@@ -43,7 +43,7 @@ describe("today recommendation API", () => {
       new Request("http://localhost/api/today-recommendation"),
     );
     const firstPayload = (await firstResponse.json()) as {
-      pool?: { activeIndex: number; size: number };
+      pool?: { activeIndex: number; items?: { id: string }[]; size: number };
       recommendation?: { id: string; title: string; source: string };
     };
     const secondResponse = await getTodayRecommendation(
@@ -57,8 +57,10 @@ describe("today recommendation API", () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(200);
     expect(generateTextJSONMock).not.toHaveBeenCalled();
-    expect(firstPayload.pool).toEqual({ activeIndex: 0, size: 30 });
-    expect(secondPayload.pool).toEqual({ activeIndex: 1, size: 30 });
+    expect(firstPayload.pool).toMatchObject({ activeIndex: 0, size: 30 });
+    expect(secondPayload.pool).toMatchObject({ activeIndex: 1, size: 30 });
+    expect(firstPayload.pool?.items).toHaveLength(30);
+    expect(firstPayload.pool?.items?.[0]?.id).toBe(firstPayload.recommendation?.id);
     expect(firstPayload.recommendation?.source).toBe("fallback");
     expect(secondPayload.recommendation?.source).toBe("fallback");
     expect(secondPayload.recommendation?.id).not.toBe(

@@ -47,8 +47,46 @@ const refreshedRecommendation: TodayRecommendation = {
   evidence: ["refreshed evidence"],
 };
 
+const thirdRecommendation: TodayRecommendation = {
+  id: "demo_narration:channel_partner:zephyr-bright:memory_context",
+  title: "渠道合作伙伴 · 产品演示讲解",
+  reason: "第二次刷新后重新计算出的推荐。",
+  goalId: "demo_narration",
+  goalLabel: "产品演示讲解",
+  personaId: "channel_partner",
+  personaLabel: "渠道合作伙伴",
+  voicePackId: "zephyr-bright",
+  voicePackLabel: "Zephyr 明亮友好",
+  materialMode: "memory_context",
+  materialLabel: "系统记忆",
+  durationMinutes: 10,
+  href: "/practice",
+  source: "ai",
+  evidence: ["third evidence"],
+};
+
 function recommendationResponse(recommendation: TodayRecommendation) {
   return new Response(JSON.stringify({ recommendation }), { status: 200 });
+}
+
+function recommendationPoolResponse({
+  activeIndex,
+  recommendation,
+}: {
+  activeIndex: number;
+  recommendation: TodayRecommendation;
+}) {
+  return new Response(
+    JSON.stringify({
+      recommendation,
+      pool: {
+        activeIndex,
+        items: [cachedRecommendation, refreshedRecommendation, thirdRecommendation],
+        size: 3,
+      },
+    }),
+    { status: 200 },
+  );
 }
 
 describe("today recommendation daily cache", () => {
@@ -123,24 +161,40 @@ describe("today recommendation daily cache", () => {
     );
   });
 
+  it("switches instantly from the cached pool while server sync is still pending", () => {
+    let resolveFetch: (response: Response) => void = () => {};
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve;
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    writeTodayRecommendationCache(cachedRecommendation, {
+      poolActiveIndex: 0,
+      poolItems: [cachedRecommendation, refreshedRecommendation, thirdRecommendation],
+    });
+
+    render(<TodayPracticeCard />);
+
+    fireEvent.click(screen.getByRole("button", { name: "刷新今日建议" }));
+
+    expect(screen.getByText("企业买家 · 应用场景说明")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/today-recommendation?refresh=1",
+      { signal: undefined },
+    );
+    expect(readTodayRecommendationCache()?.recommendation.title).toBe(
+      "企业买家 · 应用场景说明",
+    );
+
+    resolveFetch(recommendationPoolResponse({
+      activeIndex: 1,
+      recommendation: refreshedRecommendation,
+    }));
+  });
+
   it("keeps refresh as a simple next-package switch across repeated clicks", async () => {
-    const thirdRecommendation: TodayRecommendation = {
-      id: "demo_narration:channel_partner:zephyr-bright:memory_context",
-      title: "渠道合作伙伴 · 产品演示讲解",
-      reason: "第二次刷新后重新计算出的推荐。",
-      goalId: "demo_narration",
-      goalLabel: "产品演示讲解",
-      personaId: "channel_partner",
-      personaLabel: "渠道合作伙伴",
-      voicePackId: "zephyr-bright",
-      voicePackLabel: "Zephyr 明亮友好",
-      materialMode: "memory_context",
-      materialLabel: "系统记忆",
-      durationMinutes: 10,
-      href: "/practice",
-      source: "ai",
-      evidence: ["third evidence"],
-    };
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(recommendationResponse(refreshedRecommendation))

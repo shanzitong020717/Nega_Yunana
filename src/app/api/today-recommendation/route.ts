@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       recommendation,
       pool: {
         activeIndex: pool.activeIndex,
+        items: pool.items,
         size: pool.items.length,
       },
     });

@@ -16,6 +16,7 @@ import {
   type TodayRecommendation,
 } from "@/lib/recommendations/today-recommendation";
 import {
+  advanceCachedTodayRecommendation,
   fetchTodayRecommendationPackage,
   millisecondsUntilNextTodayRecommendationRollover,
   readTodayRecommendationCache,
@@ -73,12 +74,15 @@ export function TodayPracticeCard({
       }
 
       try {
-        const nextRecommendation = await fetchTodayRecommendationPackage({
+        const nextPackage = await fetchTodayRecommendationPackage({
           signal: controller.signal,
         });
 
-        writeTodayRecommendationCache(nextRecommendation);
-        setRecommendation(nextRecommendation);
+        writeTodayRecommendationCache(nextPackage.recommendation, {
+          poolActiveIndex: nextPackage.pool?.activeIndex,
+          poolItems: nextPackage.pool?.items,
+        });
+        setRecommendation(nextPackage.recommendation);
         setFailed(false);
       } catch {
         if (!controller.signal.aborted) {
@@ -106,12 +110,15 @@ export function TodayPracticeCard({
         setFailed(false);
 
         try {
-          const nextRecommendation = await fetchTodayRecommendationPackage({
+          const nextPackage = await fetchTodayRecommendationPackage({
             signal: controller.signal,
           });
 
-          writeTodayRecommendationCache(nextRecommendation);
-          setRecommendation(nextRecommendation);
+          writeTodayRecommendationCache(nextPackage.recommendation, {
+            poolActiveIndex: nextPackage.pool?.activeIndex,
+            poolItems: nextPackage.pool?.items,
+          });
+          setRecommendation(nextPackage.recommendation);
           setFailed(false);
         } catch {
           if (!controller.signal.aborted && isMounted) {
@@ -140,19 +147,35 @@ export function TodayPracticeCard({
   }, []);
 
   async function refreshRecommendation() {
+    const cachedNext = advanceCachedTodayRecommendation();
+
+    if (cachedNext) {
+      setRecommendation(cachedNext.recommendation);
+      setFailed(false);
+
+      void fetchTodayRecommendationPackage({
+        refresh: true,
+      }).catch(() => null);
+
+      return;
+    }
+
     const controller = new AbortController();
 
     setIsRefreshing(true);
     setFailed(false);
 
     try {
-      const nextRecommendation = await fetchTodayRecommendationPackage({
+      const nextPackage = await fetchTodayRecommendationPackage({
         refresh: true,
         signal: controller.signal,
       });
 
-      writeTodayRecommendationCache(nextRecommendation);
-      setRecommendation(nextRecommendation);
+      writeTodayRecommendationCache(nextPackage.recommendation, {
+        poolActiveIndex: nextPackage.pool?.activeIndex,
+        poolItems: nextPackage.pool?.items,
+      });
+      setRecommendation(nextPackage.recommendation);
     } catch {
       setFailed(true);
     } finally {

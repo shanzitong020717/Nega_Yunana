@@ -3,9 +3,21 @@ import type { TodayRecommendation } from "@/lib/recommendations/today-recommenda
 export type TodayRecommendationCacheRecord = {
   completedRecommendationIds: string[];
   date: string;
+  pool?: TodayRecommendationPoolCacheSnapshot;
   recommendation: TodayRecommendation;
   shownRecommendationIds: string[];
   updatedAt: string;
+};
+
+export type TodayRecommendationPoolCacheSnapshot = {
+  activeIndex: number;
+  items: TodayRecommendation[];
+  size: number;
+};
+
+export type TodayRecommendationPackageResponse = {
+  pool?: TodayRecommendationPoolCacheSnapshot;
+  recommendation: TodayRecommendation;
 };
 
 const cacheKeyPrefix = "today-recommendation";
@@ -78,6 +90,52 @@ function isCacheRecord(value: unknown): value is TodayRecommendationCacheRecord 
   );
 }
 
+function isRecommendation(value: unknown): value is TodayRecommendation {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const recommendation = value as Record<string, unknown>;
+
+  return (
+    typeof recommendation.id === "string" &&
+    typeof recommendation.title === "string" &&
+    typeof recommendation.goalId === "string" &&
+    typeof recommendation.personaId === "string" &&
+    typeof recommendation.voicePackId === "string" &&
+    typeof recommendation.materialMode === "string"
+  );
+}
+
+function normalizePoolSnapshot(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return undefined;
+  }
+
+  const pool = value as Record<string, unknown>;
+  const items = Array.isArray(pool.items)
+    ? pool.items.filter(isRecommendation)
+    : [];
+
+  if (items.length === 0) {
+    return undefined;
+  }
+
+  const activeIndex =
+    typeof pool.activeIndex === "number" && Number.isFinite(pool.activeIndex)
+      ? Math.min(Math.max(Math.round(pool.activeIndex), 0), items.length - 1)
+      : 0;
+
+  return {
+    activeIndex,
+    items,
+    size:
+      typeof pool.size === "number" && Number.isFinite(pool.size)
+        ? Math.max(Math.round(pool.size), items.length)
+        : items.length,
+  };
+}
+
 function stringArray(value: unknown) {
   return Array.isArray(value)
     ? value.filter((item): item is string => typeof item === "string" && item.length > 0)
@@ -86,6 +144,14 @@ function stringArray(value: unknown) {
 
 function unique(values: string[]) {
   return Array.from(new Set(values));
+}
+
+function clampPoolActiveIndex(activeIndex: number, size: number) {
+  if (size <= 0) {
+    return 0;
+  }
+
+  return Math.min(Math.max(Math.round(activeIndex), 0), size - 1);
 }
 
 export function readTodayRecommendationCache(date = new Date()) {
@@ -112,6 +178,9 @@ export function readTodayRecommendationCache(date = new Date()) {
       completedRecommendationIds: unique(
         stringArray(parsedCache.completedRecommendationIds),
       ),
+      pool: normalizePoolSnapshot(
+        (parsedCache as Partial<TodayRecommendationCacheRecord>).pool,
+      ),
       shownRecommendationIds: unique([
         ...stringArray(
           (parsedCache as Partial<TodayRecommendationCacheRecord>)
@@ -130,6 +199,8 @@ export function writeTodayRecommendationCache(
   options: {
     completedRecommendationIds?: string[];
     date?: Date;
+    poolActiveIndex?: number;
+    poolItems?: TodayRecommendation[];
     shownRecommendationIds?: string[];
   } = {},
 ) {
@@ -150,10 +221,31 @@ export function writeTodayRecommendationCache(
       []),
     recommendation.id,
   ]);
+  const poolItems = options.poolItems ?? currentCache?.pool?.items;
+  const matchedPoolIndex = poolItems?.findIndex(
+    (item) => item.id === recommendation.id,
+  );
+  const resolvedPoolActiveIndex =
+    options.poolActiveIndex ??
+    (matchedPoolIndex !== undefined && matchedPoolIndex >= 0
+      ? matchedPoolIndex
+      : currentCache?.pool?.activeIndex ?? 0);
+  const pool =
+    poolItems && poolItems.length > 0
+      ? {
+          activeIndex: clampPoolActiveIndex(
+            resolvedPoolActiveIndex,
+            poolItems.length,
+          ),
+          items: poolItems,
+          size: poolItems.length,
+        }
+      : undefined;
   const cacheRecord: TodayRecommendationCacheRecord = {
     date: localDateKey(date),
     recommendation,
     completedRecommendationIds,
+    pool,
     shownRecommendationIds,
     updatedAt: new Date().toISOString(),
   };
@@ -164,6 +256,35 @@ export function writeTodayRecommendationCache(
   );
 
   return cacheRecord;
+}
+
+export function advanceCachedTodayRecommendation(date = new Date()) {
+  const currentCache = readTodayRecommendationCache(date);
+  const poolItems = currentCache?.pool?.items ?? [];
+
+  if (!currentCache || poolItems.length < 2) {
+    return null;
+  }
+
+  const currentIndex = poolItems.findIndex(
+    (item) => item.id === currentCache.recommendation.id,
+  );
+  const activeIndex =
+    currentIndex >= 0 ? currentIndex : currentCache.pool?.activeIndex ?? 0;
+  const nextIndex = (activeIndex + 1) % poolItems.length;
+  const nextRecommendation = poolItems[nextIndex];
+
+  if (!nextRecommendation) {
+    return null;
+  }
+
+  return writeTodayRecommendationCache(nextRecommendation, {
+    completedRecommendationIds: currentCache.completedRecommendationIds,
+    date,
+    poolActiveIndex: nextIndex,
+    poolItems,
+    shownRecommendationIds: currentCache.shownRecommendationIds,
+  });
 }
 
 export function markTodayRecommendationCompleted(
@@ -233,6 +354,7 @@ export async function fetchTodayRecommendationPackage({
   }
 
   const payload = (await response.json()) as {
+    pool?: unknown;
     recommendation?: TodayRecommendation;
   };
 
@@ -240,7 +362,10 @@ export async function fetchTodayRecommendationPackage({
     throw new Error("Today recommendation payload is empty.");
   }
 
-  return payload.recommendation;
+  return {
+    pool: normalizePoolSnapshot(payload.pool),
+    recommendation: payload.recommendation,
+  };
 }
 
 export async function completeTodayRecommendationAndPrefetch(
@@ -250,16 +375,18 @@ export async function completeTodayRecommendationAndPrefetch(
   const controller = new AbortController();
 
   try {
-    const nextRecommendation = await fetchTodayRecommendationPackage({
+    const nextPackage = await fetchTodayRecommendationPackage({
       refresh: true,
       signal: controller.signal,
     });
 
-    writeTodayRecommendationCache(nextRecommendation, {
+    writeTodayRecommendationCache(nextPackage.recommendation, {
       completedRecommendationIds: completedState.completedRecommendationIds,
+      poolActiveIndex: nextPackage.pool?.activeIndex,
+      poolItems: nextPackage.pool?.items,
     });
 
-    return nextRecommendation;
+    return nextPackage.recommendation;
   } catch {
     return null;
   }
