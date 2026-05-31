@@ -41,6 +41,10 @@ export async function POST(
       ? getPrepCardRecord(practiceSession.prepCardId, scope)
       : null;
     const guidance = await generateSmartGuidance({
+      diagnostics: {
+        sessionId,
+        userId: authContext.profileId,
+      },
       transcriptTurns: input.transcriptTurns,
       persona,
       practiceSession,

@@ -37,6 +37,10 @@ export async function POST(request: Request, context: SupportCueRouteContext) {
       : null;
     const cueResult = await generateSupportCue({
       cue: input.cue,
+      diagnostics: {
+        sessionId,
+        userId: authContext.profileId,
+      },
       transcriptTurns: input.transcriptTurns,
       persona,
       practiceSession,

@@ -86,6 +86,10 @@ describe("generateSuggestedAnswer", () => {
     vi.stubEnv("NODE_ENV", "production");
 
     const suggestion = await generateSuggestedAnswer({
+      diagnostics: {
+        sessionId: "session_model_vocabulary",
+        userId: "user_suggested_answer",
+      },
       practiceSession: {
         id: "session_model_vocabulary",
         scenarioPackId: "rokid-overseas-sales",
@@ -133,6 +137,11 @@ describe("generateSuggestedAnswer", () => {
         schemaName: "suggested answer",
         timeoutMs: 12_000,
         maxRetries: 1,
+        diagnostics: {
+          feature: "suggested_answer",
+          sessionId: "session_model_vocabulary",
+          userId: "user_suggested_answer",
+        },
       }),
     );
   });

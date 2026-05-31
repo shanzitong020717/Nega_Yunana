@@ -26,6 +26,10 @@ export type SuggestedAnswerPersona = {
 };
 
 export type GenerateSuggestedAnswerInput = {
+  diagnostics?: {
+    sessionId?: string;
+    userId?: string;
+  };
   latestAiTurn: SuggestedAnswerAiTurn;
   materialBrief?: MaterialBriefPayload | null;
   mockMode?: boolean;
@@ -1363,6 +1367,11 @@ export async function generateSuggestedAnswer(
     try {
       core = repairSuggestedAnswerCore(
         await generateTextJSON({
+          diagnostics: {
+            feature: "suggested_answer",
+            sessionId: input.diagnostics?.sessionId,
+            userId: input.diagnostics?.userId,
+          },
           prompt: buildSuggestedAnswerPrompt(input),
           schemaName: "suggested answer",
           model: suggestedAnswerTextModel(),

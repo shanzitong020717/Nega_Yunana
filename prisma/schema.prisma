@@ -85,6 +85,11 @@ enum AllowedUserStatus {
   BLOCKED
 }
 
+enum AiCallStatus {
+  SUCCESS
+  ERROR
+}
+
 model UserProfile {
   id                       String                    @id @default(cuid())
   authUserId               String?                   @unique @db.Uuid
@@ -102,6 +107,7 @@ model UserProfile {
   phrases                  Phrase[]
   todayRecommendationPools TodayRecommendationPool[]
   weaknesses               WeaknessMetric[]
+  aiCallDiagnostics        AiCallDiagnostic[]
 }
 
 model AllowedUser {
@@ -304,4 +310,30 @@ model TodayRecommendationPool {
   @@unique([userId, dateKey])
   @@index([userId])
   @@index([dateKey])
+}
+
+model AiCallDiagnostic {
+  id           String       @id @default(cuid())
+  userId       String?
+  sessionId    String?
+  feature      String
+  schemaName   String
+  provider     String
+  model        String
+  status       AiCallStatus
+  durationMs   Int
+  attemptCount Int          @default(1)
+  maxRetries   Int          @default(0)
+  timeoutMs    Int?
+  httpStatus   Int?
+  errorType    String?
+  errorMessage String?
+  metadata     Json         @default("{}")
+  createdAt    DateTime     @default(now())
+  user         UserProfile? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([feature, createdAt])
+  @@index([sessionId])
 }

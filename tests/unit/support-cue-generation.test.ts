@@ -75,6 +75,10 @@ describe("generateSupportCue", () => {
 
     const result = await generateSupportCue({
       cue: "Ask a Discovery Question",
+      diagnostics: {
+        sessionId: "session_support_cue_model",
+        userId: "user_support_cue",
+      },
       persona,
       practiceSession,
       transcriptTurns: [
@@ -102,6 +106,11 @@ describe("generateSupportCue", () => {
         schemaName: "support cue",
         timeoutMs: 10_000,
         maxRetries: 1,
+        diagnostics: {
+          feature: "support_cue_ask_a_discovery_question",
+          sessionId: "session_support_cue_model",
+          userId: "user_support_cue",
+        },
       }),
     );
     const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;

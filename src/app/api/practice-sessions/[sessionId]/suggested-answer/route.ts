@@ -45,6 +45,10 @@ export async function POST(
       ? getPrepCardRecord(practiceSession.prepCardId, scope)
       : null;
     const suggestion = await generateSuggestedAnswer({
+      diagnostics: {
+        sessionId,
+        userId: authContext.profileId,
+      },
       latestAiTurn: input.latestAiTurn,
       transcriptTurns: input.transcriptTurns,
       persona,

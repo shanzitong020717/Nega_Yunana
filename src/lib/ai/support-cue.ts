@@ -25,6 +25,10 @@ export type SupportCuePersona = {
 
 type GenerateSupportCueInput = {
   cue: SupportCue;
+  diagnostics?: {
+    sessionId?: string;
+    userId?: string;
+  };
   materialBrief?: MaterialBriefPayload | null;
   mockMode?: boolean;
   persona: SupportCuePersona;
@@ -39,6 +43,10 @@ const LIVE_COACHING_FAST_TEXT_MODEL = "deepseek-v4-flash";
 const SUPPORT_CUE_TIMEOUT_MS = 10_000;
 const SMART_GUIDANCE_TIMEOUT_MS = 7_000;
 const LIVE_COACHING_MAX_RETRIES = 1;
+
+function diagnosticFeatureName(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+}
 
 function shouldUseMockMode(input: { mockMode?: boolean }) {
   return (
@@ -428,6 +436,11 @@ export async function generateSupportCue(
   try {
     return supportCueResultSchema.parse(
       await generateTextJSON({
+        diagnostics: {
+          feature: `support_cue_${diagnosticFeatureName(input.cue)}`,
+          sessionId: input.diagnostics?.sessionId,
+          userId: input.diagnostics?.userId,
+        },
         prompt: buildSupportCuePrompt(input),
         schemaName: "support cue",
         model: supportCueTextModel(),
@@ -461,6 +474,11 @@ export async function generateSmartGuidance(
     return normalizeSmartGuidanceOutput(
       smartGuidanceSchema.parse(
         await generateTextJSON({
+          diagnostics: {
+            feature: "smart_guidance",
+            sessionId: input.diagnostics?.sessionId,
+            userId: input.diagnostics?.userId,
+          },
           prompt: buildSmartGuidancePrompt(input),
           schemaName: "smart guidance",
           model: smartGuidanceTextModel(),

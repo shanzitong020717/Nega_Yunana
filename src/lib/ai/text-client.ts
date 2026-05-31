@@ -1,6 +1,13 @@
 import { normalizeOpenAIApiKey, normalizeOpenAIBaseURL } from "@/lib/ai/openai-client";
+import { recordAiCallDiagnostic } from "@/lib/ai/diagnostics";
 
 type GenerateTextJSONInput = {
+  diagnostics?: {
+    feature?: string;
+    metadata?: Record<string, unknown>;
+    sessionId?: string;
+    userId?: string;
+  };
   maxRetries?: number;
   maxTokens?: number;
   model?: string;
@@ -107,6 +114,79 @@ class TextGenerationHTTPError extends Error {
     super(message);
     this.name = "TextGenerationHTTPError";
   }
+}
+
+function featureFromSchemaName(schemaName: string) {
+  return schemaName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+}
+
+function classifyTextGenerationError(error: unknown) {
+  if (error instanceof TextGenerationHTTPError) {
+    if (error.status === 429) {
+      return {
+        errorType: "rate_limit",
+        httpStatus: error.status,
+        errorMessage: error.message,
+      };
+    }
+
+    if (error.status >= 500) {
+      return {
+        errorType: "upstream_5xx",
+        httpStatus: error.status,
+        errorMessage: error.message,
+      };
+    }
+
+    return {
+      errorType: "http_error",
+      httpStatus: error.status,
+      errorMessage: error.message,
+    };
+  }
+
+  if (!(error instanceof Error)) {
+    return {
+      errorType: "unknown_error",
+      errorMessage: "Unknown text generation error.",
+    };
+  }
+
+  if (error.name === "AbortError" || error.message.includes("timed out")) {
+    return {
+      errorType: "timeout",
+      errorMessage: error.message,
+    };
+  }
+
+  if (error.message.includes("invalid JSON")) {
+    return {
+      errorType: "invalid_json",
+      errorMessage: error.message,
+    };
+  }
+
+  if (error.message.includes("returned no content")) {
+    return {
+      errorType: "empty_response",
+      errorMessage: error.message,
+    };
+  }
+
+  if (
+    error.message.includes("fetch failed") ||
+    error.message.includes("network")
+  ) {
+    return {
+      errorType: "network_error",
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    errorType: error.name || "text_generation_error",
+    errorMessage: error.message,
+  };
 }
 
 function isRetryableTextGenerationError(error: unknown) {
@@ -224,11 +304,35 @@ async function requestTextJSON(input: GenerateTextJSONInput) {
 export async function generateTextJSON(input: GenerateTextJSONInput) {
   const maxRetries = retryCountFrom(input);
   const retryDelayMs = retryDelayFrom(input);
+  const startedAt = Date.now();
+  const model = input.model ?? getTextAIModel();
+  const feature =
+    input.diagnostics?.feature ?? featureFromSchemaName(input.schemaName);
+  let attemptCount = 0;
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    attemptCount = attempt + 1;
+
     try {
-      return await requestTextJSON(input);
+      const result = await requestTextJSON(input);
+
+      recordAiCallDiagnostic({
+        attemptCount,
+        durationMs: Date.now() - startedAt,
+        feature,
+        maxRetries,
+        metadata: input.diagnostics?.metadata,
+        model,
+        provider: TEXT_ANALYSIS_PROVIDER_NAME,
+        schemaName: input.schemaName,
+        sessionId: input.diagnostics?.sessionId,
+        status: "success",
+        timeoutMs: input.timeoutMs,
+        userId: input.diagnostics?.userId,
+      });
+
+      return result;
     } catch (error) {
       lastError = error;
 
@@ -236,6 +340,25 @@ export async function generateTextJSON(input: GenerateTextJSONInput) {
         attempt >= maxRetries ||
         !isRetryableTextGenerationError(error)
       ) {
+        const classifiedError = classifyTextGenerationError(error);
+
+        recordAiCallDiagnostic({
+          attemptCount,
+          durationMs: Date.now() - startedAt,
+          errorMessage: classifiedError.errorMessage,
+          errorType: classifiedError.errorType,
+          feature,
+          httpStatus: classifiedError.httpStatus,
+          maxRetries,
+          metadata: input.diagnostics?.metadata,
+          model,
+          provider: TEXT_ANALYSIS_PROVIDER_NAME,
+          schemaName: input.schemaName,
+          sessionId: input.diagnostics?.sessionId,
+          status: "error",
+          timeoutMs: input.timeoutMs,
+          userId: input.diagnostics?.userId,
+        });
         throw error;
       }
 

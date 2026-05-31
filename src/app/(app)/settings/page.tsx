@@ -1,8 +1,20 @@
 import { PageHeader } from "@/components/page-header";
 import { StatusPill } from "@/components/status-pill";
+import { AiDiagnosticsPanel } from "@/features/settings/ai-diagnostics-panel";
 import { PrivacySettings } from "@/features/settings/privacy-settings";
+import { requireAuthContext } from "@/lib/auth/require-user";
+import {
+  listAiCallDiagnosticsAsync,
+  summarizeAiCallDiagnostics,
+} from "@/lib/ai/diagnostics";
 
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  const authContext = await requireAuthContext();
+  const aiDiagnostics = await listAiCallDiagnosticsAsync({
+    limit: 20,
+    userId: authContext.profileId,
+  });
+
   return (
     <>
       <PageHeader
@@ -18,6 +30,10 @@ export default function SettingsPage() {
             Confidential mode should be enabled by default, and OpenAI API keys must only be used from server-side route handlers.
           </p>
         </section>
+        <AiDiagnosticsPanel
+          diagnostics={aiDiagnostics}
+          summary={summarizeAiCallDiagnostics(aiDiagnostics)}
+        />
         <PrivacySettings />
       </div>
     </>

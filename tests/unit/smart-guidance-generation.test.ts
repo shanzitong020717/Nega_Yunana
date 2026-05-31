@@ -47,6 +47,10 @@ describe("generateSmartGuidance", () => {
     vi.stubEnv("NODE_ENV", "production");
 
     const guidance = await generateSmartGuidance({
+      diagnostics: {
+        sessionId: "session_smart_guidance_model",
+        userId: "user_smart_guidance",
+      },
       persona,
       practiceSession,
       transcriptTurns: [
@@ -73,6 +77,11 @@ describe("generateSmartGuidance", () => {
         schemaName: "smart guidance",
         timeoutMs: 7_000,
         maxRetries: 1,
+        diagnostics: {
+          feature: "smart_guidance",
+          sessionId: "session_smart_guidance_model",
+          userId: "user_smart_guidance",
+        },
       }),
     );
     const prompt = generateTextJSONMock.mock.calls[0]?.[0].prompt as string;
