@@ -54,8 +54,8 @@ describe("today recommendation API", () => {
     expect(firstResponse.status).toBe(200);
     expect(secondResponse.status).toBe(200);
     expect(generateTextJSONMock).not.toHaveBeenCalled();
-    expect(firstPayload.pool).toEqual({ activeIndex: 0, size: 10 });
-    expect(secondPayload.pool).toEqual({ activeIndex: 1, size: 10 });
+    expect(firstPayload.pool).toEqual({ activeIndex: 0, size: 30 });
+    expect(secondPayload.pool).toEqual({ activeIndex: 1, size: 30 });
     expect(firstPayload.recommendation?.source).toBe("fallback");
     expect(secondPayload.recommendation?.source).toBe("fallback");
     expect(secondPayload.recommendation?.id).not.toBe(

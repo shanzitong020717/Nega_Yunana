@@ -64,8 +64,8 @@ export type GenerateTodayRecommendationInput = {
   random?: () => number;
 };
 
-export const TODAY_RECOMMENDATION_POOL_SIZE = 10;
-export const TODAY_RECOMMENDATION_POOL_SIGNATURE = "random-config-v1";
+export const TODAY_RECOMMENDATION_POOL_SIZE = 30;
+export const TODAY_RECOMMENDATION_POOL_SIGNATURE = "random-config-v2-size-30";
 const materialFriendlyGoalIds = new Set<PracticeGoalId>([
   "application_scenarios",
   "demo_narration",

@@ -95,7 +95,7 @@ describe("today practice recommendation", () => {
     });
     const firstThreeRefreshes = pool.slice(1, 4).map(packageKey);
 
-    expect(pool).toHaveLength(10);
+    expect(pool).toHaveLength(30);
     expect(new Set(pool.map(packageKey)).size).toBe(pool.length);
     expect(new Set(firstThreeRefreshes).size).toBe(3);
   });
