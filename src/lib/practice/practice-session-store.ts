@@ -9,6 +9,7 @@ import {
   PracticeSessionStatus,
   TranscriptSpeaker,
 } from "@/generated/prisma/enums";
+import { shouldBypassAuthForE2E } from "@/lib/auth/e2e-bypass";
 import { LOCAL_DEMO_PROFILE_ID, type UserScope } from "@/lib/auth/user-scope";
 import { getDb } from "@/lib/db";
 import { consolidateReviewMemoryCandidates } from "@/lib/memory/review-memory-consolidation";
@@ -63,7 +64,11 @@ const reviewRecords = new Map<string, ReviewRecord>();
 const suggestedAnswerRecords = new Map<string, SuggestedAnswerRecord[]>();
 
 function canPersistPracticeData() {
-  return process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
+  return (
+    !shouldBypassAuthForE2E() &&
+    process.env.NODE_ENV !== "test" &&
+    Boolean(process.env.DATABASE_URL)
+  );
 }
 
 function getRecordUserId(record: { userId?: string }) {

@@ -38,8 +38,10 @@ test.describe("redesign smoke coverage", () => {
   }) => {
     await page.goto("/dashboard");
 
-    await expect(page.getByRole("heading", { name: "今日练习" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /开始今日练习/ })).toHaveCount(1);
+    await expect(
+      page.getByRole("heading", { name: "今日练习", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("link", { name: /快速训练/ })).toHaveCount(1);
     await expect(page.getByText("今日建议你练")).toBeVisible();
   });
 

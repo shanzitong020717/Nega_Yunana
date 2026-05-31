@@ -1,4 +1,5 @@
 import { defaultScenarioPack } from "@/data/scenario-packs";
+import { shouldBypassAuthForE2E } from "@/lib/auth/e2e-bypass";
 import { getDb } from "@/lib/db";
 import { listMaterialRecords } from "@/lib/materials/material-store";
 import { rankMemoriesForPractice } from "@/lib/memory/memory-store";
@@ -31,7 +32,11 @@ const dailyPoolRolloverHour = 4;
 const oneDayInMs = 24 * 60 * 60 * 1000;
 
 function canPersistTodayRecommendationPools() {
-  return process.env.NODE_ENV !== "test" && Boolean(process.env.DATABASE_URL);
+  return (
+    !shouldBypassAuthForE2E() &&
+    process.env.NODE_ENV !== "test" &&
+    Boolean(process.env.DATABASE_URL)
+  );
 }
 
 function formatDateKey(year: number, month: number, day: number) {

@@ -23,6 +23,14 @@ export default defineConfig({
   ],
   webServer: {
     command: `npm run build && npm run start -- --port ${port}`,
+    env: {
+      NEXT_PUBLIC_SUPABASE_URL:
+        process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+        "sb_publishable_test_key",
+      PLAYWRIGHT_AUTH_BYPASS: "1",
+    },
     url: `${baseURL}/dashboard`,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

@@ -1,3 +1,5 @@
+import { shouldBypassAuthForE2E } from "@/lib/auth/e2e-bypass";
+
 export type AiCallDiagnosticStatus = "success" | "error";
 
 export type AiCallDiagnosticInput = {
@@ -58,6 +60,7 @@ const memoryDiagnostics: AiCallDiagnosticRecord[] = [];
 
 function canPersistAiDiagnostics() {
   return (
+    !shouldBypassAuthForE2E() &&
     process.env.NEXT_RUNTIME !== "edge" &&
     process.env.NODE_ENV !== "test" &&
     Boolean(process.env.DATABASE_URL)

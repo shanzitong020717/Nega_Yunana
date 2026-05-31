@@ -13,15 +13,20 @@ import type { PracticeSessionRecord } from "@/lib/practice/practice-session-stor
 import type { TranscriptTurnInput } from "@/lib/validation/practice";
 import {
   createReviewInputSchema,
+  type ConversationReview,
   type ObjectionFrameworkReview,
   type ObjectionFrameworkStep,
   type PracticeReviewPayload,
 } from "@/lib/validation/reviews";
 import type { SuggestedAnswerRecord } from "@/lib/validation/suggested-answer";
 
+type ReviewTranscriptTurnInput = TranscriptTurnInput & {
+  id?: string;
+};
+
 export type GeneratePracticeReviewInput = {
   practiceSession: PracticeSessionRecord;
-  transcriptTurns: TranscriptTurnInput[];
+  transcriptTurns: ReviewTranscriptTurnInput[];
   persona: CustomerPersona;
   materialBrief?: MaterialBriefPayload | null;
   prepCard?: PrepCardPayload | null;
@@ -169,6 +174,115 @@ export function parseReviewPayload(value: unknown): PracticeReviewPayload {
   }
 }
 
+function translationFromMetadata(turn: TranscriptTurnInput) {
+  const translation =
+    turn.metadata.translationZh ??
+    turn.metadata.translation ??
+    turn.metadata.chinese ??
+    turn.metadata.translation_zh;
+
+  return typeof translation === "string" && translation.trim()
+    ? translation.trim()
+    : "暂无中文翻译。";
+}
+
+function isConversationSpeakerTurn(
+  turn: ReviewTranscriptTurnInput,
+): turn is ReviewTranscriptTurnInput & { speaker: "ai_customer" | "user" } {
+  return turn.speaker === "ai_customer" || turn.speaker === "user";
+}
+
+function turnIdFrom(turn: ReviewTranscriptTurnInput) {
+  return typeof turn.id === "string" && turn.id.trim()
+    ? turn.id.trim()
+    : undefined;
+}
+
+function definedString(value: string | undefined): value is string {
+  return typeof value === "string" && value.length > 0;
+}
+
+function buildMockConversationReview(
+  input: GeneratePracticeReviewInput,
+): ConversationReview {
+  const conversationTurns = input.transcriptTurns.filter(isConversationSpeakerTurn);
+  const turns: ConversationReview["turns"] = conversationTurns.map(
+    (turn, index) => {
+      const isUser = turn.speaker === "user";
+      const turnId = turnIdFrom(turn);
+
+      return {
+        id: `conversation_turn_review_${index + 1}`,
+        turnId,
+        pairIndex: Math.floor(index / 2) + 1,
+        speaker: turn.speaker,
+        text: turn.text,
+        translationZh: translationFromMetadata(turn),
+        timestamp: turn.timestamp,
+        intentZh: isUser
+          ? "用户正在尝试回应客户问题并介绍 Rokid 价值。"
+          : "AI 客户正在确认业务场景、需求或决策条件。",
+        roleInConversationZh: isUser ? "用户回答" : "客户提问",
+        customerNeedZh: isUser
+          ? undefined
+          : "客户需要更具体的业务场景、价值证据或下一步安排。",
+        answerFit: isUser ? "partial" : undefined,
+        answerFitReasonZh: isUser
+          ? "回答有产品信息，但还需要更明确连接客户场景。"
+          : undefined,
+        strengths: isUser ? ["没有编造不确定的产品承诺"] : [],
+        issues: isUser
+          ? [
+              {
+                type: "answer_relevance",
+                severity: 3,
+                summaryZh: "回答需要更直接回应客户刚才的问题。",
+                evidence: turn.text,
+                suggestionZh: "先回答客户问题，再补充 Rokid 能力。",
+              },
+            ]
+          : [],
+        betterResponse: isUser
+          ? {
+              english:
+                "Let's focus on one concrete customer scenario first, then I can explain how Rokid supports that workflow.",
+              chinese:
+                "我们先聚焦一个具体客户场景，然后我再说明 Rokid 如何支持这个工作流。",
+              reasonZh: "这句话先接住客户场景，再自然推进产品价值。",
+            }
+          : undefined,
+        relatedSentenceReviewIds: isUser ? ["sentence_review_value_1"] : [],
+      };
+    },
+  );
+  const evidenceTurnIds = turns
+    .map((turn) => turn.turnId)
+    .filter(definedString);
+
+  return {
+    summaryZh: "本次对话能介绍 Rokid 价值，但需要更先确认客户场景。",
+    turns,
+    stages: [
+      {
+        stage: "scenario_discovery",
+        labelZh: "确认客户场景",
+        status: "partial",
+        evidenceTurnIds,
+        summaryZh: "客户场景确认已经出现，但回答还可以更具体。",
+        improvementZh: "下次先选择一个行业或业务流程，再展开产品能力。",
+      },
+    ],
+    overallFlow: {
+      answeredCustomerNeedsZh: ["说明了 Rokid 的产品能力"],
+      missedCustomerNeedsZh: ["还需要更具体确认客户业务场景"],
+      strongestMomentZh: "没有过度承诺不确定信息。",
+      weakestMomentZh: "客户要求聚焦场景时，回答仍偏产品功能。",
+      nextConversationStrategyZh:
+        "先确认客户场景，再把 Rokid 功能转成客户结果。",
+    },
+  };
+}
+
 function generateMockReview(
   input: GeneratePracticeReviewInput,
 ): PracticeReviewPayload {
@@ -252,6 +366,7 @@ function generateMockReview(
       `You kept the answer connected to ${customerValue}.`,
       "You avoided making unsupported claims about pricing, compliance, or accuracy.",
     ],
+    conversationReview: buildMockConversationReview(input),
     sentenceReviews: [
       {
         id: "sentence_review_value_1",
@@ -516,8 +631,16 @@ function buildReviewPrompt(input: GeneratePracticeReviewInput) {
     "You are generating a structured after-practice review for a Rokid overseas sales and solution professional.",
     TEXT_ANALYSIS_BOUNDARY,
     "Return strict JSON only. Do not include Markdown.",
-    "The JSON must include meetingOutcome, reviewSnapshot, scores, topImprovements, bestMoments, sentenceReviews, sentenceUpgrades, materialCoverage, phrasebookSuggestions, weaknessUpdates, memoryCandidates, and nextSessionRecommendation.",
+    "The JSON must include meetingOutcome, reviewSnapshot, scores, topImprovements, bestMoments, conversationReview, sentenceReviews, sentenceUpgrades, materialCoverage, phrasebookSuggestions, weaknessUpdates, memoryCandidates, and nextSessionRecommendation.",
     "reviewSnapshot must be a Chinese 30-second summary with overallSummaryZh, 1-3 strengths, 1-3 priorityImprovements, phrasebookCandidateCount, memoryCandidateCount, and nextPracticeFocus.",
+    "conversationReview must include summaryZh, turns, stages, and overallFlow.",
+    "conversationReview.turns must include every non-system transcript turn in order.",
+    "For AI customer turns, explain the customer's intent and what information they wanted from the learner.",
+    "For user turns, judge whether the answer fits the latest AI customer question using answerFit: good, partial, missed, or off_topic.",
+    "Each user turn must include answerFitReasonZh, strengths, issues, optional betterResponse, and relatedSentenceReviewIds when relevant.",
+    "Do not invent a conversation. Ground every conversationReview.turn in the actual Transcript array.",
+    "If the transcript includes translation metadata, use it. Otherwise provide concise Chinese translation.",
+    "conversationReview.stages must evaluate opening, scenario_discovery, value_positioning, detail_answering, objection_handling, and next_step when those stages appear or are missing.",
     "For sentenceReviews, evaluate each meaningful user speaking turn. Focus on what the learner said, not the AI customer.",
     "Each sentenceReview must include id, original, translationZh, quality, grammarIssues, wordChoiceIssues, naturalnessIssues, highlights, reasonZh, practicePrompt, vocabulary, and optional phrasebookCandidate.",
     "Use grammarIssues for grammar errors, wordChoiceIssues for wrong or weak wording, and naturalnessIssues for unnatural, verbose, literal, or business-inappropriate wording.",

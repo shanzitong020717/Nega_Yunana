@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { shouldBypassAuthForE2E } from "@/lib/auth/e2e-bypass";
+
 const protectedPrefixes = [
   "/dashboard",
   "/materials",
@@ -21,6 +23,10 @@ function isProtectedPath(pathname: string) {
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  if (shouldBypassAuthForE2E()) {
+    return response;
+  }
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

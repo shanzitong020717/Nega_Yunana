@@ -12,6 +12,7 @@ vi.mock("@/lib/ai/text-client", () => ({
 
 import { personas } from "@/data/personas";
 import { generatePracticeReview } from "@/lib/ai/review";
+import type { TranscriptTurnInput } from "@/lib/validation/practice";
 
 const transcriptTurns = [
   {
@@ -165,6 +166,70 @@ describe("generatePracticeReview", () => {
     expect(review.nextSessionRecommendation.focus).toContain("business value");
   });
 
+  it("generates conversationReview grounded in the transcript turns", async () => {
+    const transcriptTurnsWithIds: Array<TranscriptTurnInput & { id: string }> = [
+      {
+        id: "turn_ai_1",
+        speaker: "ai_customer",
+        text: "Which customer scenario should we focus on first?",
+        timestamp: 4,
+        metadata: { translationZh: "我们应该先关注哪个客户场景？" },
+      },
+      {
+        id: "turn_user_1",
+        speaker: "user",
+        text: "Rokid has translation function and smart glasses.",
+        timestamp: 12,
+        metadata: { translationZh: "Rokid 有翻译功能和智能眼镜。" },
+      },
+    ];
+
+    const review = await generatePracticeReview({
+      practiceSession: {
+        id: "session_conversation_replay",
+        scenarioPackId: "rokid-overseas-sales",
+        goalId: "application_scenarios",
+        mode: "customer_qa",
+        personaId: "enterprise_buyer",
+        voicePackId: "kore-firm",
+        materialId: undefined,
+        prepCardId: undefined,
+        difficulty: "normal",
+        trainingFocus: ["应用场景说明"],
+        focusTags: ["应用场景"],
+        sourceObjectionId: undefined,
+        status: "completed",
+        createdAt: new Date().toISOString(),
+      },
+      transcriptTurns: transcriptTurnsWithIds,
+      persona: personas.find((persona) => persona.id === "enterprise_buyer")!,
+      mockMode: true,
+    });
+
+    expect(review.conversationReview?.turns).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          turnId: "turn_ai_1",
+          speaker: "ai_customer",
+          intentZh: expect.stringContaining("客户"),
+        }),
+        expect.objectContaining({
+          turnId: "turn_user_1",
+          speaker: "user",
+          answerFit: expect.any(String),
+          betterResponse: expect.objectContaining({
+            english: expect.any(String),
+            chinese: expect.any(String),
+            reasonZh: expect.any(String),
+          }),
+        }),
+      ]),
+    );
+    expect(
+      review.conversationReview?.overallFlow.nextConversationStrategyZh,
+    ).toEqual(expect.any(String));
+  });
+
   it("asks the text model to generate sentence reviews and validates the returned structure", async () => {
     generateTextJSONMock.mockResolvedValueOnce({
       meetingOutcome: {
@@ -191,6 +256,59 @@ describe("generatePracticeReview", () => {
       },
       topImprovements: ["Lead with customer outcomes."],
       bestMoments: ["Connected Rokid to meeting flow."],
+      conversationReview: {
+        summaryZh: "本次对话能说明价值，但需要更明确确认客户场景。",
+        turns: [
+          {
+            id: "conversation_turn_review_1",
+            turnId: "turn_user_1",
+            pairIndex: 1,
+            speaker: "user",
+            text: "We have translation function and it can help your meeting.",
+            translationZh: "我们有翻译功能，可以帮助你们的会议。",
+            timestamp: 8,
+            intentZh: "用户试图说明产品价值。",
+            roleInConversationZh: "用户回答客户问题",
+            answerFit: "partial",
+            answerFitReasonZh: "回答提到功能，但还需要连接客户具体场景。",
+            strengths: ["有意识围绕会议场景回答"],
+            issues: [
+              {
+                type: "answer_relevance",
+                severity: 3,
+                summaryZh: "回答还不够贴合客户具体问题。",
+                evidence: "help your meeting",
+                suggestionZh: "先确认客户场景，再说明实时字幕如何帮助该场景。",
+              },
+            ],
+            betterResponse: {
+              english:
+                "For multilingual customer meetings, Rokid can make the conversation easier to follow with real-time translated captions.",
+              chinese:
+                "在多语言客户会议中，Rokid 可以通过实时翻译字幕让对话更容易跟上。",
+              reasonZh: "这句话把功能连接到了客户场景和会议结果。",
+            },
+            relatedSentenceReviewIds: ["sentence_review_1"],
+          },
+        ],
+        stages: [
+          {
+            stage: "value_positioning",
+            labelZh: "介绍产品价值",
+            status: "partial",
+            evidenceTurnIds: ["turn_user_1"],
+            summaryZh: "已经说明产品能力，但业务价值还可以更具体。",
+            improvementZh: "用客户场景承接产品功能。",
+          },
+        ],
+        overallFlow: {
+          answeredCustomerNeedsZh: ["说明了实时翻译字幕的价值"],
+          missedCustomerNeedsZh: ["没有先确认客户具体工作流"],
+          strongestMomentZh: "能把产品连接到会议场景。",
+          weakestMomentZh: "客户场景确认不足。",
+          nextConversationStrategyZh: "先确认场景，再给产品价值。",
+        },
+      },
       sentenceReviews: [
         {
           id: "sentence_review_1",
@@ -301,7 +419,11 @@ describe("generatePracticeReview", () => {
     expect(prompt).toContain("wordChoiceIssues");
     expect(prompt).toContain("naturalnessIssues");
     expect(prompt).toContain("highlights");
+    expect(prompt).toContain("conversationReview");
+    expect(prompt).toContain("conversationReview.turns");
+    expect(prompt).toContain("answerFit");
     expect(prompt).toContain("Do not rewrite sentences that are already natural");
+    expect(review.conversationReview?.turns[0]?.answerFit).toBe("partial");
     expect(review.sentenceReviews[0]?.phrasebookCandidate?.english).toContain(
       "Rokid makes multilingual meetings",
     );

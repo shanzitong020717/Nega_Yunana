@@ -4,6 +4,7 @@ import {
   AuthRequiredError,
   ProfileSyncError,
 } from "@/lib/auth/auth-errors";
+import { shouldBypassAuthForE2E } from "@/lib/auth/e2e-bypass";
 import { createSupabaseServerClient } from "@/lib/auth/supabase-server";
 import { LOCAL_DEMO_PROFILE_ID } from "@/lib/auth/user-scope";
 
@@ -82,7 +83,10 @@ export async function requireAuthContextFromClients(
 }
 
 export async function requireAuthContext() {
-  if (process.env.NODE_ENV === "test" && !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (
+    shouldBypassAuthForE2E() ||
+    (process.env.NODE_ENV === "test" && !process.env.NEXT_PUBLIC_SUPABASE_URL)
+  ) {
     return {
       user: {
         id: "00000000-0000-0000-0000-000000000000",

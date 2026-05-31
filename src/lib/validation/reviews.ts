@@ -146,6 +146,88 @@ export const objectionFrameworkReviewSchema = z.object({
   coachingNote: nonEmptyString("异议框架建议不能为空"),
 });
 
+export const conversationTurnIssueSchema = z.object({
+  type: z.enum([
+    "answer_relevance",
+    "business_logic",
+    "missing_detail",
+    "overlong",
+    "grammar",
+    "word_choice",
+    "naturalness",
+    "tone",
+  ]),
+  severity: z.number().int().min(1).max(5),
+  summaryZh: nonEmptyString("逐轮问题摘要不能为空"),
+  evidence: nonEmptyString("逐轮问题证据不能为空"),
+  suggestionZh: nonEmptyString("逐轮问题建议不能为空"),
+});
+
+export const betterConversationResponseSchema = z.object({
+  english: nonEmptyString("推荐英文不能为空"),
+  chinese: nonEmptyString("推荐中文不能为空"),
+  reasonZh: nonEmptyString("推荐原因不能为空"),
+});
+
+export const conversationTurnReviewSchema = z.object({
+  id: nonEmptyString("逐轮分析 ID 不能为空"),
+  turnId: z.string().optional(),
+  pairedTurnId: z.string().optional(),
+  pairIndex: z.number().int().min(0),
+  speaker: z.enum(["ai_customer", "user"]),
+  text: nonEmptyString("对话内容不能为空"),
+  translationZh: nonEmptyString("中文翻译不能为空"),
+  timestamp: z.number().int().min(0),
+  intentZh: nonEmptyString("对话意图不能为空"),
+  roleInConversationZh: nonEmptyString("对话作用不能为空"),
+  customerNeedZh: z.string().optional(),
+  answerFit: z.enum(["good", "partial", "missed", "off_topic"]).optional(),
+  answerFitReasonZh: z.string().optional(),
+  strengths: z.array(z.string().min(1)).default([]),
+  issues: z.array(conversationTurnIssueSchema).default([]),
+  betterResponse: betterConversationResponseSchema.optional(),
+  relatedSentenceReviewIds: z.array(z.string().min(1)).default([]),
+  phrasebookCandidate: z
+    .object({
+      english: nonEmptyString("表达英文不能为空"),
+      chinese: nonEmptyString("表达中文不能为空"),
+      useCase: nonEmptyString("使用场景不能为空"),
+      tags: z.array(z.string().min(1)).default([]),
+    })
+    .optional(),
+});
+
+export const conversationStageReviewSchema = z.object({
+  stage: z.enum([
+    "opening",
+    "scenario_discovery",
+    "value_positioning",
+    "detail_answering",
+    "objection_handling",
+    "next_step",
+  ]),
+  labelZh: nonEmptyString("阶段名称不能为空"),
+  status: z.enum(["completed", "partial", "missing"]),
+  evidenceTurnIds: z.array(z.string().min(1)).default([]),
+  summaryZh: nonEmptyString("阶段总结不能为空"),
+  improvementZh: nonEmptyString("阶段建议不能为空"),
+});
+
+export const overallConversationFlowReviewSchema = z.object({
+  answeredCustomerNeedsZh: z.array(z.string().min(1)).default([]),
+  missedCustomerNeedsZh: z.array(z.string().min(1)).default([]),
+  strongestMomentZh: nonEmptyString("最强表现不能为空"),
+  weakestMomentZh: nonEmptyString("最弱表现不能为空"),
+  nextConversationStrategyZh: nonEmptyString("下一次会谈策略不能为空"),
+});
+
+export const conversationReviewSchema = z.object({
+  summaryZh: nonEmptyString("对话回放总结不能为空"),
+  turns: z.array(conversationTurnReviewSchema).default([]),
+  stages: z.array(conversationStageReviewSchema).default([]),
+  overallFlow: overallConversationFlowReviewSchema,
+});
+
 export const weaknessUpdateInputSchema = z.object({
   type: z.enum(
     [
@@ -187,6 +269,7 @@ export const createReviewInputSchema = z.object({
   sentenceReviews: z.array(sentenceReviewSchema).default([]),
   sentenceUpgrades: z.array(sentenceUpgradeSchema).default([]),
   suggestedAnswers: z.array(suggestedAnswerRecordSchema).default([]).optional(),
+  conversationReview: conversationReviewSchema.optional(),
   materialCoverage: materialCoverageSchema,
   objectionFramework: objectionFrameworkReviewSchema.optional(),
   phrasebookSuggestions: z.array(createPhraseInputSchema).default([]),
@@ -206,5 +289,15 @@ export type SentenceHighlight = z.infer<typeof sentenceHighlightSchema>;
 export type ReviewVocabularyItem = z.infer<typeof reviewVocabularyItemSchema>;
 export type SentenceReview = z.infer<typeof sentenceReviewSchema>;
 export type ReviewSnapshot = z.infer<typeof reviewSnapshotSchema>;
+export type ConversationTurnIssue = z.infer<
+  typeof conversationTurnIssueSchema
+>;
+export type ConversationTurnReview = z.infer<
+  typeof conversationTurnReviewSchema
+>;
+export type ConversationStageReview = z.infer<
+  typeof conversationStageReviewSchema
+>;
+export type ConversationReview = z.infer<typeof conversationReviewSchema>;
 export type CreateReviewInput = z.infer<typeof createReviewInputSchema>;
 export type PracticeReviewPayload = z.infer<typeof createReviewInputSchema>;
