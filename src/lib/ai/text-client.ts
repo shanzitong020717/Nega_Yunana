@@ -1,0 +1,490 @@
+import { normalizeOpenAIApiKey, normalizeOpenAIBaseURL } from "@/lib/ai/openai-client";
+import { recordAiCallDiagnostic } from "@/lib/ai/diagnostics";
+
+type GenerateTextJSONInput = {
+  diagnostics?: {
+    feature?: string;
+    metadata?: Record<string, unknown>;
+    sessionId?: string;
+    userId?: string;
+  };
+  fallbackModels?: string[];
+  maxRetries?: number;
+  maxTokens?: number;
+  model?: string;
+  prompt: string;
+  retryDelayMs?: number;
+  schemaName: string;
+  timeoutMs?: number;
+};
+
+const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_DEEPSEEK_MODEL = "deepseek-v4-pro";
+const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_MAX_RETRIES = 1;
+const DEFAULT_RETRY_DELAY_MS = 200;
+
+export const TEXT_ANALYSIS_PROVIDER_NAME = "DeepSeek";
+export const TEXT_ANALYSIS_BOUNDARY =
+  "DeepSeek text analysis boundary: Use DeepSeek only for offline JSON text analysis outside the realtime audio loop. Do not use it for live microphone/audio turns.";
+
+function configuredTextApiKey() {
+  return (
+    normalizeOpenAIApiKey(process.env.DEEPSEEK_API_KEY) ??
+    normalizeOpenAIApiKey(process.env.OPENAI_API_KEY)
+  );
+}
+
+export function hasTextAIApiKey() {
+  return Boolean(configuredTextApiKey());
+}
+
+export function getTextAIBaseURL() {
+  return (
+    normalizeOpenAIBaseURL(process.env.DEEPSEEK_BASE_URL) ??
+    normalizeOpenAIBaseURL(process.env.OPENAI_BASE_URL) ??
+    DEFAULT_DEEPSEEK_BASE_URL
+  );
+}
+
+export function getTextAIModel() {
+  return (
+    process.env.DEEPSEEK_TEXT_MODEL?.trim() ||
+    process.env.OPENAI_TEXT_MODEL?.trim() ||
+    DEFAULT_DEEPSEEK_MODEL
+  );
+}
+
+function extractJSONContent(content: string) {
+  const trimmedContent = content.trim();
+
+  if (trimmedContent.startsWith("```")) {
+    return trimmedContent
+      .replace(/^```(?:json)?\s*/i, "")
+      .replace(/\s*```$/, "")
+      .trim();
+  }
+
+  return trimmedContent;
+}
+
+function retryCountFrom(input: GenerateTextJSONInput) {
+  const configuredRetryCount =
+    input.maxRetries ?? process.env.TEXT_AI_MAX_RETRIES;
+
+  if (configuredRetryCount === undefined || configuredRetryCount === "") {
+    return DEFAULT_MAX_RETRIES;
+  }
+
+  const rawRetryCount = Number(configuredRetryCount);
+  if (!Number.isFinite(rawRetryCount)) {
+    return DEFAULT_MAX_RETRIES;
+  }
+
+  return Math.max(0, Math.min(3, Math.floor(rawRetryCount)));
+}
+
+function retryDelayFrom(input: GenerateTextJSONInput) {
+  const configuredDelay = input.retryDelayMs ?? process.env.TEXT_AI_RETRY_DELAY_MS;
+
+  if (configuredDelay === undefined || configuredDelay === "") {
+    return DEFAULT_RETRY_DELAY_MS;
+  }
+
+  const rawDelay = Number(configuredDelay);
+  if (!Number.isFinite(rawDelay)) {
+    return DEFAULT_RETRY_DELAY_MS;
+  }
+
+  return Math.max(0, Math.min(2_000, Math.floor(rawDelay)));
+}
+
+function parseModelList(value?: string | string[]) {
+  const rawValues = Array.isArray(value) ? value : value?.split(",");
+
+  return (
+    rawValues
+      ?.map((model) => model.trim())
+      .filter((model): model is string => model.length > 0) ?? []
+  );
+}
+
+function dedupeModels(models: string[]) {
+  const seenModels = new Set<string>();
+
+  return models.filter((model) => {
+    const modelKey = model.toLowerCase();
+    if (seenModels.has(modelKey)) {
+      return false;
+    }
+
+    seenModels.add(modelKey);
+    return true;
+  });
+}
+
+function modelCandidatesFrom(input: GenerateTextJSONInput) {
+  const configuredDefaultModel = getTextAIModel();
+  const primaryModel = input.model ?? configuredDefaultModel;
+  const fallbackModels = [
+    ...parseModelList(input.fallbackModels),
+    ...parseModelList(process.env.TEXT_AI_FALLBACK_MODELS),
+  ];
+
+  if (primaryModel !== configuredDefaultModel) {
+    fallbackModels.push(configuredDefaultModel);
+  }
+
+  return {
+    primaryModel,
+    modelCandidates: dedupeModels([primaryModel, ...fallbackModels]),
+  };
+}
+
+function diagnosticsMetadataWithModelFallback(input: {
+  attemptedModels: string[];
+  finalModel: string;
+  metadata?: Record<string, unknown>;
+  primaryModel: string;
+}) {
+  return {
+    ...input.metadata,
+    attemptedModels: input.attemptedModels,
+    fallbackUsed: input.finalModel !== input.primaryModel,
+    primaryModel: input.primaryModel,
+  };
+}
+
+function wait(ms: number) {
+  return ms > 0
+    ? new Promise((resolve) => {
+        setTimeout(resolve, ms);
+      })
+    : Promise.resolve();
+}
+
+class TextGenerationHTTPError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "TextGenerationHTTPError";
+  }
+}
+
+function featureFromSchemaName(schemaName: string) {
+  return schemaName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+}
+
+function classifyTextGenerationError(error: unknown) {
+  if (error instanceof TextGenerationHTTPError) {
+    if (error.status === 429) {
+      return {
+        errorType: "rate_limit",
+        httpStatus: error.status,
+        errorMessage: error.message,
+      };
+    }
+
+    if (error.status >= 500) {
+      return {
+        errorType: "upstream_5xx",
+        httpStatus: error.status,
+        errorMessage: error.message,
+      };
+    }
+
+    return {
+      errorType: "http_error",
+      httpStatus: error.status,
+      errorMessage: error.message,
+    };
+  }
+
+  if (!(error instanceof Error)) {
+    return {
+      errorType: "unknown_error",
+      errorMessage: "Unknown text generation error.",
+    };
+  }
+
+  if (error.name === "AbortError" || error.message.includes("timed out")) {
+    return {
+      errorType: "timeout",
+      errorMessage: error.message,
+    };
+  }
+
+  if (error.message.includes("invalid JSON")) {
+    return {
+      errorType: "invalid_json",
+      errorMessage: error.message,
+    };
+  }
+
+  if (error.message.includes("returned no content")) {
+    return {
+      errorType: "empty_response",
+      errorMessage: error.message,
+    };
+  }
+
+  if (
+    error.message.includes("fetch failed") ||
+    error.message.includes("network")
+  ) {
+    return {
+      errorType: "network_error",
+      errorMessage: error.message,
+    };
+  }
+
+  return {
+    errorType: error.name || "text_generation_error",
+    errorMessage: error.message,
+  };
+}
+
+function isRetryableTextGenerationError(error: unknown) {
+  if (error instanceof TextGenerationHTTPError) {
+    return [408, 409, 429, 500, 502, 503, 504].includes(error.status);
+  }
+
+  if (!(error instanceof Error)) {
+    return true;
+  }
+
+  return (
+    error.name === "AbortError" ||
+    error.message.includes("timed out") ||
+    error.message.includes("fetch failed") ||
+    error.message.includes("network") ||
+    error.message.includes("returned no content") ||
+    error.message.includes("returned invalid JSON")
+  );
+}
+
+async function requestTextJSON(input: GenerateTextJSONInput) {
+  const apiKey = configuredTextApiKey();
+
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY or OPENAI_API_KEY is required.");
+  }
+
+  const controller =
+    input.timeoutMs && input.timeoutMs > 0 ? new AbortController() : null;
+  const timeoutId = controller
+    ? setTimeout(() => controller.abort(), input.timeoutMs)
+    : null;
+
+  try {
+    const response = await fetch(`${getTextAIBaseURL()}/chat/completions`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      signal: controller?.signal,
+      body: JSON.stringify({
+        model: input.model ?? getTextAIModel(),
+        messages: [
+          {
+            role: "system",
+            content:
+              "You return valid JSON only. Do not include Markdown fences or explanatory text.",
+          },
+          {
+            role: "user",
+            content: input.prompt,
+          },
+        ],
+        response_format: {
+          type: "json_object",
+        },
+        max_tokens: input.maxTokens ?? DEFAULT_MAX_TOKENS,
+        temperature: 0.2,
+      }),
+    });
+
+    let payload: {
+      choices?: Array<{ message?: { content?: string } }>;
+      error?: { message?: string };
+    };
+
+    try {
+      payload = (await response.json()) as typeof payload;
+    } catch (error) {
+      throw new Error(
+        `${input.schemaName} generation returned invalid response JSON.`,
+        { cause: error },
+      );
+    }
+
+    if (!response.ok) {
+      throw new TextGenerationHTTPError(
+        payload.error?.message ??
+          `${input.schemaName} generation failed with status ${response.status}.`,
+        response.status,
+      );
+    }
+
+    const content = payload.choices?.[0]?.message?.content;
+
+    if (!content) {
+      throw new Error(`${input.schemaName} generation returned no content.`);
+    }
+
+    try {
+      return JSON.parse(extractJSONContent(content)) as unknown;
+    } catch (error) {
+      throw new Error(
+        `${input.schemaName} generation returned invalid JSON content.`,
+        { cause: error },
+      );
+    }
+  } catch (error) {
+    if (controller?.signal.aborted) {
+      throw new Error(
+        `${input.schemaName} generation timed out after ${input.timeoutMs}ms.`,
+      );
+    }
+
+    throw error;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
+export async function generateTextJSON(input: GenerateTextJSONInput) {
+  const maxRetries = retryCountFrom(input);
+  const retryDelayMs = retryDelayFrom(input);
+  const startedAt = Date.now();
+  const { modelCandidates, primaryModel } = modelCandidatesFrom(input);
+  const attemptedModels: string[] = [];
+  const feature =
+    input.diagnostics?.feature ?? featureFromSchemaName(input.schemaName);
+  let attemptCount = 0;
+  let lastError: unknown;
+  let lastModel = primaryModel;
+
+  for (const model of modelCandidates) {
+    lastModel = model;
+    attemptedModels.push(model);
+
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      attemptCount += 1;
+
+      try {
+        const result = await requestTextJSON({
+          ...input,
+          model,
+        });
+
+        recordAiCallDiagnostic({
+          attemptCount,
+          durationMs: Date.now() - startedAt,
+          feature,
+          maxRetries,
+          metadata: diagnosticsMetadataWithModelFallback({
+            attemptedModels,
+            finalModel: model,
+            metadata: input.diagnostics?.metadata,
+            primaryModel,
+          }),
+          model,
+          provider: TEXT_ANALYSIS_PROVIDER_NAME,
+          schemaName: input.schemaName,
+          sessionId: input.diagnostics?.sessionId,
+          status: "success",
+          timeoutMs: input.timeoutMs,
+          userId: input.diagnostics?.userId,
+        });
+
+        return result;
+      } catch (error) {
+        lastError = error;
+        const hasMoreAttemptsForCurrentModel = attempt < maxRetries;
+        const hasMoreModels =
+          modelCandidates.indexOf(model) < modelCandidates.length - 1;
+        const isRetryableError = isRetryableTextGenerationError(error);
+
+        if (hasMoreAttemptsForCurrentModel && isRetryableError) {
+          console.warn(
+            `${input.schemaName} generation failed on attempt ${attempt + 1} with ${model}; retrying.`,
+            error,
+          );
+          await wait(retryDelayMs);
+          continue;
+        }
+
+        if (hasMoreModels && isRetryableError) {
+          console.warn(
+            `${input.schemaName} generation failed with ${model}; switching fallback model.`,
+            error,
+          );
+          break;
+        }
+
+        const classifiedError = classifyTextGenerationError(error);
+
+        recordAiCallDiagnostic({
+          attemptCount,
+          durationMs: Date.now() - startedAt,
+          errorMessage: classifiedError.errorMessage,
+          errorType: classifiedError.errorType,
+          feature,
+          httpStatus: classifiedError.httpStatus,
+          maxRetries,
+          metadata: diagnosticsMetadataWithModelFallback({
+            attemptedModels,
+            finalModel: model,
+            metadata: input.diagnostics?.metadata,
+            primaryModel,
+          }),
+          model,
+          provider: TEXT_ANALYSIS_PROVIDER_NAME,
+          schemaName: input.schemaName,
+          sessionId: input.diagnostics?.sessionId,
+          status: "error",
+          timeoutMs: input.timeoutMs,
+          userId: input.diagnostics?.userId,
+        });
+        throw error;
+      }
+    }
+  }
+
+  if (lastError) {
+    const classifiedError = classifyTextGenerationError(lastError);
+
+    recordAiCallDiagnostic({
+      attemptCount,
+      durationMs: Date.now() - startedAt,
+      errorMessage: classifiedError.errorMessage,
+      errorType: classifiedError.errorType,
+      feature,
+      httpStatus: classifiedError.httpStatus,
+      maxRetries,
+      metadata: diagnosticsMetadataWithModelFallback({
+        attemptedModels,
+        finalModel: lastModel,
+        metadata: input.diagnostics?.metadata,
+        primaryModel,
+      }),
+      model: lastModel,
+      provider: TEXT_ANALYSIS_PROVIDER_NAME,
+      schemaName: input.schemaName,
+      sessionId: input.diagnostics?.sessionId,
+      status: "error",
+      timeoutMs: input.timeoutMs,
+      userId: input.diagnostics?.userId,
+    });
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(`${input.schemaName} generation failed.`);
+}

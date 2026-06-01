@@ -6,6 +6,8 @@ node_modules/
 dist/
 build/
 out/
+*.tsbuildinfo
+src/generated/prisma/
 
 # Environment
 .env
@@ -15,6 +17,8 @@ out/
 # Local uploads and storage
 uploads/
 storage/
+.worktrees/
+.superpowers/
 
 # Logs
 *.log
@@ -23,7 +27,14 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Test artifacts
+test-results/
+playwright-report/
+
 # OS / editor
 .DS_Store
 .vscode/
 .idea/
+
+/src/generated/prisma
+.vercel
